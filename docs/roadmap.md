@@ -45,7 +45,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] Ablation study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off; +token features
 - [x] Baselines on identical features: Bernoulli NB (binary features, not Multinomial), Decision Tree, Logistic Regression, linear SVM, Random Forest
 - [x] Metrics: macro-F1, per-language F1, confusion matrix, on CV, test, and wild sets (wild when available)
-- [ ] YAML config system + seed control (with the ablation runner)
+- [x] YAML config system + seed control (`configs/*.yaml`, settings hash in results)
 - [x] Auto-generated `docs/results.md`
 - [x] Confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
 - [x] Embedded-language rule for HTML (windows that are mostly `<script>`)
