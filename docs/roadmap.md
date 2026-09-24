@@ -38,11 +38,12 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M2 — Features & baselines
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-**Status:** baselines, data checks and stable split done (best: logistic regression, CV macro-F1 0.917, repeated test 0.931 ± 0.007 on dataset v5; see [results.md](results.md)). Ablations next.
+**Status:** baselines, data checks and stable split done (best: logistic regression, CV macro-F1 0.917, repeated test 0.931 ± 0.007 on dataset v5; see [results.md](results.md)). Ablation runner done; first finding: bigrams alone reach CV 0.944 (see [ablations.md](ablations.md)). Selection and token features next.
 
 - [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
 - [ ] Token-level features (keywords, identifiers shape, indentation stats) as optional feature block
-- [ ] Ablation study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off; +token features
+- [x] Ablation runner + first study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off ([ablations.md](ablations.md))
+- [ ] Ablation: discriminative vocabulary selection (frequency ranking picks generic n-grams, issues-and-fixes M6), token features, larger M
 - [x] Baselines on identical features: Bernoulli NB (binary features, not Multinomial), Decision Tree, Logistic Regression, linear SVM, Random Forest
 - [x] Metrics: macro-F1, per-language F1, confusion matrix, on CV, test, and wild sets (wild when available)
 - [x] YAML config system + seed control (`configs/*.yaml`, settings hash in results)

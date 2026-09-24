@@ -51,7 +51,7 @@ Pre-alpha. Full plan in [docs/roadmap.md](docs/roadmap.md).
 | --- | --- |
 | M0 Foundations | done |
 | M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
-| M2 Features & baselines | in progress: best baseline CV macro-F1 0.917, repeated test 0.931 ([results](docs/results.md)) |
+| M2 Features & baselines | in progress: best baseline CV macro-F1 0.917, repeated test 0.931 ([results](docs/results.md)); ablations running ([ablations](docs/ablations.md)) |
 | M3 TM training | planned |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |
