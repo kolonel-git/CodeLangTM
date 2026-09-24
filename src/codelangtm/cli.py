@@ -50,7 +50,33 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--out", type=Path, default=Path("data/processed/audit.md"))
     audit.add_argument("--samples", type=int, default=10, help="samples per language")
     audit.add_argument("--seed", type=int, default=0)
+
+    base = sub.add_parser("baselines", help="train and evaluate classical baselines")
+    base.add_argument("--data", type=Path, default=Path("data/processed"))
+    base.add_argument(
+        "--model", action="append",
+        help="naive_bayes, decision_tree, logistic_regression, linear_svm or random_forest "
+        "(repeatable; default: all)",
+    )  # fmt: skip
+    base.add_argument("--features", type=int, default=500, help="binary features (M)")
+    base.add_argument("--seed", type=int, default=0)
+    base.add_argument("--out", type=Path, default=Path("docs/results.md"))
     return parser
+
+
+def _baselines(args: argparse.Namespace) -> int:
+    from .baselines import best_by_cv, render_results_md, run_baselines, summary_table
+
+    try:
+        results, meta = run_baselines(args.data, args.model, args.features, args.seed)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"baselines failed: {e}", file=sys.stderr)
+        return 1
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(render_results_md(results, meta), encoding="utf-8")
+    print(summary_table(results))
+    print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {args.out}")
+    return 0
 
 
 def _data_audit(args: argparse.Namespace) -> int:
@@ -135,6 +161,8 @@ def main(argv: list[str] | None = None) -> int:
         return _data_build(args)
     if args.command == "data" and args.data_command == "audit":
         return _data_audit(args)
+    if args.command == "baselines":
+        return _baselines(args)
     parser.print_help()
     return 0
 
