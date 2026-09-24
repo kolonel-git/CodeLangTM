@@ -15,6 +15,10 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+data/cache/
+
+# Secrets
+.env
 
 # Models / build outputs
 *.pkl

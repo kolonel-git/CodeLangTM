@@ -1,18 +1,18 @@
 # CodeLangTM — Progress Log
 
-Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); this file records what is done and what is next.
+Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-24
-**Current milestone:** M1 — Data pipeline
-**Overall:** M0 complete, M1 in progress (schema done)
+**Current milestone:** M1 → M2 (M1 Stage A done once `feat/data-build` is merged)
+**Overall:** M0 complete, M1 Stage A complete (dataset v3: 861 snippets, [dataset card](docs/dataset-card.md))
 
 ## Milestone overview
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | Next | Real-world data only |
-| M2 Features & baselines | Planned | |
+| M1 Data pipeline | Stage A done | v3: 861 snippets, 196 repos; Stage B items deferred |
+| M2 Features & baselines | Next | |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -28,16 +28,58 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: dataset loader + tests on tiny fixtures (JSONL in `data.py`)
 - [x] M1: window extractor (20-50 contiguous lines), dedup, label sanity check
 - [x] M1: group-by-repo split + k-fold
-- [ ] M1: `codelangtm data build` command chaining windows → label check → dedup → split over a local folder
-- [ ] M1: GitHub collector (permissive licenses only; token from env var)
-- [ ] M1: public-dataset loaders (The Stack, CodeSearchNet), wild set
-- [ ] M1: Stage A dataset (1,000 snippets) + dataset card
-- [ ] Log every data source in [docs/data-sources.md](docs/data-sources.md)
+- [x] M1: GitHub collector (permissive licenses only; token from env var)
+- [x] M1: smoke-test collector against real GitHub (4 Python snippets, 2 Apache-2.0 repos, 0 drops)
+- [x] M1: `codelangtm data build` command: merge sources → split → write train/test/wild
+- [x] M1: Stage A collection run + review drop counts per language
+- [x] M1: `data build` on Stage A data
+- [x] M1: template-heavy SQL/HTML filter
+- [x] M1: `data audit` command + manual sample review
+- [x] M1: fix windows cutting comments/strings; re-collect (dataset v3)
+- [x] M1: re-skim regenerated `audit.md` (no problems found)
+- [x] M1: dataset card (`docs/dataset-card.md`) + ledger rows in [docs/data-sources.md](docs/data-sources.md)
+- [ ] M1: push `feat/data-build`, open PR, merge → M1 Stage A done
+- [ ] M2: harden Binarizer (save/load, deterministic vocabulary) + feature matrix from dataset v3
+- [ ] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
+- [ ] M2: confident-learning check + shortcut probe on baseline features
+- [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
+- [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-24 — Dataset card, M1 Stage A closed
+- Manual re-review of v3 audit samples: no problems found.
+- `docs/dataset-card.md` (Datasheets for Datasets structure): composition per language, collection and cleaning steps with drop counts, splits, licensing (MIT 505, Apache-2.0 315, BSD 41), known biases (SQL star floor 10 and imbalance, test-file share up to 40% for Go, 20-50 line windows only), intended use, reproduction commands, v3 file hashes.
+- `docs/data-sources.md` ledger rows for the two GitHub collection runs; roadmap M1 ticked, Stage B items marked deferred; README status updated.
+- Stage A target was 1,000 snippets; reached 861 (SQL limited by permissive repos). Accepted and documented.
+
+### 2026-09-24 — Stage A data quality: templates, audit, cut comments (M1)
+Details and numbers in [docs/issues-and-fixes.md](docs/issues-and-fixes.md) (D1-D4, W3).
+- Stage A v1: 829 snippets; SQL only 40 from 10 repos. SQL top-up with `--min-stars 10` → 77 from 21 repos.
+- Template filter (`labels.py`): SQL/HTML windows > 30% Jinja/Liquid/ERB lines dropped (21: HTML 15, SQL 6).
+- `audit.py` + `codelangtm data audit`: per-language stats (repo share, comment ratio, test-file share, licenses), flags, and `data/processed/audit.md` with 10 seeded samples per language + GitHub permalinks. Header shows generation time.
+- Manual review found windows cutting through comments/docstrings (40 of 866). Added `syntax.py` scanner; windows now snap to boundaries outside comments/strings; label check flags cut snippets. Re-collected → v3: 861 snippets, 0 drops, audit flags: none.
+- Watch: Go test-file share 40% (idiomatic `_test.go`), SQL still smallest class (77 vs 124).
+- Tests: 117 passing, ruff clean.
+
+### 2026-09-24 — Dataset build command (M1)
+- Collector smoke test passed and pushed (`feat/github-collector`).
+- `build.py`: `build_dataset` = load all `.jsonl` under sources → label check → cross-source dedup (training data first, so wild copies of training snippets are dropped) → group-by-repo train/test → k-fold ids for train → leakage checks (train/test, main/wild) → thin-language warnings.
+- Writes `data/processed/{train,test,wild}.jsonl`, `folds.json`, `dataset.json` (counts, drops, params, SHA-256 per file).
+- CLI: `codelangtm data build [--source DIR] --out data/processed --test-size 0.2 --folds 5 --seed 0`.
+- Tests: 70 passing, ruff clean.
+
+### 2026-09-24 — GitHub collector (M1)
+- PR #1 merged (schema, windows, dedup, labels, splits).
+- Created read-only fine-grained GitHub token, stored in `GITHUB_TOKEN` user env var (verified: 5000/hr limit).
+- `github.py`: `GitHubClient` (token from env, rate-limit + 5xx retry, plain 403 fails fast, commit-pinned disk cache), `search_repos` (license allowlist, star bands, round-robin), `candidate_files` (extension + vendored/generated/minified/size filters), `collect_repo` (1 random window per file, label check), `collect_language` (repo caps, skips empty/broken repos, dedup, report).
+- CLI: `codelangtm collect github [--language X] --repos 25 --per-repo 5 --min-stars 50` writes `<lang>.jsonl` + `<lang>.manifest.json`.
+- Deps: `httpx` in new `collect` extra (+ dev group). `.gitignore`: `data/cache/`, `.env`.
+- Tests: 63 passing, all offline via `httpx.MockTransport`; includes a test that the token never appears in outputs.
+- Note: use `uv sync --extra tm --extra collect`; plain `uv sync` removes TMU from the venv.
 
 ### 2026-09-24 — Window extractor, dedup, label check, group split (M1)
 - `windows.py`: `extract_windows` (seeded, non-overlapping 20-50 line windows) + `is_low_signal` (blank / license / comment-only windows dropped).

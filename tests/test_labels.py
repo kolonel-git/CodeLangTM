@@ -1,7 +1,7 @@
 import pytest
 
 from codelangtm.data import Snippet
-from codelangtm.labels import check_label, filter_labels, language_from_path
+from codelangtm.labels import check_label, filter_labels, language_from_path, template_fraction
 
 PY = "import os\n\ndef f(x):\n    return x + 1\n"
 CPP = "#include <iostream>\nclass A {};\nint main() { std::cout << 1; }\n"
@@ -56,6 +56,31 @@ def test_required_markers():
     assert check_label(snip("<div>hi</div>\n", "html", "a.html")).ok
     assert not check_label(snip("hello world\n", "sql", "a.sql")).ok
     assert check_label(snip("SELECT 1 FROM t;\n", "sql", "a.sql")).ok
+
+
+DBT = "{% macro m() %}\n{{ config(x=1) }}\nselect *\nfrom {{ ref('a') }}\n{% endmacro %}\n"
+DBT_LIGHT = "select id,\n  name,\n  email\nfrom {{ ref('users') }}\nwhere active\n" * 2
+JEKYLL = "---\nlayout: page\n---\n<div>{{ page.title }}</div>\n<p>{% include x.html %}</p>\n"
+
+
+def test_template_fraction():
+    assert template_fraction(DBT) == pytest.approx(4 / 5)
+    assert template_fraction("---\nselect 1;\n") == 0.0  # `---` is a SQL comment
+    assert template_fraction("---\n<p>x</p>\n", front_matter=True) == 0.5
+
+
+def test_template_heavy_dropped():
+    assert "template-heavy" in check_label(snip(DBT, "sql", "m.sql")).reasons
+    assert "template-heavy" in check_label(snip(JEKYLL, "html", "i.html")).reasons
+
+
+def test_lightly_templated_kept():
+    assert check_label(snip(DBT_LIGHT, "sql", "m.sql")).ok  # 2 of 10 lines
+
+
+def test_template_check_only_for_sql_and_html():
+    rust = "fn main() {\n    println!(\"{{}}\", 1);\n    let v = vec![{{ 1 }}];\n}\n"
+    assert check_label(snip(rust, "rust", "a.rs")).ok
 
 
 def test_wild_skips_extension_check():

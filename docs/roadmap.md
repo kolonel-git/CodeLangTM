@@ -18,17 +18,20 @@ Ordered milestones, no fixed deadlines. Each milestone maps to a GitHub mileston
 
 Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch set added in Stage B: C, C#, TypeScript, Kotlin, PHP, Ruby, to stress confusable pairs (JS/TS, C/C++, Java/C#).
 
-- [ ] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
-- [ ] Collector: GitHub API, permissive licenses only (MIT / Apache-2.0 / BSD)
-- [ ] Loaders for public datasets (The Stack, CodeSearchNet) with license filter
-- [ ] Window extractor: contiguous 20-50 line windows from real files; skip near-empty / license-header-only windows
-- [ ] Dedup: exact hash + near-duplicate (MinHash or shingle Jaccard)
-- [ ] Label sanity check (extension vs content; drop mislabeled files, e.g. `.h` C vs C++)
-- [ ] Splits: group-by-repo train/test + stratified group k-fold CV
-- [ ] Wild test set: snippets from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
-- [ ] **Stage A:** 1,000 snippets (~125/language)
-- [ ] **Stage B:** scale to 10,000+ and add stretch languages
-- [ ] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
+**Status:** Stage A complete (dataset v3, 861 snippets, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred and do not block M2.
+
+- [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
+- [x] Collector: GitHub API, permissive licenses only (MIT / Apache-2.0 / BSD)
+- [ ] *Stage B:* loaders for public datasets (The Stack, CodeSearchNet) with license filter
+- [x] Window extractor: contiguous 20-50 line windows from real files; skip near-empty / license-header-only windows; never cut comments/strings
+- [x] Dedup: exact hash + near-duplicate (MinHash or shingle Jaccard)
+- [x] Label sanity check (extension vs content; drop mislabeled files, e.g. `.h` C vs C++; template-heavy SQL/HTML)
+- [x] Splits: group-by-repo train/test + stratified group k-fold CV
+- [x] Dataset audit: per-language stats, flags, manual sample review
+- [ ] *Stage B:* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
+- [x] **Stage A:** target 1,000 snippets (~125/language); reached 861 (SQL limited by available permissive repos)
+- [ ] *Stage B:* scale to 10,000+ and add stretch languages
+- [x] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
 
 **Exit:** `codelangtm data build` reproduces the dataset from configs; no repo appears in both train and test; every row has a license.
 

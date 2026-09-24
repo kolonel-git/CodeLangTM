@@ -27,12 +27,13 @@ dependencies = [
 # Needs a C compiler; see docs/architecture.md for WSL/Docker fallback.
 # TMU 0.8.x breaks on numpy 2.x (np.uint32(~0) overflow), so cap numpy/scipy.
 tm = ["tmu", "numpy<2", "scipy<1.14"]
+collect = ["httpx>=0.27"]
 
 [project.scripts]
 codelangtm = "codelangtm.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "httpx>=0.27"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/codelangtm"]
