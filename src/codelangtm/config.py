@@ -8,6 +8,7 @@ recorded in generated results.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
@@ -103,6 +104,77 @@ def parse_baselines(raw: dict | None) -> BaselinesConfig:
     if "repeats" in raw:
         cfg = replace(cfg, repeats=_int("config", "repeats", raw["repeats"], 0))
     return cfg
+
+
+@dataclass(frozen=True)
+class Study:
+    """One ablation: every combination of the varied feature options, the rest from `base`."""
+
+    name: str
+    settings: tuple[FeatureConfig, ...]
+    varied: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AblationConfig:
+    data: Path = Path("data/processed")
+    out: Path = Path("docs/ablations.md")
+    seed: int = 0
+    models: tuple[str, ...] = ("logistic_regression", "naive_bayes")
+    base: FeatureConfig = field(default_factory=FeatureConfig)
+    studies: tuple[Study, ...] = ()
+
+    def feature_settings(self) -> list[FeatureConfig]:
+        """Unique settings across all studies (base first), in first-seen order."""
+        seen = {self.base: None}
+        for study in self.studies:
+            seen.update(dict.fromkeys(study.settings))
+        return list(seen)
+
+
+def parse_study(name: str, raw: Any, base: FeatureConfig) -> Study:
+    section = f"studies.{name}"
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError(f"{section}: expected a mapping of feature option -> list of values")
+    _check_keys(section, raw, {f.name for f in fields(FeatureConfig)})
+    for key, values in raw.items():
+        if not isinstance(values, list) or not values:
+            raise ValueError(f"{section}.{key}: expected a non-empty list of values")
+    varied = tuple(raw)
+    settings = []
+    for combo in itertools.product(*(raw[k] for k in varied)):
+        options = {**config_dict(base), **dict(zip(varied, combo, strict=True))}
+        settings.append(parse_features(options, section))
+    return Study(name, tuple(dict.fromkeys(settings)), varied)
+
+
+def parse_ablations(raw: dict | None) -> AblationConfig:
+    raw = raw or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"config: expected a mapping, got {raw!r}")
+    _check_keys("config", raw, {f.name for f in fields(AblationConfig)})
+    base = parse_features(raw.get("base"), "base")
+    cfg = AblationConfig(base=base)
+    for key in ("data", "out"):
+        if key in raw:
+            if not isinstance(raw[key], str):
+                raise ValueError(f"config.{key}: expected a path string")
+            cfg = replace(cfg, **{key: Path(raw[key])})
+    if "seed" in raw:
+        cfg = replace(cfg, seed=_int("config", "seed", raw["seed"], 0))
+    if "models" in raw:
+        models = raw["models"]
+        if not (isinstance(models, list) and models and all(isinstance(m, str) for m in models)):
+            raise ValueError("config.models: expected a non-empty list of model names")
+        cfg = replace(cfg, models=tuple(models))
+    studies = raw.get("studies")
+    if not isinstance(studies, dict) or not studies:
+        raise ValueError("config.studies: expected a mapping of study name -> varied options")
+    return replace(cfg, studies=tuple(parse_study(n, s, base) for n, s in studies.items()))
+
+
+def load_ablation_config(path: str | Path) -> AblationConfig:
+    return parse_ablations(load_yaml(path))
 
 
 def load_yaml(path: str | Path) -> dict:

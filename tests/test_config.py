@@ -7,7 +7,9 @@ from codelangtm.config import (
     BaselinesConfig,
     FeatureConfig,
     config_hash,
+    load_ablation_config,
     load_baselines_config,
+    parse_ablations,
     parse_baselines,
     parse_features,
 )
@@ -83,6 +85,56 @@ def test_hash_tracks_settings():
     assert config_hash(a) == config_hash(BaselinesConfig())
     assert config_hash(a) != config_hash(a.with_overrides(seed=1))
     assert config_hash(a) != config_hash(a.with_overrides(n_features=250))
+
+
+def test_repo_ablation_config_parses():
+    cfg = load_ablation_config(REPO_CONFIG.with_name("ablations.yaml"))
+    assert cfg.base == FeatureConfig()  # ablations start from the baseline features
+    assert set(cfg.models) <= set(MODEL_NAMES)
+    assert cfg.feature_settings()[0] == cfg.base
+
+
+def test_study_is_product_of_varied_options():
+    cfg = parse_ablations({
+        "base": {"n_features": 500, "use_delimiters": False},
+        "studies": {"x": {"n_features": [100, 200], "ngram_sizes": [[2], [3, 3]]}},
+    })  # fmt: skip
+    (study,) = cfg.studies
+    assert study.varied == ("n_features", "ngram_sizes")
+    assert [(f.n_features, f.ngram_sizes) for f in study.settings] == [
+        (100, (2,)), (100, (3,)), (200, (2,)), (200, (3,)),
+    ]  # fmt: skip
+    assert all(f.use_delimiters is False for f in study.settings)  # rest from base
+
+
+def test_feature_settings_deduplicated_base_first():
+    cfg = parse_ablations({
+        "studies": {
+            "a": {"n_features": [100, 500]},
+            "b": {"n_features": [500, 100, 100]},
+        },
+    })  # fmt: skip
+    assert [f.n_features for f in cfg.feature_settings()] == [500, 100]
+    assert [f.n_features for f in cfg.studies[1].settings] == [500, 100]
+
+
+@pytest.mark.parametrize(
+    "raw, match",
+    [
+        ({}, "studies"),
+        ({"studies": {}}, "studies"),
+        ({"studies": {"a": {"n_feature": [1]}}}, "unknown key"),
+        ({"studies": {"a": {"n_features": 100}}}, "non-empty list"),
+        ({"studies": {"a": {"n_features": []}}}, "non-empty list"),
+        ({"studies": {"a": {"n_features": [0]}}}, "n_features"),
+        ({"studies": {"a": {}}}, "mapping"),
+        ({"studies": {"a": {"n_features": [1]}}, "models": []}, "models"),
+        ({"studies": {"a": {"n_features": [1]}}, "grid": 1}, "unknown key"),
+    ],
+)
+def test_invalid_ablation_config_rejected(raw, match):
+    with pytest.raises(ValueError, match=match):
+        parse_ablations(raw)
 
 
 def test_feature_config_builds_binarizer():

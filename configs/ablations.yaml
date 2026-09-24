@@ -1,0 +1,26 @@
+# M2 feature ablations. Regenerates docs/ablations.md:
+#   uv run codelangtm ablate                         # all studies
+#   uv run codelangtm ablate --study delimiters      # one study
+# Repo-grouped CV on train only; the test set is never used for feature choices.
+# Each study varies the listed options (every combination) and keeps the rest from `base`.
+
+data: data/processed
+out: docs/ablations.md
+seed: 0
+models: [logistic_regression, naive_bayes]   # first model drives the per-language tables
+
+base:                    # current baseline features (configs/baselines.yaml)
+  n_features: 500
+  ngram_sizes: [2, 3]
+  use_delimiters: true
+
+studies:
+  vocabulary_size:
+    n_features: [100, 250, 500, 1000]
+  ngram_sizes:
+    ngram_sizes: [[2], [3], [4], [2, 3], [2, 3, 4]]
+  delimiters:
+    use_delimiters: [true, false]
+  ngrams_x_vocabulary:   # longer n-grams may need a larger vocabulary
+    n_features: [250, 500, 1000]
+    ngram_sizes: [[2, 3], [2, 3, 4]]
