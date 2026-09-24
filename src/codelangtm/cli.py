@@ -44,7 +44,29 @@ def _build_parser() -> argparse.ArgumentParser:
     build.add_argument("--test-size", type=float, default=0.2)
     build.add_argument("--folds", type=int, default=5)
     build.add_argument("--seed", type=int, default=0)
+
+    audit = data_sub.add_parser("audit", help="per-language stats, flags and review samples")
+    audit.add_argument("--data", type=Path, default=Path("data/processed"))
+    audit.add_argument("--out", type=Path, default=Path("data/processed/audit.md"))
+    audit.add_argument("--samples", type=int, default=10, help="samples per language")
+    audit.add_argument("--seed", type=int, default=0)
     return parser
+
+
+def _data_audit(args: argparse.Namespace) -> int:
+    from .audit import run_audit, summary_table
+
+    try:
+        stats, flags = run_audit(args.data, args.out, args.samples, args.seed)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"data audit failed: {e}", file=sys.stderr)
+        return 1
+    print(summary_table(stats))
+    print("\nflags:" if flags else "\nflags: none")
+    for f in flags:
+        print(f"  - {f}")
+    print(f"\nreview file: {args.out}")
+    return 0
 
 
 def _data_build(args: argparse.Namespace) -> int:
@@ -111,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
         return _collect_github(args)
     if args.command == "data" and args.data_command == "build":
         return _data_build(args)
+    if args.command == "data" and args.data_command == "audit":
+        return _data_audit(args)
     parser.print_help()
     return 0
 
