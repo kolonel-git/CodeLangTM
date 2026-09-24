@@ -1,7 +1,14 @@
 import pytest
 
 from codelangtm.data import Snippet
-from codelangtm.labels import check_label, filter_labels, language_from_path, template_fraction
+from codelangtm.labels import (
+    HTML_TAG,
+    check_label,
+    filter_labels,
+    language_from_path,
+    markup_share,
+    template_fraction,
+)
 
 PY = "import os\n\ndef f(x):\n    return x + 1\n"
 CPP = "#include <iostream>\nclass A {};\nint main() { std::cout << 1; }\n"
@@ -81,6 +88,37 @@ def test_lightly_templated_kept():
 def test_template_check_only_for_sql_and_html():
     rust = "fn main() {\n    println!(\"{{}}\", 1);\n    let v = vec![{{ 1 }}];\n}\n"
     assert check_label(snip(rust, "rust", "a.rs")).ok
+
+
+SCRIPT_ONLY = "    var n = 0;\n    for (var i = 0; i < elements.length; i++) {\n" \
+    "        n += elements[i].value;\n    }\n    return n;\n"
+
+
+def test_html_tag_pattern():
+    for tag in ("<div>", "</p>", "<my-el attr>", "<br/>", "<!-- c -->", "<!DOCTYPE html>", "<a"):
+        assert HTML_TAG.search(tag), tag
+    for not_tag in ("i < elements.length", "a<b", "x <= 3", "if (a<b.c)"):
+        assert not HTML_TAG.search(not_tag), not_tag
+
+
+def test_markup_share():
+    assert markup_share("<div>\n  text\n</div>\n\n") == pytest.approx(2 / 3)
+    assert markup_share(SCRIPT_ONLY) == 0.0
+
+
+def test_script_only_html_dropped():
+    reasons = check_label(snip(SCRIPT_ONLY, "html", "a.html")).reasons
+    assert "expected markers missing" in reasons  # comparisons no longer count as tags
+
+
+def test_mostly_script_html_dropped():
+    text = "<script>\n" + SCRIPT_ONLY * 3 + "</script>\n"  # 2 tag lines of 17
+    assert "mostly embedded script/style" in check_label(snip(text, "html", "a.html")).reasons
+
+
+def test_html_with_some_markup_kept():
+    text = "<div id=\"x\">\n<script>\n" + SCRIPT_ONLY + "</script>\n</div>\n"  # 4 of 9 lines
+    assert check_label(snip(text, "html", "a.html")).ok
 
 
 def test_wild_skips_extension_check():
