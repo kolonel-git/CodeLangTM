@@ -59,7 +59,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M3 — Tsetlin Machine training
 **Goal:** working TMU classifier with fair comparison.
 
-- [ ] Verify TMU install (C backend; CUDA optional); document Windows/WSL/Docker path
+- [x] Verify TMU install: TMU 0.8.3 builds natively on Windows with `numpy<2` (see [architecture.md](architecture.md) install notes); CUDA optional
 - [ ] `TMLanguageClassifier` fit/predict/save/load with tests
 - [ ] Baseline run: N_c=100, T=30, s=3.5
 - [ ] Training curves (accuracy vs epoch); throughput
@@ -82,7 +82,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M5 — Explainability
 **Goal:** make the interpretability claim demonstrable.
 
-- [ ] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`)
+- [ ] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`); name features via `Binarizer.get_feature_names_out()` so word features read `word("SELECT")`, not the internal marker
 - [ ] Per-prediction explanation: `codelangtm predict --explain` shows winning clauses and vote totals
 - [ ] Rule quality metrics: length, coverage, precision, overlap between classes
 - [ ] HTML report: matched n-grams highlighted in the snippet, votes per language

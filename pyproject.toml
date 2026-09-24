@@ -20,8 +20,8 @@ classifiers = [
 dependencies = [
     "numpy>=1.26",
     "scikit-learn>=1.4",
-    "pandas>=2.1",
     "pyyaml>=6",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]

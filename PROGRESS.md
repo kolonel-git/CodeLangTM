@@ -4,7 +4,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 **Last updated:** 2026-09-24
 **Current milestone:** M2 — Features & baselines
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 baselines + data checks done: bar to beat = LR CV macro-F1 0.917, repeated test 0.931 ([results](docs/results.md))
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 baselines + data checks done (LR CV macro-F1 0.917, repeated test 0.931, [results](docs/results.md)); M2 ablations: label-aware feature selection reaches CV ~0.96 ([ablations](docs/ablations.md)); next: freeze the feature config
 
 ## Milestone overview
 
@@ -45,13 +45,13 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2: embedded-language rule for HTML (drop windows with < 20% markup lines; stricter tag pattern)
 - [x] M2: re-collect HTML → dataset v4; rerun build, baselines, diagnose; update dataset card + results
 - [x] M2: stable split (hash-based per-language repo assignment) + repeated-split test reporting → dataset v5
-- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [x] M2: push `feat/baselines`, open PR, merge (M2 part 1)
 - [x] M2 ablations step 1: YAML config system (`configs/baselines.yaml`, strict loader, settings hash in results)
 - [x] M2 ablations step 2: ablation runner (M, n-gram sizes, delimiters) → `docs/ablations.md`
 - [x] M2 ablations step 3: label-aware vocabulary selection (fixes M6 and M5), word tokens (no gain), larger M (no gain once selection is on)
 - [ ] M2 ablations step 4: run, analyse, freeze the feature config for M3
-- [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
+- [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end; first cheap win: test delimiters by substring, see issues-and-fixes M2)
+- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 

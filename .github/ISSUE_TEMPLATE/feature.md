@@ -8,4 +8,4 @@ labels: enhancement
 
 **Proposed solution**
 
-**Roadmap phase** (1-4 / future extension)
+**Roadmap milestone** (M1-M7 in docs/roadmap.md, or Future)
