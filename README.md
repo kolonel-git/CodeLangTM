@@ -1,6 +1,6 @@
 # CodeLangTM
 
-[![CI](https://github.com/OWNER/CodeLangTM/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/CodeLangTM/actions)
+[![CI](https://github.com/kolonel-git/CodeLangTM/actions/workflows/ci.yml/badge.svg)](https://github.com/kolonel-git/CodeLangTM/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 
@@ -45,7 +45,18 @@ uv run pytest
 
 ## Status
 
-Pre-alpha. See [docs/roadmap.md](docs/roadmap.md).
+Pre-alpha. Full plan in [docs/roadmap.md](docs/roadmap.md).
+
+| Milestone | Status |
+| --- | --- |
+| M0 Foundations | done |
+| M1 Data pipeline | next |
+| M2 Features & baselines | planned |
+| M3 TM training | planned |
+| M4 Tuning & compression | planned |
+| M5 Explainability | planned |
+| M6 Deployment & benchmarks | planned |
+| M7 Showcase & release | planned |
 
 ## License
 
