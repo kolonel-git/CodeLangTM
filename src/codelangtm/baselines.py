@@ -185,7 +185,9 @@ def run_baselines(
     seed: int = 0,
     languages: Sequence[str] = LANGUAGES,
     repeats: int = 10,
+    binarizer: Binarizer | None = None,
 ) -> tuple[list[ModelResult], dict]:
+    """`binarizer` (unfitted) sets all feature options; if omitted, `Binarizer(n_features)`."""
     data_dir = Path(data_dir)
     dataset = load_dataset(data_dir)
     folds = load_folds(data_dir)
@@ -193,7 +195,7 @@ def run_baselines(
     unknown = set(models or ()) - set(available)
     if unknown:
         raise ValueError(f"unknown model(s): {sorted(unknown)}")
-    binarizer = Binarizer(n_features=n_features)
+    binarizer = binarizer or Binarizer(n_features=n_features)
     results = [
         evaluate_model(name, available[name], dataset, folds, binarizer, languages, repeats)
         for name in (models or available)
@@ -212,7 +214,12 @@ def run_baselines(
         "n_test": len(dataset["test"]),
         "n_wild": len(dataset.get("wild", [])),
         "n_folds": len(set(folds.tolist())),
-        "n_features": n_features,
+        "n_features": binarizer.n_features,
+        "features": {
+            "n_features": binarizer.n_features,
+            "ngram_sizes": list(binarizer.ngram_sizes),
+            "use_delimiters": binarizer.use_delimiters,
+        },
         "seed": seed,
         "repeats": repeats,
         "split": split_params,
@@ -273,6 +280,23 @@ def _split_text(params: dict) -> str:
     return "repo-grouped (StratifiedGroupKFold)" if params else "n/a"
 
 
+def _features_text(meta: dict) -> str:
+    f = meta.get("features") or {"n_features": meta["n_features"], "ngram_sizes": [2, 3]}
+    sizes = ", ".join(str(n) for n in f["ngram_sizes"])
+    delims = "" if f.get("use_delimiters", True) else ", use_delimiters=False"
+    return f"`Binarizer(n_features={f['n_features']}, ngram_sizes=({sizes}){delims})`"
+
+
+def _config_text(meta: dict) -> str:
+    cfg = meta.get("config")
+    if not cfg:
+        return "n/a"
+    source = f"`{cfg['path']}`" if cfg.get("path") else "defaults"
+    if cfg.get("overrides"):
+        source += " + CLI overrides " + ", ".join(f"`{k}`" for k in cfg["overrides"])
+    return f"{source} (settings hash `{cfg['hash']}`)"
+
+
 def render_results_md(
     results: Sequence[ModelResult], meta: dict, languages: Sequence[str] = LANGUAGES
 ) -> str:
@@ -286,10 +310,10 @@ def render_results_md(
         "## Setup",
         "",
         f"- Generated: {meta['generated']}",
+        f"- Config: {_config_text(meta)}",
         f"- Dataset: `{meta['data_dir']}` (train {meta['n_train']}, test {meta['n_test']}, "
         f"wild {meta['n_wild']}); SHA-256 prefixes: {files}",
-        f"- Features: `Binarizer(n_features={meta['n_features']}, ngram_sizes=(2, 3))`, "
-        "refit inside every fold",
+        f"- Features: {_features_text(meta)}, refit inside every fold",
         f"- Split: {_split_text(meta.get('split', {}))}",
         f"- Protocol: {meta['n_folds']}-fold repo-grouped CV on train (model selection), then "
         "refit on all of train and score test once",

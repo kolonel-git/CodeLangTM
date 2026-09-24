@@ -1,0 +1,14 @@
+# M2 classical baselines. Regenerates docs/results.md:
+#   uv run codelangtm baselines --config configs/baselines.yaml
+# CLI flags (--model, --features, --seed, --repeats, --data, --out) override values here.
+
+data: data/processed
+out: docs/results.md
+seed: 0          # model seeds (decision tree, SVM, random forest)
+repeats: 10      # extra repo-level splits for the repeated test score (0 = off)
+models: [naive_bayes, decision_tree, logistic_regression, linear_svm, random_forest]
+
+features:
+  n_features: 500        # vocabulary size M (delimiters first, then top n-grams)
+  ngram_sizes: [2, 3]    # character n-gram lengths
+  use_delimiters: true   # always include ; { } ( ) // # etc.
