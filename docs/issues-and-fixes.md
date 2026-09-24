@@ -14,6 +14,18 @@ v3 audit: no flags; largest single repo <= 6% of any language; median windows 0-
 
 ---
 
+## Modelling
+
+### M1. Feature vocabulary could leak across CV folds
+- **Risk:** fitting the n-gram vocabulary once on all training data, then cross-validating, lets n-grams that appear only in the validation fold shape the features. A subtle leak that inflates CV scores.
+- **Fix:** `Binarizer` became a scikit-learn transformer inside `Pipeline([Binarizer, model])`, cloned per fold. A test spies on `Binarizer.fit` and asserts it never receives test or held-out fold snippets.
+
+### M2. Latency is dominated by feature extraction
+- **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible.
+- **Implication:** the < 0.1 ms target is a feature-extraction problem. Planned: faster Python binarization in M2, and C feature extraction in M6.
+
+---
+
 ## Data quality
 
 ### D4. Windows cut through comments and strings
@@ -69,6 +81,10 @@ v3 audit: no flags; largest single repo <= 6% of any language; median windows 0-
 ---
 
 ## Tooling & workflow
+
+### W4. `±` printed as `�` in the console
+- **Root cause:** Windows console uses cp1252, which cannot encode `±`.
+- **Fix:** console tables use ASCII `+/-`; generated Markdown files (UTF-8) keep `±`.
 
 ### W3. Audit file looked stale
 - **Symptom:** after regenerating, `audit.md` appeared unchanged in the editor.

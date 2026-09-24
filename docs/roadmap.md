@@ -38,13 +38,17 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M2 — Features & baselines
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-- [ ] Harden Binarizer (fit/transform tests, sparse-safe, deterministic vocabulary, save/load)
+**Status:** baselines done (best: logistic regression, CV macro-F1 0.920, test 0.951; see [results.md](results.md)). Ablations and data checks next.
+
+- [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
 - [ ] Token-level features (keywords, identifiers shape, indentation stats) as optional feature block
 - [ ] Ablation study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off; +token features
-- [ ] Baselines on identical features: Multinomial NB, Decision Tree, Logistic Regression, linear SVM, Random Forest
-- [ ] Metrics: macro-F1, per-language F1, confusion matrix, on CV, test, and wild sets
-- [ ] YAML config system + seed control; `codelangtm eval --config ...`
-- [ ] Auto-generated `docs/results.md`
+- [x] Baselines on identical features: Bernoulli NB (binary features, not Multinomial), Decision Tree, Logistic Regression, linear SVM, Random Forest
+- [x] Metrics: macro-F1, per-language F1, confusion matrix, on CV, test, and wild sets (wild when available)
+- [ ] YAML config system + seed control (with the ablation runner)
+- [x] Auto-generated `docs/results.md`
+- [ ] Confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
+- [ ] Faster binarization (currently ~0.31 ms/snippet, ~100% of end-to-end latency)
 
 **Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.
 

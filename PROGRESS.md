@@ -3,8 +3,8 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-24
-**Current milestone:** M1 → M2 (M1 Stage A done once `feat/data-build` is merged)
-**Overall:** M0 complete, M1 Stage A complete (dataset v3: 861 snippets, [dataset card](docs/dataset-card.md))
+**Current milestone:** M2 — Features & baselines
+**Overall:** M0 complete, M1 Stage A complete (dataset v3: 861 snippets, [dataset card](docs/dataset-card.md)), M2 baselines done: bar to beat = CV macro-F1 0.920 ([results](docs/results.md))
 
 ## Milestone overview
 
@@ -12,7 +12,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v3: 861 snippets, 196 repos; Stage B items deferred |
-| M2 Features & baselines | Next | |
+| M2 Features & baselines | In progress | 5 baselines done; ablations + data checks next |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -38,10 +38,12 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: fix windows cutting comments/strings; re-collect (dataset v3)
 - [x] M1: re-skim regenerated `audit.md` (no problems found)
 - [x] M1: dataset card (`docs/dataset-card.md`) + ledger rows in [docs/data-sources.md](docs/data-sources.md)
-- [ ] M1: push `feat/data-build`, open PR, merge → M1 Stage A done
-- [ ] M2: harden Binarizer (save/load, deterministic vocabulary) + feature matrix from dataset v3
-- [ ] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
-- [ ] M2: confident-learning check + shortcut probe on baseline features
+- [x] M1: push `feat/data-build`, open PR, merge → M1 Stage A done (PR merged)
+- [x] M2: harden Binarizer (sklearn transformer, deterministic vocabulary, save/load, faster transform)
+- [x] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
+- [ ] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
+- [ ] M2: ablations (M, n-gram sizes, delimiters, token features) with YAML configs
+- [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 
@@ -49,6 +51,15 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — M2 baselines
+- `features.py`: `Binarizer` is now a scikit-learn transformer so the vocabulary is refit inside each CV fold (fitting it once on all train would leak validation n-grams). Alphabetical tie-break makes the vocabulary independent of input order; JSON save/load; `use_delimiters` switch for ablations; transform uses n-gram set lookups instead of substring search.
+- `baselines.py` + `codelangtm baselines`: 5 models as `Pipeline([Binarizer, model])`, 5-fold repo-grouped CV (model selection) then one test evaluation; macro-F1, accuracy, per-language F1, confusion matrix, fit time, end-to-end latency, pickled size → generated `docs/results.md` with dataset hashes and library versions.
+- Decision: Bernoulli NB instead of Multinomial NB (features are presence flags, not counts).
+- Results (dataset v3, M=500): logistic regression best by CV (0.920 ± 0.010, test 0.951); linear SVM 0.905; random forest 0.897 (10.8 MB); naive Bayes 0.853; decision tree 0.724 (SQL F1 0.22).
+- Findings: main confusion is C++ → Rust (4 of 21 C++ test snippets; shared `::`, `->`, braces); Go scores 1.00 everywhere (distinctive syntax, gofmt tabs); test F1 > CV for most models because test has only 39 repos, so CV is the more reliable number.
+- Latency: binarization takes ~0.31 ms/snippet, essentially all of the end-to-end time; model inference is negligible. The < 0.1 ms target depends on feature extraction speed (M6 C export).
+- Tests: 134 passing, all offline; includes a spy test proving the vocabulary never sees test or held-out fold snippets.
 
 ### 2026-09-24 — Dataset card, M1 Stage A closed
 - Manual re-review of v3 audit samples: no problems found.
@@ -131,11 +142,11 @@ Decisions made (recorded in roadmap):
 - **Timeline:** no deadlines
 
 ## Results log
-No experiments yet. Record each run here: date, config, dataset version, macro-F1 (CV / test / wild), latency, model size.
+Record each run here: date, config, dataset version, macro-F1 (CV / test / wild), latency, model size. Full tables in [docs/results.md](docs/results.md).
 
-| Date | Experiment | Dataset | Macro-F1 | Notes |
+| Date | Experiment | Dataset | Macro-F1 (CV / test) | Notes |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| 2026-09-24 | Baselines, M=500, 2/3-grams + delimiters | v3 | LR 0.920 / 0.951 (best) | SVM 0.905, RF 0.897, NB 0.853, DT 0.724; 0.31 ms/snippet (binarization-bound) |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.

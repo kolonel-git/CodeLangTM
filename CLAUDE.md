@@ -7,6 +7,9 @@ Tsetlin Machine (TMU) classifier that identifies a snippet's programming languag
 - `uv run pytest` — tests
 - `uv run ruff check .` — lint
 - `uv run codelangtm --version` — CLI
+- `uv run codelangtm collect github` / `data build` / `data audit` — dataset pipeline (see docs/data-sources.md)
+- `uv run codelangtm baselines` — classical baselines → docs/results.md
+- Always `uv sync --extra tm --extra collect` (plain `uv sync` removes TMU)
 
 ## Layout
 `src/codelangtm/`: `features.py` (binarizer + literals), `model.py` (TMU wrapper), `rules.py` (rule extraction), `export_c.py` (C export), `cli.py`.

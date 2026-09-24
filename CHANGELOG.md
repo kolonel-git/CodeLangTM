@@ -16,6 +16,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Dataset audit: stats, quality flags and review samples (`audit.py`, `codelangtm data audit`).
 - Comment/string scanner (`syntax.py`) so windows never start or end mid-comment.
 - Dataset card for Stage A v3 (`docs/dataset-card.md`) and source ledger entries.
+- Classical baselines with repo-grouped CV and generated `docs/results.md` (`baselines.py`, `codelangtm baselines`).
+
+### Changed
+- `Binarizer` is a scikit-learn transformer (refit per CV fold), with alphabetical tie-breaking, JSON save/load, a `use_delimiters` switch and set-based transform. When `n_features` is smaller than the delimiter list, delimiters are now truncated too.
 
 ### Fixed
 - TMU crash on NumPy 2: `tm` extra pins `numpy<2`, `scipy<1.14`.
