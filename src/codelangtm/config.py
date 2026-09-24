@@ -1,0 +1,140 @@
+"""YAML experiment configs: one file per experiment in `configs/`, validated strictly.
+
+Unknown keys and wrong types raise `ValueError`, so a typo cannot silently fall back to a
+default. `config_hash` fingerprints the effective settings (file + CLI overrides) and is
+recorded in generated results.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field, fields, replace
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from .features import Binarizer
+
+
+@dataclass(frozen=True)
+class FeatureConfig:
+    n_features: int = 500
+    ngram_sizes: tuple[int, ...] = (2, 3)
+    use_delimiters: bool = True
+
+    def binarizer(self) -> Binarizer:
+        return Binarizer(self.n_features, self.ngram_sizes, self.use_delimiters)
+
+
+@dataclass(frozen=True)
+class BaselinesConfig:
+    data: Path = Path("data/processed")
+    out: Path = Path("docs/results.md")
+    models: tuple[str, ...] | None = None  # None = all
+    seed: int = 0
+    repeats: int = 10
+    features: FeatureConfig = field(default_factory=FeatureConfig)
+
+    def with_overrides(self, **overrides: Any) -> BaselinesConfig:
+        """Apply CLI overrides; `None` means "not given". `n_features` targets the feature block."""
+        given = {k: v for k, v in overrides.items() if v is not None}
+        cfg = self
+        if "n_features" in given:
+            cfg = replace(cfg, features=replace(cfg.features, n_features=given.pop("n_features")))
+        if "models" in given:
+            given["models"] = tuple(given["models"])
+        return replace(cfg, **given)
+
+
+def _check_keys(section: str, raw: dict, allowed: set[str]) -> None:
+    unknown = set(raw) - allowed
+    if unknown:
+        raise ValueError(f"{section}: unknown key(s) {sorted(unknown)}; allowed: {sorted(allowed)}")
+
+
+def _int(section: str, key: str, value: Any, minimum: int) -> int:
+    # bool is an int subclass; reject it explicitly
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValueError(f"{section}.{key}: expected an integer >= {minimum}, got {value!r}")
+    return value
+
+
+def parse_features(raw: dict | None, section: str = "features") -> FeatureConfig:
+    raw = raw or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{section}: expected a mapping, got {raw!r}")
+    _check_keys(section, raw, {f.name for f in fields(FeatureConfig)})
+    cfg = FeatureConfig()
+    if "n_features" in raw:
+        cfg = replace(cfg, n_features=_int(section, "n_features", raw["n_features"], 1))
+    if "ngram_sizes" in raw:
+        sizes = raw["ngram_sizes"]
+        if not isinstance(sizes, list) or not sizes:
+            raise ValueError(f"{section}.ngram_sizes: expected a non-empty list, got {sizes!r}")
+        sizes = tuple(sorted({_int(section, "ngram_sizes", n, 1) for n in sizes}))
+        cfg = replace(cfg, ngram_sizes=sizes)
+    if "use_delimiters" in raw:
+        if not isinstance(raw["use_delimiters"], bool):
+            raise ValueError(f"{section}.use_delimiters: expected true/false")
+        cfg = replace(cfg, use_delimiters=raw["use_delimiters"])
+    return cfg
+
+
+def parse_baselines(raw: dict | None) -> BaselinesConfig:
+    raw = raw or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"config: expected a mapping, got {raw!r}")
+    _check_keys("config", raw, {f.name for f in fields(BaselinesConfig)})
+    cfg = BaselinesConfig(features=parse_features(raw.get("features")))
+    for key in ("data", "out"):
+        if key in raw:
+            if not isinstance(raw[key], str):
+                raise ValueError(f"config.{key}: expected a path string")
+            cfg = replace(cfg, **{key: Path(raw[key])})
+    if "models" in raw:
+        models = raw["models"]
+        if not isinstance(models, list) or not all(isinstance(m, str) for m in models):
+            raise ValueError("config.models: expected a list of model names")
+        cfg = replace(cfg, models=tuple(models))
+    if "seed" in raw:
+        cfg = replace(cfg, seed=_int("config", "seed", raw["seed"], 0))
+    if "repeats" in raw:
+        cfg = replace(cfg, repeats=_int("config", "repeats", raw["repeats"], 0))
+    return cfg
+
+
+def load_yaml(path: str | Path) -> dict:
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"config not found: {path}")
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as e:
+        raise ValueError(f"{path}: invalid YAML ({e})") from e
+
+
+def load_baselines_config(path: str | Path) -> BaselinesConfig:
+    return parse_baselines(load_yaml(path))
+
+
+def config_dict(cfg: Any) -> dict:
+    """JSON-safe dict of a config dataclass (paths as POSIX strings, tuples as lists)."""
+
+    def clean(value: Any) -> Any:
+        if isinstance(value, Path):
+            return value.as_posix()
+        if isinstance(value, dict):
+            return {k: clean(v) for k, v in value.items()}
+        if isinstance(value, list | tuple):
+            return [clean(v) for v in value]
+        return value
+
+    return clean(asdict(cfg))
+
+
+def config_hash(cfg: Any) -> str:
+    """Short SHA-256 of the effective settings; identical settings give identical hashes."""
+    blob = json.dumps(config_dict(cfg), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:12]

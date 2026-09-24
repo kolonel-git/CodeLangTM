@@ -144,3 +144,29 @@ def test_cli(processed, tmp_path, capsys):
     assert "best by CV: naive_bayes" in capsys.readouterr().out
     assert out.read_text(encoding="utf-8").startswith("# Results")
     assert main(["baselines", "--data", str(tmp_path / "none")]) == 1
+
+
+def test_cli_config_file_and_override(processed, tmp_path, capsys):
+    out = tmp_path / "results.md"
+    cfg = tmp_path / "exp.yaml"
+    cfg.write_text(
+        f"data: {processed.as_posix()}\nout: {out.as_posix()}\nrepeats: 0\n"
+        "models: [naive_bayes, decision_tree]\n"
+        "features: {n_features: 40, ngram_sizes: [3], use_delimiters: false}\n",
+        encoding="utf-8",
+    )
+    assert main(["baselines", "--config", str(cfg), "--model", "naive_bayes"]) == 0
+    assert "best by CV: naive_bayes" in capsys.readouterr().out  # --model overrode the list
+    md = out.read_text(encoding="utf-8")
+    assert f"`{cfg.as_posix()}` + CLI overrides `models`" in md
+    assert "`Binarizer(n_features=40, ngram_sizes=(3), use_delimiters=False)`" in md
+
+    cfg.write_text("featurs: {}\n", encoding="utf-8")
+    assert main(["baselines", "--config", str(cfg)]) == 1
+    assert "unknown key" in capsys.readouterr().err
+
+
+def test_binarizer_options_reach_pipeline(processed):
+    b = Binarizer(n_features=30, ngram_sizes=(3,), use_delimiters=False)
+    _, meta = bl.run_baselines(processed, ["naive_bayes"], languages=LANGS, repeats=0, binarizer=b)
+    assert meta["features"] == {"n_features": 30, "ngram_sizes": [3], "use_delimiters": False}

@@ -54,20 +54,25 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--samples", type=int, default=10, help="samples per language")
     audit.add_argument("--seed", type=int, default=0)
 
+    # Flags default to None so only flags actually given override the config file.
     base = sub.add_parser("baselines", help="train and evaluate classical baselines")
-    base.add_argument("--data", type=Path, default=Path("data/processed"))
+    base.add_argument(
+        "--config", type=Path,
+        help="YAML experiment config, e.g. configs/baselines.yaml (flags below override it)",
+    )  # fmt: skip
+    base.add_argument("--data", type=Path, help="default: data/processed")
     base.add_argument(
         "--model", action="append",
         help="naive_bayes, decision_tree, logistic_regression, linear_svm or random_forest "
         "(repeatable; default: all)",
     )  # fmt: skip
-    base.add_argument("--features", type=int, default=500, help="binary features (M)")
-    base.add_argument("--seed", type=int, default=0)
+    base.add_argument("--features", type=int, help="binary features M (default: 500)")
+    base.add_argument("--seed", type=int, help="default: 0")
     base.add_argument(
-        "--repeats", type=int, default=10,
-        help="extra repo-level train/test splits for test-score spread (0 = off)",
+        "--repeats", type=int,
+        help="extra repo-level train/test splits for test-score spread (0 = off; default: 10)",
     )  # fmt: skip
-    base.add_argument("--out", type=Path, default=Path("docs/results.md"))
+    base.add_argument("--out", type=Path, help="default: docs/results.md")
 
     diag = sub.add_parser(
         "diagnose", help="label-issue candidates and shortcut features (training data only)"
@@ -95,18 +100,31 @@ def _diagnose(args: argparse.Namespace) -> int:
 
 def _baselines(args: argparse.Namespace) -> int:
     from .baselines import best_by_cv, render_results_md, run_baselines, summary_table
+    from .config import BaselinesConfig, config_hash, load_baselines_config
 
+    overrides = {
+        "data": args.data, "models": args.model, "n_features": args.features,
+        "seed": args.seed, "repeats": args.repeats, "out": args.out,
+    }  # fmt: skip
     try:
+        cfg = load_baselines_config(args.config) if args.config else BaselinesConfig()
+        cfg = cfg.with_overrides(**overrides)
         results, meta = run_baselines(
-            args.data, args.model, args.features, args.seed, repeats=args.repeats
-        )
+            cfg.data, cfg.models, seed=cfg.seed, repeats=cfg.repeats,
+            binarizer=cfg.features.binarizer(),
+        )  # fmt: skip
     except (FileNotFoundError, ValueError) as e:
         print(f"baselines failed: {e}", file=sys.stderr)
         return 1
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(render_results_md(results, meta), encoding="utf-8")
+    meta["config"] = {
+        "path": args.config.as_posix() if args.config else None,
+        "overrides": sorted(k for k, v in overrides.items() if v is not None),
+        "hash": config_hash(cfg),
+    }
+    cfg.out.parent.mkdir(parents=True, exist_ok=True)
+    cfg.out.write_text(render_results_md(results, meta), encoding="utf-8")
     print(summary_table(results))
-    print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {args.out}")
+    print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {cfg.out}")
     return 0
 
 
