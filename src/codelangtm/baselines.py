@@ -200,20 +200,8 @@ def run_baselines(
         evaluate_model(name, available[name], dataset, folds, binarizer, languages, repeats)
         for name in (models or available)
     ]
-
-    manifest_path = data_dir / "dataset.json"
-    files, split_params = {}, {}
-    if manifest_path.exists():
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        files, split_params = manifest.get("files", {}), manifest.get("params", {})
     meta = {
-        "generated": datetime.now().isoformat(sep=" ", timespec="seconds"),
-        "data_dir": str(data_dir),
-        "dataset_files": {k: v[:12] for k, v in files.items()},
-        "n_train": len(dataset["train"]),
-        "n_test": len(dataset["test"]),
-        "n_wild": len(dataset.get("wild", [])),
-        "n_folds": len(set(folds.tolist())),
+        **dataset_meta(data_dir, dataset, folds),
         "n_features": binarizer.n_features,
         "features": {
             "n_features": binarizer.n_features,
@@ -222,6 +210,25 @@ def run_baselines(
         },
         "seed": seed,
         "repeats": repeats,
+    }
+    return results, meta
+
+
+def dataset_meta(data_dir: Path, dataset: dict[str, list], folds: np.ndarray) -> dict:
+    """Provenance shared by generated reports: dataset hashes, sizes, split, versions, CPU."""
+    manifest_path = data_dir / "dataset.json"
+    files, split_params = {}, {}
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        files, split_params = manifest.get("files", {}), manifest.get("params", {})
+    return {
+        "generated": datetime.now().isoformat(sep=" ", timespec="seconds"),
+        "data_dir": str(data_dir),
+        "dataset_files": {k: v[:12] for k, v in files.items()},
+        "n_train": len(dataset["train"]),
+        "n_test": len(dataset["test"]),
+        "n_wild": len(dataset.get("wild", [])),
+        "n_folds": len(set(folds.tolist())),
         "split": split_params,
         "versions": {
             "python": platform.python_version(),
@@ -230,7 +237,6 @@ def run_baselines(
         },
         "cpu": platform.processor() or platform.machine(),
     }
-    return results, meta
 
 
 def best_by_cv(results: Sequence[ModelResult]) -> ModelResult:

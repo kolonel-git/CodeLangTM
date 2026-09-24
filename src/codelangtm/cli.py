@@ -74,6 +74,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )  # fmt: skip
     base.add_argument("--out", type=Path, help="default: docs/results.md")
 
+    abl = sub.add_parser("ablate", help="feature ablations with repo-grouped CV (train only)")
+    abl.add_argument("--config", type=Path, default=Path("configs/ablations.yaml"))
+    abl.add_argument(
+        "--study", action="append", help="run only this study (repeatable; default: all)"
+    )
+    abl.add_argument("--out", type=Path, help="default: the config's `out` (docs/ablations.md)")
+
     diag = sub.add_parser(
         "diagnose", help="label-issue candidates and shortcut features (training data only)"
     )
@@ -95,6 +102,29 @@ def _diagnose(args: argparse.Namespace) -> int:
         return 1
     print(result.summary())
     print(f"\nreview file: {args.out}")
+    return 0
+
+
+def _ablate(args: argparse.Namespace) -> int:
+    from . import ablations as ab
+    from .config import load_ablation_config
+
+    def progress(i: int, n: int, features: object) -> None:
+        print(f"[{i + 1}/{n}] {ab.describe(features)}", flush=True)
+
+    try:
+        cfg = ab.select_studies(load_ablation_config(args.config), args.study)
+        runs, meta = ab.run_ablations(cfg, progress=progress)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"ablate failed: {e}", file=sys.stderr)
+        return 1
+    meta["config_path"] = args.config.as_posix()
+    out = args.out or cfg.out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(ab.render_ablations_md(cfg, runs, meta), encoding="utf-8")
+    print()
+    print(ab.summary_table(cfg, runs))
+    print(f"\nwrote {out}")
     return 0
 
 
@@ -212,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
         return _data_audit(args)
     if args.command == "baselines":
         return _baselines(args)
+    if args.command == "ablate":
+        return _ablate(args)
     if args.command == "diagnose":
         return _diagnose(args)
     parser.print_help()
