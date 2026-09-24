@@ -18,7 +18,7 @@ Ordered milestones, no fixed deadlines. Each milestone maps to a GitHub mileston
 
 Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch set added in Stage B: C, C#, TypeScript, Kotlin, PHP, Ruby, to stress confusable pairs (JS/TS, C/C++, Java/C#).
 
-**Status:** Stage A complete (dataset v4, 869 snippets, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred and do not block M2.
+**Status:** Stage A complete (dataset v5, 869 snippets, stable split, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred and do not block M2.
 
 - [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
 - [x] Collector: GitHub API, permissive licenses only (MIT / Apache-2.0 / BSD)
@@ -26,7 +26,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Window extractor: contiguous 20-50 line windows from real files; skip near-empty / license-header-only windows; never cut comments/strings
 - [x] Dedup: exact hash + near-duplicate (MinHash or shingle Jaccard)
 - [x] Label sanity check (extension vs content; drop mislabeled files, e.g. `.h` C vs C++; template-heavy SQL/HTML)
-- [x] Splits: group-by-repo train/test + stratified group k-fold CV
+- [x] Splits: group-by-repo train/test + 5-fold repo-grouped CV (stable hash-based per language since v5)
 - [x] Dataset audit: per-language stats, flags, manual sample review
 - [ ] *Stage B:* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
 - [x] **Stage A:** target 1,000 snippets (~125/language); reached 869 in v4 (SQL limited by available permissive repos)
