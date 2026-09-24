@@ -4,7 +4,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 **Last updated:** 2026-09-24
 **Current milestone:** M1 — Data pipeline
-**Overall:** M0 complete, M1 not started
+**Overall:** M0 complete, M1 in progress (schema done)
 
 ## Milestone overview
 
@@ -22,9 +22,9 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 ## Next steps (in order)
 
 - [ ] Verify GitHub repo settings: description, topics, replace `OWNER` in README badges, CI green ([docs/github-setup.md](docs/github-setup.md))
-- [ ] Check TMU installs: `uv sync --extra tm` (fallback: WSL2 / Docker)
-- [ ] Re-run `uv run ruff check .` and `uv run pytest` after the `features.py` lint fix
-- [ ] M1: define snippet record schema in code (`text, language, source, repo, commit, path, license, start_line, end_line`)
+- [x] Check TMU installs: `uv sync --extra tm` (works natively on Windows, no WSL/Docker needed)
+- [x] Re-run `uv run ruff check .` and `uv run pytest` after the `features.py` lint fix
+- [x] M1: define snippet record schema in code (`Snippet` in `src/codelangtm/data.py`)
 - [ ] M1: dataset loader + tests on tiny fixtures
 - [ ] M1: GitHub collector (permissive licenses only)
 - [ ] M1: window extractor (20-50 contiguous lines), dedup, label sanity check
@@ -32,9 +32,16 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [ ] Log every data source in [docs/data-sources.md](docs/data-sources.md)
 
 ## Blockers / open questions
-- None yet. Possible: TMU build on Windows (needs C compiler).
+- None.
 
 ## Done log
+
+### 2026-09-24 — TMU check + snippet schema (M1 start)
+- `uv sync --extra tm` installed `tmu 0.8.3`. First toy run crashed with numpy 2.5 (`OverflowError: Python integer -1 out of bounds for uint32`).
+- Fix: `tm` extra now pins `numpy<2` and `scipy<1.14` (numpy 1.26.4 + scipy 1.13.1). Toy XOR training works (93.5% acc, CPU backend; pycuda warning harmless).
+- Added `src/codelangtm/data.py`: `Snippet` frozen dataclass (fields per schema), validation (known language, 20-50 line window rule left to the extractor), JSONL `save_snippets` / `load_snippets`, `group_key` = repo.
+- Added `tests/test_data.py`.
+- Ruff clean, pytest passing.
 
 ### 2026-09-24 — Project setup (M0)
 - Wrote project brief into structure; chose Public + MIT license.
