@@ -43,7 +43,10 @@ def _build_parser() -> argparse.ArgumentParser:
     build.add_argument("--out", type=Path, default=Path("data/processed"))
     build.add_argument("--test-size", type=float, default=0.2)
     build.add_argument("--folds", type=int, default=5)
-    build.add_argument("--seed", type=int, default=0)
+    build.add_argument(
+        "--salt", default="codelangtm-v1",
+        help="split salt; changing it gives a different (still stable, balanced) split",
+    )  # fmt: skip
 
     audit = data_sub.add_parser("audit", help="per-language stats, flags and review samples")
     audit.add_argument("--data", type=Path, default=Path("data/processed"))
@@ -60,6 +63,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )  # fmt: skip
     base.add_argument("--features", type=int, default=500, help="binary features (M)")
     base.add_argument("--seed", type=int, default=0)
+    base.add_argument(
+        "--repeats", type=int, default=10,
+        help="extra repo-level train/test splits for test-score spread (0 = off)",
+    )  # fmt: skip
     base.add_argument("--out", type=Path, default=Path("docs/results.md"))
 
     diag = sub.add_parser(
@@ -90,7 +97,9 @@ def _baselines(args: argparse.Namespace) -> int:
     from .baselines import best_by_cv, render_results_md, run_baselines, summary_table
 
     try:
-        results, meta = run_baselines(args.data, args.model, args.features, args.seed)
+        results, meta = run_baselines(
+            args.data, args.model, args.features, args.seed, repeats=args.repeats
+        )
     except (FileNotFoundError, ValueError) as e:
         print(f"baselines failed: {e}", file=sys.stderr)
         return 1
@@ -122,7 +131,7 @@ def _data_build(args: argparse.Namespace) -> int:
 
     try:
         report = build_dataset(
-            args.source or [Path("data/raw")], args.out, args.test_size, args.folds, args.seed
+            args.source or [Path("data/raw")], args.out, args.test_size, args.folds, args.salt
         )
     except (FileNotFoundError, ValueError) as e:
         print(f"data build failed: {e}", file=sys.stderr)

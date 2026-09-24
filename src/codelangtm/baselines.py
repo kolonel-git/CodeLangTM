@@ -13,7 +13,7 @@ import platform
 import statistics
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -31,6 +31,7 @@ from sklearn.tree import DecisionTreeClassifier
 from . import LANGUAGES
 from .audit import load_dataset
 from .features import Binarizer
+from .splits import SPLIT_SALT, check_no_leakage, stable_split
 
 LATENCY_REPEATS = 5
 
@@ -61,6 +62,7 @@ class ModelResult:
     latency_ms: float
     size_kb: float
     wild_f1: float | None = None
+    repeat_f1: list[float] = field(default_factory=list)  # test F1 over extra repo-level splits
 
     @property
     def cv_mean(self) -> float:
@@ -70,6 +72,14 @@ class ModelResult:
     def cv_std(self) -> float:
         return statistics.pstdev(self.cv_f1)
 
+    @property
+    def repeat_mean(self) -> float | None:
+        return statistics.fmean(self.repeat_f1) if self.repeat_f1 else None
+
+    @property
+    def repeat_std(self) -> float | None:
+        return statistics.pstdev(self.repeat_f1) if self.repeat_f1 else None
+
 
 def _macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     present = sorted(set(y_true))  # languages absent from y_true would score an undefined 0
@@ -78,6 +88,30 @@ def _macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def _pipeline(model: object, binarizer: Binarizer) -> Pipeline:
     return Pipeline([("binarize", clone(binarizer)), ("model", clone(model))])
+
+
+def repeated_split_f1(
+    model: object,
+    pool: Sequence,
+    binarizer: Binarizer,
+    repeats: int,
+    test_size: float = 0.2,
+) -> list[float]:
+    """Test macro-F1 over `repeats` independent balanced repo-level splits of `pool`.
+
+    Reports how much the test score depends on which repos land in test. Not used for model
+    selection (that is CV's job).
+    """
+    scores = []
+    for k in range(repeats):
+        split = stable_split(pool, test_size, n_folds=2, salt=f"{SPLIT_SALT}:repeat:{k}")
+        train, test = split.split(pool)
+        check_no_leakage(train, test)
+        pipe = _pipeline(model, binarizer)
+        pipe.fit([s.text for s in train], [s.language for s in train])
+        pred = pipe.predict([s.text for s in test])
+        scores.append(_macro_f1(np.asarray([s.language for s in test]), pred))
+    return scores
 
 
 def load_folds(data_dir: str | Path) -> np.ndarray:
@@ -92,6 +126,7 @@ def evaluate_model(
     folds: np.ndarray,
     binarizer: Binarizer,
     languages: Sequence[str] = LANGUAGES,
+    repeats: int = 0,
 ) -> ModelResult:
     train, test = dataset["train"], dataset["test"]
     x_train = np.asarray([s.text for s in train], dtype=object)
@@ -139,6 +174,7 @@ def evaluate_model(
         latency_ms=latency_ms,
         size_kb=len(pickle.dumps(pipe)) / 1024,
         wild_f1=wild_f1,
+        repeat_f1=repeated_split_f1(model, [*train, *test], binarizer, repeats),
     )
 
 
@@ -148,6 +184,7 @@ def run_baselines(
     n_features: int = 500,
     seed: int = 0,
     languages: Sequence[str] = LANGUAGES,
+    repeats: int = 10,
 ) -> tuple[list[ModelResult], dict]:
     data_dir = Path(data_dir)
     dataset = load_dataset(data_dir)
@@ -158,14 +195,15 @@ def run_baselines(
         raise ValueError(f"unknown model(s): {sorted(unknown)}")
     binarizer = Binarizer(n_features=n_features)
     results = [
-        evaluate_model(name, available[name], dataset, folds, binarizer, languages)
+        evaluate_model(name, available[name], dataset, folds, binarizer, languages, repeats)
         for name in (models or available)
     ]
 
     manifest_path = data_dir / "dataset.json"
-    files = {}
+    files, split_params = {}, {}
     if manifest_path.exists():
-        files = json.loads(manifest_path.read_text(encoding="utf-8")).get("files", {})
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        files, split_params = manifest.get("files", {}), manifest.get("params", {})
     meta = {
         "generated": datetime.now().isoformat(sep=" ", timespec="seconds"),
         "data_dir": str(data_dir),
@@ -176,6 +214,8 @@ def run_baselines(
         "n_folds": len(set(folds.tolist())),
         "n_features": n_features,
         "seed": seed,
+        "repeats": repeats,
+        "split": split_params,
         "versions": {
             "python": platform.python_version(),
             "scikit-learn": sklearn.__version__,
@@ -192,13 +232,26 @@ def best_by_cv(results: Sequence[ModelResult]) -> ModelResult:
 
 def summary_table(results: Sequence[ModelResult]) -> str:
     # ASCII only: Windows consoles (cp1252) cannot print "±".
-    rows = [f"{'model':<21}{'CV macro-F1':>18}{'test F1':>9}{'acc':>7}{'ms/snip':>9}{'KB':>8}"]
+    rows = [
+        f"{'model':<21}{'CV macro-F1':>18}{'test F1':>9}{'repeated test':>19}"
+        f"{'ms/snip':>9}{'KB':>8}"
+    ]
     for r in results:
+        rep = f"{r.repeat_mean:.3f} +/- {r.repeat_std:.3f}" if r.repeat_f1 else "-"
         rows.append(
-            f"{r.name:<21}{r.cv_mean:>9.3f} +/- {r.cv_std:.3f}{r.test_f1:>9.3f}"
-            f"{r.test_accuracy:>7.3f}{r.latency_ms:>9.3f}{r.size_kb:>8.0f}"
+            f"{r.name:<21}{r.cv_mean:>9.3f} +/- {r.cv_std:.3f}{r.test_f1:>9.3f}{rep:>19}"
+            f"{r.latency_ms:>9.3f}{r.size_kb:>8.0f}"
         )
     return "\n".join(rows)
+
+
+def _repeat_cell(r: ModelResult) -> str:
+    if not r.repeat_f1:
+        return "-"
+    return (
+        f"{r.repeat_mean:.3f} ± {r.repeat_std:.3f} "
+        f"({min(r.repeat_f1):.3f}-{max(r.repeat_f1):.3f})"
+    )
 
 
 def _top_confusions(r: ModelResult, languages: Sequence[str], n: int = 5) -> list[str]:
@@ -209,6 +262,15 @@ def _top_confusions(r: ModelResult, languages: Sequence[str], n: int = 5) -> lis
         if i != j and r.confusion[i][j]
     ]
     return [f"{t} → {p}: {c}" for c, t, p in sorted(pairs, reverse=True)[:n]]
+
+
+def _split_text(params: dict) -> str:
+    if params.get("split") == "stable-hash":
+        return (
+            f"stable hash-based per-language repo split (salt `{params.get('salt')}`, "
+            f"test share {params.get('test_size')}), repos never shared between train and test"
+        )
+    return "repo-grouped (StratifiedGroupKFold)" if params else "n/a"
 
 
 def render_results_md(
@@ -228,8 +290,12 @@ def render_results_md(
         f"wild {meta['n_wild']}); SHA-256 prefixes: {files}",
         f"- Features: `Binarizer(n_features={meta['n_features']}, ngram_sizes=(2, 3))`, "
         "refit inside every fold",
+        f"- Split: {_split_text(meta.get('split', {}))}",
         f"- Protocol: {meta['n_folds']}-fold repo-grouped CV on train (model selection), then "
         "refit on all of train and score test once",
+        f"- Repeated test: {meta.get('repeats', 0)} extra balanced repo-level train/test splits "
+        "of train + test (salts `…:repeat:k`), reported as mean ± std (min-max); not used for "
+        "model selection",
         f"- Seed {meta['seed']}; " + ", ".join(f"{k} {v}" for k, v in meta["versions"].items())
         + f"; CPU: {meta['cpu']}",
         "- Latency: end-to-end (binarize + predict), median of "
@@ -237,15 +303,16 @@ def render_results_md(
         "",
         "## Baselines",
         "",
-        "| Model | CV macro-F1 | Test macro-F1 | Test accuracy | Fit (s) | Latency (ms/snippet) "
-        "| Size (KB) |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Model | CV macro-F1 | Test macro-F1 | Repeated test macro-F1 | Test accuracy "
+        "| Fit (s) | Latency (ms/snippet) | Size (KB) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for r in results:
         name = f"**{r.name}**" if r is best else r.name
         md.append(
             f"| {name} | {r.cv_mean:.3f} ± {r.cv_std:.3f} | {r.test_f1:.3f} | "
-            f"{r.test_accuracy:.3f} | {r.fit_seconds:.2f} | {r.latency_ms:.3f} | {r.size_kb:.0f} |"
+            f"{_repeat_cell(r)} | {r.test_accuracy:.3f} | {r.fit_seconds:.2f} | "
+            f"{r.latency_ms:.3f} | {r.size_kb:.0f} |"
         )
     md += [
         "",

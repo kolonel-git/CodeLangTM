@@ -39,8 +39,8 @@ def processed(tmp_path_factory):
     return root / "processed"
 
 
-def run(processed, models=FAST):
-    return bl.run_baselines(processed, models, n_features=60, languages=LANGS)
+def run(processed, models=FAST, repeats=2):
+    return bl.run_baselines(processed, models, n_features=60, languages=LANGS, repeats=repeats)
 
 
 def test_results_shape(processed):
@@ -52,7 +52,20 @@ def test_results_shape(processed):
         assert set(r.per_language_f1) == set(LANGS)
         assert np.array(r.confusion).sum() == meta["n_test"]
         assert r.latency_ms > 0 and r.size_kb > 0 and r.wild_f1 is None
+        assert len(r.repeat_f1) == 2 and 0 <= r.repeat_mean <= 1
     assert meta["n_features"] == 60 and set(meta["dataset_files"]) >= {"train.jsonl"}
+    assert meta["repeats"] == 2 and meta["split"]["split"] == "stable-hash"
+
+
+def test_repeated_splits_differ_and_never_leak(processed):
+    pool = [*load_snippets(processed / "train.jsonl"), *load_snippets(processed / "test.jsonl")]
+    splits = [
+        bl.stable_split(pool, 0.2, 2, salt=f"{bl.SPLIT_SALT}:repeat:{k}").test_repos
+        for k in range(3)
+    ]
+    assert len(set(splits)) == 3  # independent draws
+    scores = bl.repeated_split_f1(bl.make_models()["naive_bayes"], pool, Binarizer(60), 3)
+    assert len(scores) == 3
 
 
 def test_vocabulary_never_sees_held_out_text(processed, monkeypatch):
@@ -65,7 +78,7 @@ def test_vocabulary_never_sees_held_out_text(processed, monkeypatch):
         return original(self, snippets, y)
 
     monkeypatch.setattr(Binarizer, "fit", spy)
-    bl.run_baselines(processed, ["naive_bayes"], n_features=60, languages=LANGS)
+    bl.run_baselines(processed, ["naive_bayes"], n_features=60, languages=LANGS, repeats=0)
 
     test_texts = {s.text for s in load_snippets(processed / "test.jsonl")}
     train = list(load_snippets(processed / "train.jsonl"))
@@ -126,7 +139,7 @@ def test_folds_mismatch_rejected(processed, tmp_path):
 def test_cli(processed, tmp_path, capsys):
     out = tmp_path / "results.md"
     args = ["baselines", "--data", str(processed), "--model", "naive_bayes",
-            "--features", "60", "--out", str(out)]  # fmt: skip
+            "--features", "60", "--repeats", "2", "--out", str(out)]  # fmt: skip
     assert main(args) == 0
     assert "best by CV: naive_bayes" in capsys.readouterr().out
     assert out.read_text(encoding="utf-8").startswith("# Results")
