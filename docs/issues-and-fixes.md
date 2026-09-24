@@ -9,12 +9,57 @@ Engineering log of problems hit while building CodeLangTM: symptom, root cause, 
 | v1 | First collection (25 repos × 5 snippets, >= 50 stars) | 829 | 0 | 829 | 40 | 97 |
 | v2 | SQL top-up (`--min-stars 10`) + template filter | 866 | 21 (template-heavy) | 845 | 71 | 82 |
 | v3 | Cut-safe windows, full re-collection | 861 | 0 | 861 | 77 | 92 |
+| v4 | HTML embedded-language rule, HTML re-collected | 869 | 0 | 869 | 77 | 100 |
+| v5 | Same snippets, stable hash-based split (M4) | 869 | 0 | 869 | 77 | 100 |
 
-v3 audit: no flags; largest single repo <= 6% of any language; median windows 0-10% comments.
+v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows 0-10% comments.
+
+---
+
+## Modelling
+
+### M5. Repetitive list-like code predicted as SQL (open)
+- **Symptom:** v4 confident learning flagged 3 correctly labelled Python, Java and C++ windows as SQL (p 0.77-0.85). All three are long runs of near-identical lines such as `mapDecoration("white_banner", 10),` or `Round::deregisterNode(pluginFn);`.
+- **Root cause:** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`). 2/3-character n-grams cannot see SQL keywords such as `SELECT` or `INSERT`.
+- **Planned fix:** keyword/token features in the M2 ablation study.
+
+### M4. Test score swung 5.5 points after an HTML-only change (fixed: stable split)
+- **Symptom:** after re-collecting only HTML (v3 → v4), logistic regression CV macro-F1 stayed flat (0.920 → 0.923) but test macro-F1 fell 0.951 → 0.896.
+- **Root cause:** not the model. Changing HTML repositories changed the group list, so `StratifiedGroupKFold` reshuffled which repos of *every* language went to test (e.g. Python 90/24 → 93/21 train/test). With only 39 test repos, the test score is very sensitive to that draw.
+- **Evidence:** same v4 data and model, 10 different split seeds: test macro-F1 0.870-0.978, mean 0.929 ± 0.030, matching CV (0.923).
+- **Options weighed:** (A) stable split, (B) keep StratifiedGroupKFold and never compare test across versions, (C) freeze v4's test repo list in a lock file. B leaves every future data change (Stage B) reshuffling test and leaves seed choice open; C adds a lock file for little gain. A chosen because the dataset will change again and switching now costs one baseline rerun, versus redoing ablations and TM training later.
+- **Design check:** pure hashing (repo in test if hash < 0.2) was simulated on v4 and rejected: Java would get 2 test repos (5%), Python 9 (35%), some CV folds a single repo. Chosen design: within each language, order repos by hash and take the first round(n × 0.2) for test; order the rest by a second hash and cut into 5 equal folds.
+- **Guarantees (tested):** exact test repo count per language; fold sizes differ by at most 1 repo; other languages unaffected by changes to one language; adding/removing one repo moves at most one existing repo in or out of test (50 randomised trials).
+- **Fix:** `stable_split` (salt `codelangtm-v1`) used by `data build` → dataset v5 (same snippets as v4). `codelangtm baselines` adds repeated test macro-F1 over 10 further balanced splits (salts `…:repeat:k`), reported as mean ± std (min-max), never used for selection.
+- **Result (v5):** logistic regression CV 0.917 ± 0.008, single test 0.943, repeated test 0.931 ± 0.007. CV and repeated test now agree within ~0.015.
+
+### M1. Feature vocabulary could leak across CV folds
+- **Risk:** fitting the n-gram vocabulary once on all training data, then cross-validating, lets n-grams that appear only in the validation fold shape the features. A subtle leak that inflates CV scores.
+- **Fix:** `Binarizer` became a scikit-learn transformer inside `Pipeline([Binarizer, model])`, cloned per fold. A test spies on `Binarizer.fit` and asserts it never receives test or held-out fold snippets.
+
+### M3. Baseline-driven data checks (confident learning + shortcut probe)
+- **Method:** out-of-fold logistic-regression probabilities on train (never test); a snippet is a label-issue candidate when the model's confidence in another language exceeds that language's average self-confidence (Northcutt et al. confident learning). Shortcut probe: top-weighted n-grams per language and how many repos each appears in.
+- **Label issues:** 6 of 689 (0.9%): 3 HTML windows that are entirely inside `<script>` blocks (content is JavaScript), 1 JavaScript window that is mostly an HTML template string, 1 Rust FFI struct mirroring C (`#[repr(C)]`, `c_uint`; label correct, hard example), 1 Java interface of bare signatures with Chinese Javadoc (label correct, little signal).
+- **Root cause of the HTML cases:** the "HTML must contain a tag" check used `<\s*[a-zA-Z]`, which also matches comparisons such as `i < elements`. Across the dataset, 9 of 92 HTML windows have < 20% markup lines.
+- **Shortcuts:** none. Every top feature appears in 13-20 repos and is real syntax (`def`, `func`, gofmt tabs, `::`, `let`, `public`, `--`, `<`). Test idioms (`assert`, `t.Run`, `@Test`) are not among top features, so the uneven test-file share is not acting as a shortcut.
+- **Status:** fixed with an embedded-language rule for HTML and a stricter tag pattern; see D5.
+
+### M2. Latency is dominated by feature extraction
+- **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible. Measured latency varies between runs (0.31 on v4, 0.43-0.48 on v5 for the same pipeline, on the same machine with other load); treat single-run latency as approximate until a dedicated benchmark (M6).
+- **Implication:** the < 0.1 ms target is a feature-extraction problem. Planned: faster Python binarization in M2, and C feature extraction in M6.
 
 ---
 
 ## Data quality
+
+### D5. HTML windows that are really JavaScript
+- **Symptom:** found by confident learning (M3): HTML-labelled windows consisting of `<script>` code; model predicts JavaScript with p > 0.8.
+- **Root cause:** window lies inside an inline `<script>` block, and the tag check `<\s*[a-zA-Z]` was satisfied by comparison operators (`i < elements`).
+- **Measured:** markup-line share < 10%: 6 of 92 HTML windows; < 20%: 9; < 30%: 16.
+- **Fix:**
+  1. `HTML_TAG` requires a real tag: `<name` or `</name` ending in space, `>`, `/` or end of line, not directly after an identifier or `)`/`]` (so `a<b` does not match), or `<!`.
+  2. Embedded-language rule: HTML windows with tags on fewer than 20% of non-blank lines are dropped as `mostly embedded script/style`.
+- **Result on v3 raw data:** exactly the 9 predicted windows dropped (5 mostly script, 4 with no real tags); no other language affected. A 25%-markup window (VisualDL) is kept as a hard example.
 
 ### D4. Windows cut through comments and strings
 - **Symptom:** during manual review of `audit.md`, some snippets began or ended mid-comment. Prose looked like code, and real code after a closing `*/` or `"""` looked commented out.
@@ -69,6 +114,10 @@ v3 audit: no flags; largest single repo <= 6% of any language; median windows 0-
 ---
 
 ## Tooling & workflow
+
+### W4. `±` printed as `�` in the console
+- **Root cause:** Windows console uses cp1252, which cannot encode `±`.
+- **Fix:** console tables use ASCII `+/-`; generated Markdown files (UTF-8) keep `±`.
 
 ### W3. Audit file looked stale
 - **Symptom:** after regenerating, `audit.md` appeared unchanged in the editor.

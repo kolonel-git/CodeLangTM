@@ -3,16 +3,16 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-24
-**Current milestone:** M1 → M2 (M1 Stage A done once `feat/data-build` is merged)
-**Overall:** M0 complete, M1 Stage A complete (dataset v3: 861 snippets, [dataset card](docs/dataset-card.md))
+**Current milestone:** M2 — Features & baselines
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 baselines + data checks done: bar to beat = LR CV macro-F1 0.917, repeated test 0.931 ([results](docs/results.md))
 
 ## Milestone overview
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | Stage A done | v3: 861 snippets, 196 repos; Stage B items deferred |
-| M2 Features & baselines | Next | |
+| M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
+| M2 Features & baselines | In progress | Baselines, data checks, stable split done; ablations next |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -21,7 +21,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 ## Next steps (in order)
 
-- [ ] Verify GitHub repo settings: description, topics, replace `OWNER` in README badges, CI green ([docs/github-setup.md](docs/github-setup.md))
+- [x] Verify GitHub repo settings: description, topics, replace `OWNER` in README badges, CI green ([docs/github-setup.md](docs/github-setup.md))
 - [x] Check TMU installs: `uv sync --extra tm` (works natively on Windows, no WSL/Docker needed)
 - [x] Re-run `uv run ruff check .` and `uv run pytest` after the `features.py` lint fix
 - [x] M1: define snippet record schema in code (`Snippet` in `src/codelangtm/data.py`)
@@ -38,10 +38,16 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: fix windows cutting comments/strings; re-collect (dataset v3)
 - [x] M1: re-skim regenerated `audit.md` (no problems found)
 - [x] M1: dataset card (`docs/dataset-card.md`) + ledger rows in [docs/data-sources.md](docs/data-sources.md)
-- [ ] M1: push `feat/data-build`, open PR, merge → M1 Stage A done
-- [ ] M2: harden Binarizer (save/load, deterministic vocabulary) + feature matrix from dataset v3
-- [ ] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
-- [ ] M2: confident-learning check + shortcut probe on baseline features
+- [x] M1: push `feat/data-build`, open PR, merge → M1 Stage A done (PR merged)
+- [x] M2: harden Binarizer (sklearn transformer, deterministic vocabulary, save/load, faster transform)
+- [x] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
+- [x] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
+- [x] M2: embedded-language rule for HTML (drop windows with < 20% markup lines; stricter tag pattern)
+- [x] M2: re-collect HTML → dataset v4; rerun build, baselines, diagnose; update dataset card + results
+- [x] M2: stable split (hash-based per-language repo assignment) + repeated-split test reporting → dataset v5
+- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
+- [ ] M2: ablations (M, n-gram sizes, delimiters, token features) with YAML configs
+- [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 
@@ -49,6 +55,42 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — Stable split and repeated-split reporting (dataset v5)
+- Decision (option A after weighing A/B/C, see issues-and-fixes M4): stable hash-based per-language split + repeated test splits for baselines now and for the final TM comparison.
+- Rejected pure hashing after simulating it on v4 (Java 2 test repos, Python 9). Chosen: per language, hash-ordered repos, first round(n × 0.2) to test; rest cut into 5 equal folds by a second hash.
+- `splits.py`: `stable_split`, `StableSplit`, `repo_languages`; `data build` uses it (`--salt`, default `codelangtm-v1`); manifest records `split: stable-hash`.
+- `baselines.py`: `repeated_split_f1`; `--repeats 10` (default) → "Repeated test macro-F1" column (mean ± std, min-max).
+- Tests: 155 passing; properties tested: exact per-language balance, isolation between languages, at most one repo moved per added/removed repo (50 randomised trials).
+- v5 results: LR CV 0.917 ± 0.008, test 0.943, repeated test 0.931 ± 0.007 (CV and repeated test now agree). Each language has 5 test repos (SQL 4).
+
+### 2026-09-24 — Dataset v4 and test-variance finding
+- HTML re-collected with the embedded-language rule: 100 snippets from 25 repos (13 repos skipped). Dataset v4: 869 snippets (train 696, test 173).
+- Baselines on v4: logistic regression still best by CV (0.923 ± 0.014, was 0.920); test fell 0.951 → 0.896.
+- Investigated: the HTML change reshuffled test repos for every language. Same data and model over 10 split seeds: test macro-F1 0.870-0.978 (mean 0.929 ± 0.030). Test drop is split luck, not a regression. CV is the primary metric. (issues-and-fixes M4)
+- Diagnose on v4: 5 of 696 candidates, all correctly labelled. 3 are repetitive list-like code predicted as SQL: SQL is partly learned as "data rows" because n-grams miss keywords. (issues-and-fixes M5)
+- Dataset card updated to v4 (counts, drops, hashes, history, split variance, new limitations); ledger, README, roadmap updated.
+
+### 2026-09-24 — HTML embedded-language rule
+- `labels.py`: `HTML_TAG` now requires a real tag (not `i < x` or `a<b` comparisons); HTML windows with < 20% markup lines dropped as `mostly embedded script/style`.
+- On v3 raw data: exactly the 9 predicted HTML windows dropped (5 mostly script, 4 no real tags); 0 other languages affected. Issues-and-fixes D5 closed.
+- Tests: 145 passing.
+
+### 2026-09-24 — M2 data checks with the baseline
+- `diagnostics.py` + `codelangtm diagnose`: out-of-fold logistic-regression probabilities (train only) → confident-learning label-issue candidates; shortcut probe = top features per language with repo spread and cross-language share. Review file `data/processed/diagnostics.md`.
+- Result: 6 of 689 candidates (0.9%). 3 HTML windows are inline `<script>` code (tag check fooled by `<` comparisons), 1 JS window is mostly an HTML template, 2 are correct but hard (Rust FFI mirroring C, bare Java interface).
+- Shortcut probe: none; top features are real syntax in 13-20 repos; test idioms not among them.
+- Measured: 9 of 92 HTML windows have < 20% markup lines. Fix proposed, decision pending. Details: issues-and-fixes M3, D5.
+- Tests: 140 passing.
+
+### 2026-09-24 — M2 baselines
+- `features.py`: `Binarizer` is now a scikit-learn transformer so the vocabulary is refit inside each CV fold (fitting it once on all train would leak validation n-grams). Alphabetical tie-break makes the vocabulary independent of input order; JSON save/load; `use_delimiters` switch for ablations; transform uses n-gram set lookups instead of substring search.
+- `baselines.py` + `codelangtm baselines`: 5 models as `Pipeline([Binarizer, model])`, 5-fold repo-grouped CV (model selection) then one test evaluation; macro-F1, accuracy, per-language F1, confusion matrix, fit time, end-to-end latency, pickled size → generated `docs/results.md` with dataset hashes and library versions.
+- Decision: Bernoulli NB instead of Multinomial NB (features are presence flags, not counts).
+- Results (dataset v3, M=500): logistic regression best by CV (0.920 ± 0.010, test 0.951); linear SVM 0.905; random forest 0.897 (10.8 MB); naive Bayes 0.853; decision tree 0.724 (SQL F1 0.22).
+- Findings: main confusion is C++ → Rust (4 of 21 C++ test snippets; shared `::`, `->`, braces); Go scores 1.00 everywhere (distinctive syntax, gofmt tabs); test F1 > CV for most models because test has only 39 repos, so CV is the more reliable number.
+- Latency: binarization takes ~0.31 ms/snippet, essentially all of the end-to-end time; model inference is negligible. The < 0.1 ms target depends on feature extraction speed (M6 C export).
+- Tests: 134 passing, all offline; includes a spy test proving the vocabulary never sees test or held-out fold snippets.
 
 ### 2026-09-24 — Dataset card, M1 Stage A closed
 - Manual re-review of v3 audit samples: no problems found.
@@ -131,11 +173,13 @@ Decisions made (recorded in roadmap):
 - **Timeline:** no deadlines
 
 ## Results log
-No experiments yet. Record each run here: date, config, dataset version, macro-F1 (CV / test / wild), latency, model size.
+Record each run here: date, config, dataset version, macro-F1 (CV / test / wild), latency, model size. Full tables in [docs/results.md](docs/results.md).
 
-| Date | Experiment | Dataset | Macro-F1 | Notes |
+| Date | Experiment | Dataset | Macro-F1 (CV / test) | Notes |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| 2026-09-24 | Baselines, M=500, 2/3-grams + delimiters | v3 | LR 0.920 / 0.951 (best) | SVM 0.905, RF 0.897, NB 0.853, DT 0.724; 0.31 ms/snippet (binarization-bound) |
+| 2026-09-24 | Baselines, same config | v4 | LR 0.923 / 0.896 (best) | SVM 0.913, RF 0.907, NB 0.876, DT 0.726; test not comparable to v3 (split reshuffled; seed spread 0.870-0.978) |
+| 2026-09-24 | Baselines, same config, stable split + 10 repeated splits | v5 | LR 0.917 / 0.943; repeated 0.931 ± 0.007 (best) | SVM 0.908 (rep 0.922), RF 0.897 (rep 0.924), NB 0.857 (rep 0.880), DT 0.729 (rep 0.745) |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.

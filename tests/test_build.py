@@ -66,7 +66,8 @@ def test_splits_are_leak_free_and_complete(raw, tmp_path):
 
     manifest = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
     assert set(manifest["files"]) == {"train.jsonl", "test.jsonl", "wild.jsonl", "folds.json"}
-    assert manifest["params"]["seed"] == 0
+    assert manifest["params"]["split"] == "stable-hash"
+    assert manifest["params"]["salt"] == "codelangtm-v1"
 
 
 def test_wild_duplicate_of_training_data_is_dropped(raw, tmp_path):

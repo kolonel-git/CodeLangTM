@@ -16,7 +16,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Dataset audit: stats, quality flags and review samples (`audit.py`, `codelangtm data audit`).
 - Comment/string scanner (`syntax.py`) so windows never start or end mid-comment.
 - Dataset card for Stage A v3 (`docs/dataset-card.md`) and source ledger entries.
+- Classical baselines with repo-grouped CV and generated `docs/results.md` (`baselines.py`, `codelangtm baselines`).
+- Data diagnostics: confident-learning label-issue candidates and shortcut probe (`diagnostics.py`, `codelangtm diagnose`).
+
+### Changed
+- `data build` uses a stable hash-based per-language repo split (`stable_split`, `--salt`) instead of StratifiedGroupKFold; re-collecting one language no longer reshuffles other languages' test repos.
+- `codelangtm baselines` reports repeated test macro-F1 over 10 extra balanced splits (`--repeats`).
+- `Binarizer` is a scikit-learn transformer (refit per CV fold), with alphabetical tie-breaking, JSON save/load, a `use_delimiters` switch and set-based transform. When `n_features` is smaller than the delimiter list, delimiters are now truncated too.
 
 ### Fixed
+- HTML label check accepted comparisons (`i < x`) as tags; HTML windows that are mostly inline script/style are now dropped (embedded-language rule).
 - TMU crash on NumPy 2: `tm` extra pins `numpy<2`, `scipy<1.14`.
 - Windows splitting block comments, docstrings and multi-line strings (4.6% of Stage A v2 snippets).

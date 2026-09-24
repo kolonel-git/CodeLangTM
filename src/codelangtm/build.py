@@ -13,7 +13,7 @@ from . import LANGUAGES
 from .data import Snippet, load_snippets, save_snippets
 from .dedup import dedup
 from .labels import filter_labels
-from .splits import check_no_leakage, group_kfold, group_split, separate_wild
+from .splits import SPLIT_SALT, check_no_leakage, separate_wild, stable_split
 
 MIN_TRAIN_REPOS = 5  # fewer repos per language makes stratified group CV unreliable
 SPLITS = ("train", "test", "wild")
@@ -83,7 +83,7 @@ def build_dataset(
     out: str | Path,
     test_size: float = 0.2,
     n_folds: int = 5,
-    seed: int = 0,
+    salt: str = SPLIT_SALT,
     languages: Sequence[str] = LANGUAGES,
 ) -> BuildReport:
     report = BuildReport()
@@ -98,15 +98,11 @@ def build_dataset(
     report.duplicates_removed = stats.exact_removed + stats.near_removed
     main, wild = separate_wild(kept)
 
-    train, test = group_split(main, test_size, seed)
+    split = stable_split(main, test_size, n_folds, salt)
+    train, test = split.split(main)
     check_no_leakage(train, test)
     check_no_leakage(main, wild)
-
-    position = {id(s): i for i, s in enumerate(train)}
-    folds = [-1] * len(train)
-    for k, (_, fold_test) in enumerate(group_kfold(train, n_folds, seed)):
-        for s in fold_test:
-            folds[position[id(s)]] = k
+    folds = split.folds(train)
 
     parts = {"train": train, "test": test, "wild": wild}
     report.counts = {name: Counter(s.language for s in part) for name, part in parts.items()}
@@ -127,13 +123,18 @@ def build_dataset(
     for name, part in parts.items():
         save_snippets(part, out / f"{name}.jsonl")
     (out / "folds.json").write_text(
-        json.dumps({"n_folds": n_folds, "seed": seed, "folds": folds}), encoding="utf-8"
+        json.dumps({"n_folds": n_folds, "salt": salt, "folds": folds}), encoding="utf-8"
     )
     written = [f"{name}.jsonl" for name in parts] + ["folds.json"]
     report.files = {name: _sha256(out / name) for name in written}
     manifest = {
         **report.to_dict(),
-        "params": {"test_size": test_size, "n_folds": n_folds, "seed": seed},
+        "params": {
+            "split": "stable-hash",
+            "test_size": test_size,
+            "n_folds": n_folds,
+            "salt": salt,
+        },
         "sources": [str(p) for p in sources],
         "languages": list(languages),
     }

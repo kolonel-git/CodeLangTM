@@ -24,7 +24,7 @@ Selection rules: MIT / Apache-2.0 / BSD licenses only; no forks or archived repo
 ```bash
 uv run codelangtm data build   # reads data/raw/ recursively, writes data/processed/
 ```
-Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). Needs at least 5 distinct repos.
+Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). The split is a stable hash-based per-language repo split (`--salt`, default `codelangtm-v1`): re-collecting one language does not move other languages' test repos.
 
 ## Auditing the dataset
 ```bash
@@ -47,7 +47,7 @@ Prints per-language stats and quality flags (dominant repo > 10%, test files > 4
 ## Source ledger
 | Source | URL | License | Languages | Snippets | Date collected | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| GitHub (Stage A v3) | https://github.com (search API) | MIT / Apache-2.0 / BSD per repo | python, cpp, java, javascript, rust, go, html | 784 from 175 repos | 2026-09-24 | 25 repos × <= 5 snippets, >= 50 stars; repo list + commit SHAs in `data/raw/github/<lang>.manifest.json` |
-| GitHub (Stage A v3, SQL) | https://github.com (search API) | MIT / Apache-2.0 per repo | sql | 77 from 21 repos | 2026-09-24 | `--min-stars 10` (too few permissive SQL repos above 50 stars) |
+| GitHub (Stage A v4) | https://github.com (search API) | MIT / Apache-2.0 / BSD per repo | python, cpp, java, javascript, rust, go, html | 792 from 175 repos | 2026-09-24 | 25 repos × <= 5 snippets, >= 50 stars; HTML re-collected for v4; repo list + commit SHAs in `data/raw/github/<lang>.manifest.json` |
+| GitHub (Stage A v4, SQL) | https://github.com (search API) | MIT / Apache-2.0 per repo | sql | 77 from 21 repos | 2026-09-24 | `--min-stars 10` (too few permissive SQL repos above 50 stars) |
 
 Full description, statistics and limitations: [dataset-card.md](dataset-card.md).

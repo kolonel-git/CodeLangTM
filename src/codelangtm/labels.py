@@ -48,9 +48,17 @@ _RED_FLAGS: dict[str, re.Pattern[str]] = {
     "go": re.compile(r"^\s*(#include\b|public\s+class\b|def\s+\w+.*:\s*$)", re.M),
 }
 
+# A real HTML tag (`<div`, `</p`, `<my-el`) or `<!` (comment/doctype). The name must end in
+# space, `>`, `/` or end of line (multi-line tags), and must not follow an identifier or `)`/`]`,
+# so comparisons like `i < elements` or `a<b` do not count as tags.
+HTML_TAG = re.compile(r"(?<![\w)\]])</?[a-zA-Z][\w-]*(?:[\s>/]|$)|<!", re.M)
+
+# HTML windows that are mostly inline <script>/<style> code are really JavaScript/CSS.
+MIN_MARKUP_SHARE = 0.20
+
 # Content that must appear for the label to be believable.
 _REQUIRED: dict[str, re.Pattern[str]] = {
-    "html": re.compile(r"<\s*[a-zA-Z!]"),
+    "html": HTML_TAG,
     "sql": re.compile(
         r"\b(select|insert|update|delete|create|alter|drop|with|from|where)\b", re.I
     ),
@@ -74,6 +82,12 @@ def template_fraction(text: str, front_matter: bool = False) -> float:
         return 0.0
     hits = sum(bool(_TEMPLATE_MARK.search(ln)) or (front_matter and ln == "---") for ln in lines)
     return hits / len(lines)
+
+
+def markup_share(text: str) -> float:
+    """Share of non-blank lines containing an HTML tag."""
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    return sum(bool(HTML_TAG.search(ln)) for ln in lines) / len(lines) if lines else 0.0
 
 
 @dataclass(frozen=True)
@@ -112,6 +126,8 @@ def check_label(s: Snippet) -> LabelCheck:
     required = _REQUIRED.get(s.language)
     if required and not required.search(text):
         reasons.append("expected markers missing")
+    elif s.language == "html" and markup_share(text) < MIN_MARKUP_SHARE:
+        reasons.append("mostly embedded script/style")
     if is_cut(text, s.language):
         reasons.append("cut comment or string")
     if s.language in TEMPLATE_LANGUAGES:
