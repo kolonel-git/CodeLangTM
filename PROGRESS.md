@@ -4,15 +4,15 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 **Last updated:** 2026-09-24
 **Current milestone:** M2 — Features & baselines
-**Overall:** M0 complete, M1 Stage A complete (dataset v4: 869 snippets, [dataset card](docs/dataset-card.md)), M2 baselines + data checks done: bar to beat = CV macro-F1 0.923 ([results](docs/results.md))
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 baselines + data checks done: bar to beat = LR CV macro-F1 0.917, repeated test 0.931 ([results](docs/results.md))
 
 ## Milestone overview
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | Stage A done | v4: 869 snippets, 196 repos; Stage B items deferred |
-| M2 Features & baselines | In progress | 5 baselines done; ablations + data checks next |
+| M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
+| M2 Features & baselines | In progress | Baselines, data checks, stable split done; ablations next |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -21,7 +21,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 ## Next steps (in order)
 
-- [ ] Verify GitHub repo settings: description, topics, replace `OWNER` in README badges, CI green ([docs/github-setup.md](docs/github-setup.md))
+- [x] Verify GitHub repo settings: description, topics, replace `OWNER` in README badges, CI green ([docs/github-setup.md](docs/github-setup.md))
 - [x] Check TMU installs: `uv sync --extra tm` (works natively on Windows, no WSL/Docker needed)
 - [x] Re-run `uv run ruff check .` and `uv run pytest` after the `features.py` lint fix
 - [x] M1: define snippet record schema in code (`Snippet` in `src/codelangtm/data.py`)
@@ -44,7 +44,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
 - [x] M2: embedded-language rule for HTML (drop windows with < 20% markup lines; stricter tag pattern)
 - [x] M2: re-collect HTML → dataset v4; rerun build, baselines, diagnose; update dataset card + results
-- [ ] M2: stable split (hash-based per-language repo assignment) + repeated-split test reporting (decision pending)
+- [x] M2: stable split (hash-based per-language repo assignment) + repeated-split test reporting → dataset v5
+- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [ ] M2: ablations (M, n-gram sizes, delimiters, token features) with YAML configs
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
@@ -54,6 +55,14 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — Stable split and repeated-split reporting (dataset v5)
+- Decision (option A after weighing A/B/C, see issues-and-fixes M4): stable hash-based per-language split + repeated test splits for baselines now and for the final TM comparison.
+- Rejected pure hashing after simulating it on v4 (Java 2 test repos, Python 9). Chosen: per language, hash-ordered repos, first round(n × 0.2) to test; rest cut into 5 equal folds by a second hash.
+- `splits.py`: `stable_split`, `StableSplit`, `repo_languages`; `data build` uses it (`--salt`, default `codelangtm-v1`); manifest records `split: stable-hash`.
+- `baselines.py`: `repeated_split_f1`; `--repeats 10` (default) → "Repeated test macro-F1" column (mean ± std, min-max).
+- Tests: 155 passing; properties tested: exact per-language balance, isolation between languages, at most one repo moved per added/removed repo (50 randomised trials).
+- v5 results: LR CV 0.917 ± 0.008, test 0.943, repeated test 0.931 ± 0.007 (CV and repeated test now agree). Each language has 5 test repos (SQL 4).
 
 ### 2026-09-24 — Dataset v4 and test-variance finding
 - HTML re-collected with the embedded-language rule: 100 snippets from 25 repos (13 repos skipped). Dataset v4: 869 snippets (train 696, test 173).
@@ -170,6 +179,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | --- | --- | --- | --- | --- |
 | 2026-09-24 | Baselines, M=500, 2/3-grams + delimiters | v3 | LR 0.920 / 0.951 (best) | SVM 0.905, RF 0.897, NB 0.853, DT 0.724; 0.31 ms/snippet (binarization-bound) |
 | 2026-09-24 | Baselines, same config | v4 | LR 0.923 / 0.896 (best) | SVM 0.913, RF 0.907, NB 0.876, DT 0.726; test not comparable to v3 (split reshuffled; seed spread 0.870-0.978) |
+| 2026-09-24 | Baselines, same config, stable split + 10 repeated splits | v5 | LR 0.917 / 0.943; repeated 0.931 ± 0.007 (best) | SVM 0.908 (rep 0.922), RF 0.897 (rep 0.924), NB 0.857 (rep 0.880), DT 0.729 (rep 0.745) |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.

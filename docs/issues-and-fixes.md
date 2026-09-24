@@ -10,6 +10,7 @@ Engineering log of problems hit while building CodeLangTM: symptom, root cause, 
 | v2 | SQL top-up (`--min-stars 10`) + template filter | 866 | 21 (template-heavy) | 845 | 71 | 82 |
 | v3 | Cut-safe windows, full re-collection | 861 | 0 | 861 | 77 | 92 |
 | v4 | HTML embedded-language rule, HTML re-collected | 869 | 0 | 869 | 77 | 100 |
+| v5 | Same snippets, stable hash-based split (M4) | 869 | 0 | 869 | 77 | 100 |
 
 v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows 0-10% comments.
 
@@ -22,11 +23,15 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 - **Root cause:** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`). 2/3-character n-grams cannot see SQL keywords such as `SELECT` or `INSERT`.
 - **Planned fix:** keyword/token features in the M2 ablation study.
 
-### M4. Test score swung 5.5 points after an HTML-only change
+### M4. Test score swung 5.5 points after an HTML-only change (fixed: stable split)
 - **Symptom:** after re-collecting only HTML (v3 → v4), logistic regression CV macro-F1 stayed flat (0.920 → 0.923) but test macro-F1 fell 0.951 → 0.896.
 - **Root cause:** not the model. Changing HTML repositories changed the group list, so `StratifiedGroupKFold` reshuffled which repos of *every* language went to test (e.g. Python 90/24 → 93/21 train/test). With only 39 test repos, the test score is very sensitive to that draw.
 - **Evidence:** same v4 data and model, 10 different split seeds: test macro-F1 0.870-0.978, mean 0.929 ± 0.030, matching CV (0.923).
-- **Decision:** CV macro-F1 is the primary metric; single test scores are reported but not compared across dataset versions. Proposed: a stable split (per-language, hash-based repo assignment) so re-collecting one language cannot move other languages' test repos, and repeated-split test reporting for final results.
+- **Options weighed:** (A) stable split, (B) keep StratifiedGroupKFold and never compare test across versions, (C) freeze v4's test repo list in a lock file. B leaves every future data change (Stage B) reshuffling test and leaves seed choice open; C adds a lock file for little gain. A chosen because the dataset will change again and switching now costs one baseline rerun, versus redoing ablations and TM training later.
+- **Design check:** pure hashing (repo in test if hash < 0.2) was simulated on v4 and rejected: Java would get 2 test repos (5%), Python 9 (35%), some CV folds a single repo. Chosen design: within each language, order repos by hash and take the first round(n × 0.2) for test; order the rest by a second hash and cut into 5 equal folds.
+- **Guarantees (tested):** exact test repo count per language; fold sizes differ by at most 1 repo; other languages unaffected by changes to one language; adding/removing one repo moves at most one existing repo in or out of test (50 randomised trials).
+- **Fix:** `stable_split` (salt `codelangtm-v1`) used by `data build` → dataset v5 (same snippets as v4). `codelangtm baselines` adds repeated test macro-F1 over 10 further balanced splits (salts `…:repeat:k`), reported as mean ± std (min-max), never used for selection.
+- **Result (v5):** logistic regression CV 0.917 ± 0.008, single test 0.943, repeated test 0.931 ± 0.007. CV and repeated test now agree within ~0.015.
 
 ### M1. Feature vocabulary could leak across CV folds
 - **Risk:** fitting the n-gram vocabulary once on all training data, then cross-validating, lets n-grams that appear only in the validation fold shape the features. A subtle leak that inflates CV scores.
@@ -40,7 +45,7 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 - **Status:** fixed with an embedded-language rule for HTML and a stricter tag pattern; see D5.
 
 ### M2. Latency is dominated by feature extraction
-- **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible.
+- **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible. Measured latency varies between runs (0.31 on v4, 0.43-0.48 on v5 for the same pipeline, on the same machine with other load); treat single-run latency as approximate until a dedicated benchmark (M6).
 - **Implication:** the < 0.1 ms target is a feature-extraction problem. Planned: faster Python binarization in M2, and C feature extraction in M6.
 
 ---

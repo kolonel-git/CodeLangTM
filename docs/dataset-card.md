@@ -1,4 +1,4 @@
-# Dataset card: CodeLangTM Stage A (v4)
+# Dataset card: CodeLangTM Stage A (v5)
 
 Real-world source code windows labelled with their programming language, built to train and evaluate an interpretable Tsetlin Machine language identifier. Structure follows *Datasheets for Datasets* (Gebru et al.). How problems found along the way were fixed: [issues-and-fixes.md](issues-and-fixes.md).
 
@@ -6,11 +6,11 @@ Real-world source code windows labelled with their programming language, built t
 
 | | |
 | --- | --- |
-| Version | Stage A **v4**, collected 2026-09-24 |
+| Version | Stage A **v5** (v4 snippets, stable split), collected 2026-09-24 |
 | Instances | **869** code windows (20-50 lines each) |
 | Classes | 8: Python, C++, Java, JavaScript, Rust, Go, SQL, HTML |
 | Source | 196 public GitHub repositories, MIT / Apache-2.0 / BSD licensed |
-| Splits | train 696 / test 173 (by repository), 5 CV folds on train, wild set empty |
+| Splits | train 696 / test 173, stable hash-based repo split (5 test repos per language, SQL 4), 5 CV folds on train, wild set empty |
 | Files | `data/processed/{train,test,wild}.jsonl`, `folds.json`, `dataset.json` (not committed) |
 
 ## Motivation
@@ -23,13 +23,13 @@ Real-world source code windows labelled with their programming language, built t
 | Language | Train | Test | Total | Repos | Largest repo share | Median chars | Median comment ratio | Test-file share |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Python | 93 | 21 | 114 | 25 | 4% | 1,062 | 7% | 23% |
-| C++ | 88 | 23 | 111 | 25 | 5% | 1,012 | 8% | 6% |
-| Java | 92 | 22 | 114 | 25 | 4% | 998 | 8% | 22% |
+| C++ | 90 | 21 | 111 | 25 | 5% | 1,012 | 8% | 6% |
+| Java | 94 | 20 | 114 | 25 | 4% | 998 | 8% | 22% |
 | JavaScript | 85 | 21 | 106 | 25 | 5% | 1,021 | 3% | 29% |
 | Rust | 98 | 25 | 123 | 25 | 4% | 1,015 | 10% | 13% |
 | Go | 99 | 25 | 124 | 25 | 4% | 811 | 5% | 40% |
 | SQL | 61 | 16 | 77 | 21 | 6% | 1,022 | 8% | 1% |
-| HTML | 80 | 20 | 100 | 25 | 5% | 1,319 | 0% | 7% |
+| HTML | 76 | 24 | 100 | 25 | 5% | 1,319 | 0% | 7% |
 | **Total** | **696** | **173** | **869** | **196** | | | | |
 
 - **Instance:** one contiguous window of 20-50 lines from one file (median 30-34 lines), with provenance. Schema (`Snippet` in `src/codelangtm/data.py`):
@@ -72,10 +72,10 @@ Repos yielding no usable snippets were skipped (HTML 13, SQL 5, Go 1, Python 1) 
 ## Splits
 Command: `codelangtm data build` (`src/codelangtm/build.py`, `splits.py`).
 
-- **Train/test:** `StratifiedGroupKFold` grouped by repository, seed 0; test = one fold (173 snippets, 19.9%, 39 repos). **No repository appears in both.** Verified by `check_no_leakage` on every build.
-- **CV:** 5 stratified group folds over train; fold id per snippet in `folds.json`; a repo never spans folds.
-- **Test-score variance:** with only 39 test repos, the test score depends heavily on which repos land in test. Logistic regression on v4 scores 0.870-0.978 macro-F1 across 10 split seeds (mean 0.929 ± 0.030). CV macro-F1 (5 folds) is the primary metric; a single test score is one noisy draw.
-- **Split stability:** changing any repository (e.g. re-collecting one language) reshuffles which repos of *every* language land in test, so test scores are not comparable across dataset versions.
+- **Train/test (stable hash split, `splits.stable_split`, salt `codelangtm-v1`):** within each language, repos are ordered by a SHA-256 hash of their name and the first round(n × 0.2) go to test: 5 repos per language (SQL 4 of 21), 173 snippets (19.9%), 39 repos. **No repository appears in both.** Verified by `check_no_leakage` on every build.
+- **CV:** the remaining repos of each language are ordered by a second hash and cut into 5 equal consecutive folds (repo counts differ by at most 1); fold id per snippet in `folds.json`; a repo never spans folds.
+- **Stability:** re-collecting one language never moves another language's repos; adding or removing one repo moves at most one existing repo in or out of test. Test scores of unchanged languages stay comparable across dataset versions.
+- **Test-score variance:** with 39 test repos, the test score depends on which repos land in test (v4 experiment: 0.870-0.978 across 10 random splits). Results therefore report CV macro-F1 (model selection) and **repeated test macro-F1**: mean ± std over 10 further balanced repo-level splits of train + test (salts `codelangtm-v1:repeat:0..9`).
 - **Wild set:** empty. Planned: hand-collected StackOverflow / blog / documentation snippets, used only for final evaluation; build drops any wild snippet that duplicates training data.
 
 ## Licensing and redistribution
@@ -108,13 +108,13 @@ uv run codelangtm data build
 uv run codelangtm data audit
 ```
 
-Exact reproduction also needs the same repository HEADs; GitHub search results and HEAD commits change over time, so a re-run produces a similar, not identical, dataset. v4 is identified by these SHA-256 prefixes (full hashes in `dataset.json`):
+Exact reproduction also needs the same repository HEADs; GitHub search results and HEAD commits change over time, so a re-run produces a similar, not identical, dataset. v5 is identified by these SHA-256 prefixes (full hashes in `dataset.json`):
 
 | File | SHA-256 (prefix) |
 | --- | --- |
-| `train.jsonl` | `eb72bf96dfb6` |
-| `test.jsonl` | `2d57abab16b8` |
-| `folds.json` | `560538e76fac` |
+| `train.jsonl` | `8cdc4c91ebe6` |
+| `test.jsonl` | `54649be8e4e0` |
+| `folds.json` | `77229e0f7668` |
 | `wild.jsonl` | `e3b0c44298fc` (empty) |
 
 **History:**
@@ -125,6 +125,7 @@ Exact reproduction also needs the same repository HEADs; GitHub search results a
 | v2 | SQL top-up (`--min-stars 10`), template filter | 845 |
 | v3 | Cut-safe windows, full re-collection | 861 |
 | v4 | HTML embedded-language rule, HTML re-collected | 869 (HTML 100) |
+| v5 | Same snippets as v4; stable hash-based split replaces StratifiedGroupKFold | 869 |
 
 Details in [issues-and-fixes.md](issues-and-fixes.md).
 

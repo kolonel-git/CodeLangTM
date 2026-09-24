@@ -38,7 +38,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M2 — Features & baselines
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-**Status:** baselines and data checks done (best: logistic regression, CV macro-F1 0.923 on dataset v4; see [results.md](results.md)). Stable split and ablations next.
+**Status:** baselines, data checks and stable split done (best: logistic regression, CV macro-F1 0.917, repeated test 0.931 ± 0.007 on dataset v5; see [results.md](results.md)). Ablations next.
 
 - [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
 - [ ] Token-level features (keywords, identifiers shape, indentation stats) as optional feature block
@@ -49,7 +49,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Auto-generated `docs/results.md`
 - [x] Confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
 - [x] Embedded-language rule for HTML (windows that are mostly `<script>`)
-- [ ] Stable split: per-language hash-based repo assignment; repeated-split test reporting
+- [x] Stable split: per-language hash-based repo assignment; repeated-split test reporting (dataset v5)
 - [ ] Faster binarization (currently ~0.31 ms/snippet, ~100% of end-to-end latency)
 
 **Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.

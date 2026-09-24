@@ -24,7 +24,7 @@ Selection rules: MIT / Apache-2.0 / BSD licenses only; no forks or archived repo
 ```bash
 uv run codelangtm data build   # reads data/raw/ recursively, writes data/processed/
 ```
-Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). Needs at least 5 distinct repos.
+Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). The split is a stable hash-based per-language repo split (`--salt`, default `codelangtm-v1`): re-collecting one language does not move other languages' test repos.
 
 ## Auditing the dataset
 ```bash
