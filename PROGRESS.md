@@ -25,16 +25,27 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] Check TMU installs: `uv sync --extra tm` (works natively on Windows, no WSL/Docker needed)
 - [x] Re-run `uv run ruff check .` and `uv run pytest` after the `features.py` lint fix
 - [x] M1: define snippet record schema in code (`Snippet` in `src/codelangtm/data.py`)
-- [ ] M1: dataset loader + tests on tiny fixtures
-- [ ] M1: GitHub collector (permissive licenses only)
-- [ ] M1: window extractor (20-50 contiguous lines), dedup, label sanity check
-- [ ] M1: group-by-repo split + k-fold; Stage A dataset (1,000 snippets)
+- [x] M1: dataset loader + tests on tiny fixtures (JSONL in `data.py`)
+- [x] M1: window extractor (20-50 contiguous lines), dedup, label sanity check
+- [x] M1: group-by-repo split + k-fold
+- [ ] M1: `codelangtm data build` command chaining windows → label check → dedup → split over a local folder
+- [ ] M1: GitHub collector (permissive licenses only; token from env var)
+- [ ] M1: public-dataset loaders (The Stack, CodeSearchNet), wild set
+- [ ] M1: Stage A dataset (1,000 snippets) + dataset card
 - [ ] Log every data source in [docs/data-sources.md](docs/data-sources.md)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-24 — Window extractor, dedup, label check, group split (M1)
+- `windows.py`: `extract_windows` (seeded, non-overlapping 20-50 line windows) + `is_low_signal` (blank / license / comment-only windows dropped).
+- `dedup.py`: `dedup` = exact (whitespace-normalized SHA-1) + near-duplicate (MinHash LSH, verified by Jaccard >= 0.8 on 5-token shingles). 3,000 snippets in ~3s.
+- `labels.py`: `check_label` / `filter_labels` — binary, minified, non-ASCII, extension mismatch (`.h` decided by content), other-language red flags, required HTML/SQL markers; wild snippets skip the extension check. Returns drop-reason counts.
+- `splits.py`: `group_split`, `group_kfold` (StratifiedGroupKFold by repo), `check_no_leakage`, `separate_wild`.
+- Tests: 50 passing, ruff clean.
+- Watch on real data: dedup threshold (boilerplate-heavy languages), JS red flag drops Flow-typed JS, SQL keyword rule drops pure INSERT-value windows.
 
 ### 2026-09-24 — TMU check + snippet schema (M1 start)
 - `uv sync --extra tm` installed `tmu 0.8.3`. First toy run crashed with numpy 2.5 (`OverflowError: Python integer -1 out of bounds for uint32`).
