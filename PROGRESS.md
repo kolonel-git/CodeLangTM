@@ -28,8 +28,9 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: dataset loader + tests on tiny fixtures (JSONL in `data.py`)
 - [x] M1: window extractor (20-50 contiguous lines), dedup, label sanity check
 - [x] M1: group-by-repo split + k-fold
-- [ ] M1: `codelangtm data build` command chaining windows → label check → dedup → split over a local folder
-- [ ] M1: GitHub collector (permissive licenses only; token from env var)
+- [x] M1: GitHub collector (permissive licenses only; token from env var)
+- [ ] M1: smoke-test collector against real GitHub (`--language python --repos 2 --per-repo 2`)
+- [ ] M1: `codelangtm data build` command: merge sources → split → write train/test/wild
 - [ ] M1: public-dataset loaders (The Stack, CodeSearchNet), wild set
 - [ ] M1: Stage A dataset (1,000 snippets) + dataset card
 - [ ] Log every data source in [docs/data-sources.md](docs/data-sources.md)
@@ -38,6 +39,15 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — GitHub collector (M1)
+- PR #1 merged (schema, windows, dedup, labels, splits).
+- Created read-only fine-grained GitHub token, stored in `GITHUB_TOKEN` user env var (verified: 5000/hr limit).
+- `github.py`: `GitHubClient` (token from env, rate-limit + 5xx retry, plain 403 fails fast, commit-pinned disk cache), `search_repos` (license allowlist, star bands, round-robin), `candidate_files` (extension + vendored/generated/minified/size filters), `collect_repo` (1 random window per file, label check), `collect_language` (repo caps, skips empty/broken repos, dedup, report).
+- CLI: `codelangtm collect github [--language X] --repos 25 --per-repo 5 --min-stars 50` writes `<lang>.jsonl` + `<lang>.manifest.json`.
+- Deps: `httpx` in new `collect` extra (+ dev group). `.gitignore`: `data/cache/`, `.env`.
+- Tests: 63 passing, all offline via `httpx.MockTransport`; includes a test that the token never appears in outputs.
+- Note: use `uv sync --extra tm --extra collect`; plain `uv sync` removes TMU from the venv.
 
 ### 2026-09-24 — Window extractor, dedup, label check, group split (M1)
 - `windows.py`: `extract_windows` (seeded, non-overlapping 20-50 line windows) + `is_low_signal` (blank / license / comment-only windows dropped).
