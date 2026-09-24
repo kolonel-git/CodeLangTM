@@ -34,6 +34,7 @@ from .features import Binarizer
 from .splits import SPLIT_SALT, check_no_leakage, stable_split
 
 LATENCY_REPEATS = 5
+FEATURE_DEFAULTS = Binarizer().get_params()  # only non-default options are shown in reports
 
 
 def make_models(seed: int = 0) -> dict[str, object]:
@@ -203,11 +204,7 @@ def run_baselines(
     meta = {
         **dataset_meta(data_dir, dataset, folds),
         "n_features": binarizer.n_features,
-        "features": {
-            "n_features": binarizer.n_features,
-            "ngram_sizes": list(binarizer.ngram_sizes),
-            "use_delimiters": binarizer.use_delimiters,
-        },
+        "features": {**binarizer.get_params(), "ngram_sizes": list(binarizer.ngram_sizes)},
         "seed": seed,
         "repeats": repeats,
     }
@@ -289,8 +286,12 @@ def _split_text(params: dict) -> str:
 def _features_text(meta: dict) -> str:
     f = meta.get("features") or {"n_features": meta["n_features"], "ngram_sizes": [2, 3]}
     sizes = ", ".join(str(n) for n in f["ngram_sizes"])
-    delims = "" if f.get("use_delimiters", True) else ", use_delimiters=False"
-    return f"`Binarizer(n_features={f['n_features']}, ngram_sizes=({sizes}){delims})`"
+    extras = "".join(
+        f", {key}={f[key]!r}"
+        for key in ("use_delimiters", "selection", "min_df", "word_tokens")  # signature order
+        if key in f and f[key] != FEATURE_DEFAULTS[key]
+    )
+    return f"`Binarizer(n_features={f['n_features']}, ngram_sizes=({sizes}){extras})`"
 
 
 def _config_text(meta: dict) -> str:
