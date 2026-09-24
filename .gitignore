@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Data (collected locally; not committed)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Models / build outputs
+*.pkl
+*.npz
+*.o
+*.so
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
