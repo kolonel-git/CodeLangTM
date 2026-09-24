@@ -276,7 +276,7 @@ def collect_repo(
         if text is None:
             report.dropped["not utf-8"] += 1
             continue
-        windows = extract_windows(text, seed=rng.randrange(2**31))
+        windows = extract_windows(text, seed=rng.randrange(2**31), language=language)
         if not windows:
             report.dropped["no usable window"] += 1
             continue

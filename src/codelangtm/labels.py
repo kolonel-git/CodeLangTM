@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 from .data import Snippet
+from .syntax import is_cut
 
 EXTENSION_LANGUAGE = {
     ".py": "python",
@@ -58,6 +59,22 @@ _REQUIRED: dict[str, re.Pattern[str]] = {
 MAX_LINE_LEN = 500  # longer lines mean minified or data blobs
 MAX_NON_ASCII = 0.30
 
+# Template engines (Jinja/dbt/Liquid/Vue, ERB/EJS) wrapped around SQL or HTML. Mostly-template
+# windows teach "{% means SQL" shortcuts. Other languages use `{{` legitimately (format-string
+# escapes, JSX style props, nested initialisers), so they are not checked.
+_TEMPLATE_MARK = re.compile(r"\{%|%\}|\{\{|\}\}|<%|%>")
+TEMPLATE_LANGUAGES = frozenset({"sql", "html"})
+MAX_TEMPLATE_FRAC = 0.30
+
+
+def template_fraction(text: str, front_matter: bool = False) -> float:
+    """Share of non-blank lines with template markers (and `---` front matter if enabled)."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return 0.0
+    hits = sum(bool(_TEMPLATE_MARK.search(ln)) or (front_matter and ln == "---") for ln in lines)
+    return hits / len(lines)
+
 
 @dataclass(frozen=True)
 class LabelCheck:
@@ -95,6 +112,11 @@ def check_label(s: Snippet) -> LabelCheck:
     required = _REQUIRED.get(s.language)
     if required and not required.search(text):
         reasons.append("expected markers missing")
+    if is_cut(text, s.language):
+        reasons.append("cut comment or string")
+    if s.language in TEMPLATE_LANGUAGES:
+        if template_fraction(text, front_matter=s.language == "html") > MAX_TEMPLATE_FRAC:
+            reasons.append("template-heavy")
 
     return LabelCheck(not reasons, tuple(reasons))
 
