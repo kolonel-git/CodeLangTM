@@ -48,8 +48,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [x] M2: push `feat/baselines`, open PR, merge (M2 part 1)
 - [x] M2 ablations step 1: YAML config system (`configs/baselines.yaml`, strict loader, settings hash in results)
-- [ ] M2 ablations step 2: ablation runner (grid over M, n-gram sizes, delimiters) → `docs/ablations.md`
-- [ ] M2 ablations step 3: token/keyword feature block (targets C++ → Rust confusion and SQL "data rows", issues-and-fixes M5)
+- [x] M2 ablations step 2: ablation runner (M, n-gram sizes, delimiters) → `docs/ablations.md`
+- [ ] M2 ablations step 3: discriminative vocabulary selection (issues-and-fixes M6) + token/keyword feature block (C++ → Rust confusion, SQL "data rows", M5); larger M (2000)
 - [ ] M2 ablations step 4: run, analyse, freeze the feature config for M3
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
@@ -59,6 +59,16 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — M2 part 2 step 2: ablation runner and first results
+- `ablations.py` + `codelangtm ablate [--study NAME] [--config] [--out]`, driven by `configs/ablations.yaml`. Each study varies feature options (every combination), the rest from the base; each unique setting is evaluated once.
+- Train-only, repo-grouped 5-fold CV; the test set is never used (ablations choose features). Binarizer fit once per fold per setting and shared by all models; a test proves this gives exactly the Pipeline's CV scores.
+- Reports paired Δ vs base (mean ± std of per-fold differences), per-language out-of-fold F1, vocabulary size used, binarize ms/snippet.
+- `baselines.dataset_meta` extracted and shared by both reports.
+- Sanity check: base row equals the baselines (LR 0.917, NB 0.857).
+- Findings (LR): M matters most (M=100 -0.131, M=1000 +0.014, still rising); bigrams alone beat 2+3 (0.944, +0.027 ± 0.021) because frequency ranking fills slots with generic 3-grams like `ing`, `ion` (issues-and-fixes M6); delimiters +0.012 ± 0.014 (within noise) at ~40% of binarize time (M2 entry).
+- No feature config frozen yet: step 3 tests discriminative selection and keyword features first.
+- Tests: 197 passing.
 
 ### 2026-09-24 — M2 part 2 step 1: YAML experiment configs
 - `feat/baselines` merged (M2 part 1). New branch `feat/ablations`.
@@ -192,6 +202,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Baselines, M=500, 2/3-grams + delimiters | v3 | LR 0.920 / 0.951 (best) | SVM 0.905, RF 0.897, NB 0.853, DT 0.724; 0.31 ms/snippet (binarization-bound) |
 | 2026-09-24 | Baselines, same config | v4 | LR 0.923 / 0.896 (best) | SVM 0.913, RF 0.907, NB 0.876, DT 0.726; test not comparable to v3 (split reshuffled; seed spread 0.870-0.978) |
 | 2026-09-24 | Baselines, same config, stable split + 10 repeated splits | v5 | LR 0.917 / 0.943; repeated 0.931 ± 0.007 (best) | SVM 0.908 (rep 0.922), RF 0.897 (rep 0.924), NB 0.857 (rep 0.880), DT 0.729 (rep 0.745) |
+| 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.

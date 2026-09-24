@@ -9,6 +9,7 @@ Tsetlin Machine (TMU) classifier that identifies a snippet's programming languag
 - `uv run codelangtm --version` — CLI
 - `uv run codelangtm collect github` / `data build` / `data audit` — dataset pipeline (see docs/data-sources.md)
 - `uv run codelangtm baselines --config configs/baselines.yaml` — classical baselines → docs/results.md (flags override the YAML)
+- `uv run codelangtm ablate [--study NAME]` — feature ablations from configs/ablations.yaml → docs/ablations.md (CV only)
 - Always `uv sync --extra tm --extra collect` (plain `uv sync` removes TMU)
 
 ## Layout

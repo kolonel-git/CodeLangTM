@@ -18,6 +18,12 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
+### M6. Frequency-ranked vocabulary picks generic n-grams (open)
+- **Symptom:** first ablation run (`docs/ablations.md`): bigrams alone beat the 2+3-gram base at the same M=500 (logistic regression CV 0.944 vs 0.917, paired Δ +0.027 ± 0.021; Naive Bayes +0.036 ± 0.021). Adding 4-grams (n=2+3+4) is worse still (-0.011).
+- **Root cause:** the binarizer keeps the top M n-grams by document frequency across all languages. With 2+3-grams, 183 of the 500 slots go to 3-grams that are common everywhere, such as `ing`, `ion`, `tio`, `ent`, `con` (English identifiers and comments) and runs of spaces. They push out 183 lower-ranked bigrams that separate languages better. Frequency is not discriminative power.
+- **Also seen:** vocabulary size is the largest effect (M=100: -0.131; M=1000: +0.014 and still rising), consistent with useful features sitting below the frequency cut-off.
+- **Planned fix:** ablate discriminative selection (e.g. top-k per language, or a class-association score such as chi²) in M2 step 3, alongside keyword features (M5). Selection must stay inside each CV fold.
+
 ### M5. Repetitive list-like code predicted as SQL (open)
 - **Symptom:** v4 confident learning flagged 3 correctly labelled Python, Java and C++ windows as SQL (p 0.77-0.85). All three are long runs of near-identical lines such as `mapDecoration("white_banner", 10),` or `Round::deregisterNode(pluginFn);`.
 - **Root cause:** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`). 2/3-character n-grams cannot see SQL keywords such as `SELECT` or `INSERT`.
@@ -47,6 +53,7 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 ### M2. Latency is dominated by feature extraction
 - **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible. Measured latency varies between runs (0.31 on v4, 0.43-0.48 on v5 for the same pipeline, on the same machine with other load); treat single-run latency as approximate until a dedicated benchmark (M6).
 - **Implication:** the < 0.1 ms target is a feature-extraction problem. Planned: faster Python binarization in M2, and C feature extraction in M6.
+- **Ablation finding:** delimiters cost ~40% of binarize time (0.315 vs 0.185 ms/snippet) for a gain within fold noise (+0.012 ± 0.014). The delimiter list contains 1- and 4-character items (`;`, `\t`, 4 spaces), so `transform` extracts all 1-grams and 4-grams of every snippet just to test them. Cheap fix for the faster-binarization task: test delimiters by direct substring search instead of adding their lengths to the n-gram pass.
 
 ---
 
