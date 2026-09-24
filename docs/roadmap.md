@@ -1,24 +1,109 @@
 # Roadmap
 
-## Phase 1 — Dataset & pipeline
-- [ ] Collect ~1,000 real-world snippets (20-50 lines), 8 languages: Python, C++, Java, JS, Rust, Go, SQL, HTML
-- [ ] Record sources/licenses in `docs/data-sources.md`
-- [ ] Binarizer (M=500) — initial version in `features.py`
-- [ ] 80/20 stratified split
+Ordered milestones, no fixed deadlines. Each milestone maps to a GitHub milestone; each task checkbox becomes an issue. Work happens on feature branches merged via PR.
 
-## Phase 2 — Core training
-- [ ] TMClassifier baseline (N_c=100, T=30, s=3.5)
-- [ ] Naive Bayes + Decision Tree baselines
-- [ ] Accuracy + throughput benchmarks
+## Principles
+- **Real data only.** No synthetic snippet generators. Every snippet records its source repo and license.
+- **No leakage.** Splits are grouped by source repo; a separate "wild" test set comes from sources never seen in training.
+- **Reproducible.** YAML configs, fixed seeds, results committed to `docs/results.md`; every number regenerates from one command.
+- **Honest claims.** Targets (macro-F1 >= 96%, < 0.1 ms/snippet, < 500 KB) are reported as measured, including misses.
 
-## Phase 3 — Optimization & rules
-- [ ] Grid search s, T
-- [ ] Drop clause + literal budgeting
-- [ ] Render AND-rules
+## M0 — Foundations (done)
+- [x] Package layout, `uv` env pinned to Python 3.12, MIT license
+- [x] CI (ruff + pytest), issue/PR templates, docs skeleton
+- [x] Binarizer + literal expansion prototype
 
-## Phase 4 — Deployment
-- [ ] Pure C export
-- [ ] CLI tool; IDE plugin
+## M1 — Data pipeline
+**Goal:** a clean, licensed, leak-free dataset with documented provenance.
+
+Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch set added in Stage B: C, C#, TypeScript, Kotlin, PHP, Ruby, to stress confusable pairs (JS/TS, C/C++, Java/C#).
+
+- [ ] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
+- [ ] Collector: GitHub API, permissive licenses only (MIT / Apache-2.0 / BSD)
+- [ ] Loaders for public datasets (The Stack, CodeSearchNet) with license filter
+- [ ] Window extractor: contiguous 20-50 line windows from real files; skip near-empty / license-header-only windows
+- [ ] Dedup: exact hash + near-duplicate (MinHash or shingle Jaccard)
+- [ ] Label sanity check (extension vs content; drop mislabeled files, e.g. `.h` C vs C++)
+- [ ] Splits: group-by-repo train/test + stratified group k-fold CV
+- [ ] Wild test set: snippets from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
+- [ ] **Stage A:** 1,000 snippets (~125/language)
+- [ ] **Stage B:** scale to 10,000+ and add stretch languages
+- [ ] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
+
+**Exit:** `codelangtm data build` reproduces the dataset from configs; no repo appears in both train and test; every row has a license.
+
+## M2 — Features & baselines
+**Goal:** justify feature design with ablations; establish the bar the TM must beat.
+
+- [ ] Harden Binarizer (fit/transform tests, sparse-safe, deterministic vocabulary, save/load)
+- [ ] Token-level features (keywords, identifiers shape, indentation stats) as optional feature block
+- [ ] Ablation study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off; +token features
+- [ ] Baselines on identical features: Multinomial NB, Decision Tree, Logistic Regression, linear SVM, Random Forest
+- [ ] Metrics: macro-F1, per-language F1, confusion matrix, on CV, test, and wild sets
+- [ ] YAML config system + seed control; `codelangtm eval --config ...`
+- [ ] Auto-generated `docs/results.md`
+
+**Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.
+
+## M3 — Tsetlin Machine training
+**Goal:** working TMU classifier with fair comparison.
+
+- [ ] Verify TMU install (C backend; CUDA optional); document Windows/WSL/Docker path
+- [ ] `TMLanguageClassifier` fit/predict/save/load with tests
+- [ ] Baseline run: N_c=100, T=30, s=3.5
+- [ ] Training curves (accuracy vs epoch); throughput
+- [ ] TM vs baselines table on CV / test / wild
+- [ ] Error analysis: confusable pairs, short snippets
+
+**Exit:** TM results in `docs/results.md`, comparable to baselines on the same splits.
+
+## M4 — Tuning & compression
+**Goal:** best accuracy per byte and per rule.
+
+- [ ] Grid search over s, T, N_c; heatmaps saved to `docs/figures/`
+- [ ] Optuna refinement: epochs, drop-clause rate, literal budget (seeded)
+- [ ] Drop clause + literal budgeting to prune redundant literals
+- [ ] Trade-off curves: macro-F1 vs model size vs average rule length
+- [ ] Pick and freeze a release configuration
+
+**Exit:** frozen config in `configs/`; trade-off plots committed.
+
+## M5 — Explainability
+**Goal:** make the interpretability claim demonstrable.
+
+- [ ] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`)
+- [ ] Per-prediction explanation: `codelangtm predict --explain` shows winning clauses and vote totals
+- [ ] Rule quality metrics: length, coverage, precision, overlap between classes
+- [ ] HTML report: matched n-grams highlighted in the snippet, votes per language
+- [ ] Per-language rule gallery (top rules by coverage/precision)
+
+**Exit:** for any snippet, the report shows exactly which rules drove the prediction.
+
+## M6 — Deployment & benchmarks
+**Goal:** zero-dependency runtime meeting size/latency targets.
+
+- [ ] Pure C export of trained clauses (`export_c.export_c`)
+- [ ] Equivalence test: C predictions == Python predictions on the full test set
+- [ ] CLI: `codelangtm predict <file|->`
+- [ ] Benchmark script: latency per snippet (median, p95) and compiled model size
+- [ ] Results vs targets in README (< 0.1 ms, < 500 KB), reported as measured
+
+**Exit:** C runtime builds with a plain compiler; benchmarks reproducible.
+
+## M7 — Showcase & release
+- [ ] README: results table, figures, rule examples
+- [ ] Demo notebook (`notebooks/demo.ipynb`)
+- [ ] Write-up / blog post: method, ablations, findings, limitations
+- [ ] Tag `v0.1.0`, update CHANGELOG
 
 ## Future
-Relational TM (AST), Convolutional TM (2D layout), FPGA/ASIC (MATADOR), FedTMOS, Sparse TM for vulnerability detection.
+- Relational TM over ASTs (Horn clauses)
+- Convolutional TM over 2D code layout
+- VS Code extension; WebAssembly browser demo
+- FPGA/ASIC via MATADOR
+- Federated TM (FedTMOS)
+- Sparse TM for vulnerability detection
+- Energy measurement (RAPL or proxy)
+
+## Definition of done (per task)
+Code + tests + docs updated, CI green, results regenerated if affected, issue closed by PR.

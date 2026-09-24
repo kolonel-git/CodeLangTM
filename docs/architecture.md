@@ -24,3 +24,4 @@ TMU builds a C extension. Python 3.12 is pinned. If the Windows build fails, use
 
 ## Targets
 Macro-F1 >= 96% over 8 languages; < 0.1 ms/snippet; < 500 KB model.
+
