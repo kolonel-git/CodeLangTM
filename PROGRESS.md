@@ -4,14 +4,14 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 **Last updated:** 2026-09-24
 **Current milestone:** M2 — Features & baselines
-**Overall:** M0 complete, M1 Stage A complete (dataset v3: 861 snippets, [dataset card](docs/dataset-card.md)), M2 baselines done: bar to beat = CV macro-F1 0.920 ([results](docs/results.md))
+**Overall:** M0 complete, M1 Stage A complete (dataset v4: 869 snippets, [dataset card](docs/dataset-card.md)), M2 baselines + data checks done: bar to beat = CV macro-F1 0.923 ([results](docs/results.md))
 
 ## Milestone overview
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | Stage A done | v3: 861 snippets, 196 repos; Stage B items deferred |
+| M1 Data pipeline | Stage A done | v4: 869 snippets, 196 repos; Stage B items deferred |
 | M2 Features & baselines | In progress | 5 baselines done; ablations + data checks next |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
@@ -43,7 +43,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
 - [x] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
 - [x] M2: embedded-language rule for HTML (drop windows with < 20% markup lines; stricter tag pattern)
-- [ ] M2: re-collect HTML → dataset v4; rerun build, audit, baselines, diagnose; update dataset card + results
+- [x] M2: re-collect HTML → dataset v4; rerun build, baselines, diagnose; update dataset card + results
+- [ ] M2: stable split (hash-based per-language repo assignment) + repeated-split test reporting (decision pending)
 - [ ] M2: ablations (M, n-gram sizes, delimiters, token features) with YAML configs
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
@@ -53,6 +54,13 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — Dataset v4 and test-variance finding
+- HTML re-collected with the embedded-language rule: 100 snippets from 25 repos (13 repos skipped). Dataset v4: 869 snippets (train 696, test 173).
+- Baselines on v4: logistic regression still best by CV (0.923 ± 0.014, was 0.920); test fell 0.951 → 0.896.
+- Investigated: the HTML change reshuffled test repos for every language. Same data and model over 10 split seeds: test macro-F1 0.870-0.978 (mean 0.929 ± 0.030). Test drop is split luck, not a regression. CV is the primary metric. (issues-and-fixes M4)
+- Diagnose on v4: 5 of 696 candidates, all correctly labelled. 3 are repetitive list-like code predicted as SQL: SQL is partly learned as "data rows" because n-grams miss keywords. (issues-and-fixes M5)
+- Dataset card updated to v4 (counts, drops, hashes, history, split variance, new limitations); ledger, README, roadmap updated.
 
 ### 2026-09-24 — HTML embedded-language rule
 - `labels.py`: `HTML_TAG` now requires a real tag (not `i < x` or `a<b` comparisons); HTML windows with < 20% markup lines dropped as `mostly embedded script/style`.
@@ -161,6 +169,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | Date | Experiment | Dataset | Macro-F1 (CV / test) | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-09-24 | Baselines, M=500, 2/3-grams + delimiters | v3 | LR 0.920 / 0.951 (best) | SVM 0.905, RF 0.897, NB 0.853, DT 0.724; 0.31 ms/snippet (binarization-bound) |
+| 2026-09-24 | Baselines, same config | v4 | LR 0.923 / 0.896 (best) | SVM 0.913, RF 0.907, NB 0.876, DT 0.726; test not comparable to v3 (split reshuffled; seed spread 0.870-0.978) |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.

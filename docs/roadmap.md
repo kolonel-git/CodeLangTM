@@ -18,7 +18,7 @@ Ordered milestones, no fixed deadlines. Each milestone maps to a GitHub mileston
 
 Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch set added in Stage B: C, C#, TypeScript, Kotlin, PHP, Ruby, to stress confusable pairs (JS/TS, C/C++, Java/C#).
 
-**Status:** Stage A complete (dataset v3, 861 snippets, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred and do not block M2.
+**Status:** Stage A complete (dataset v4, 869 snippets, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred and do not block M2.
 
 - [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
 - [x] Collector: GitHub API, permissive licenses only (MIT / Apache-2.0 / BSD)
@@ -29,7 +29,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Splits: group-by-repo train/test + stratified group k-fold CV
 - [x] Dataset audit: per-language stats, flags, manual sample review
 - [ ] *Stage B:* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
-- [x] **Stage A:** target 1,000 snippets (~125/language); reached 861 (SQL limited by available permissive repos)
+- [x] **Stage A:** target 1,000 snippets (~125/language); reached 869 in v4 (SQL limited by available permissive repos)
 - [ ] *Stage B:* scale to 10,000+ and add stretch languages
 - [x] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
 
@@ -38,7 +38,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M2 — Features & baselines
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-**Status:** baselines done (best: logistic regression, CV macro-F1 0.920, test 0.951; see [results.md](results.md)). Ablations and data checks next.
+**Status:** baselines and data checks done (best: logistic regression, CV macro-F1 0.923 on dataset v4; see [results.md](results.md)). Stable split and ablations next.
 
 - [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
 - [ ] Token-level features (keywords, identifiers shape, indentation stats) as optional feature block
@@ -49,6 +49,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Auto-generated `docs/results.md`
 - [x] Confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
 - [x] Embedded-language rule for HTML (windows that are mostly `<script>`)
+- [ ] Stable split: per-language hash-based repo assignment; repeated-split test reporting
 - [ ] Faster binarization (currently ~0.31 ms/snippet, ~100% of end-to-end latency)
 
 **Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.

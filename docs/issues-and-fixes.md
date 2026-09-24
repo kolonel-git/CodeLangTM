@@ -9,12 +9,24 @@ Engineering log of problems hit while building CodeLangTM: symptom, root cause, 
 | v1 | First collection (25 repos × 5 snippets, >= 50 stars) | 829 | 0 | 829 | 40 | 97 |
 | v2 | SQL top-up (`--min-stars 10`) + template filter | 866 | 21 (template-heavy) | 845 | 71 | 82 |
 | v3 | Cut-safe windows, full re-collection | 861 | 0 | 861 | 77 | 92 |
+| v4 | HTML embedded-language rule, HTML re-collected | 869 | 0 | 869 | 77 | 100 |
 
-v3 audit: no flags; largest single repo <= 6% of any language; median windows 0-10% comments.
+v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows 0-10% comments.
 
 ---
 
 ## Modelling
+
+### M5. Repetitive list-like code predicted as SQL (open)
+- **Symptom:** v4 confident learning flagged 3 correctly labelled Python, Java and C++ windows as SQL (p 0.77-0.85). All three are long runs of near-identical lines such as `mapDecoration("white_banner", 10),` or `Round::deregisterNode(pluginFn);`.
+- **Root cause:** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`). 2/3-character n-grams cannot see SQL keywords such as `SELECT` or `INSERT`.
+- **Planned fix:** keyword/token features in the M2 ablation study.
+
+### M4. Test score swung 5.5 points after an HTML-only change
+- **Symptom:** after re-collecting only HTML (v3 → v4), logistic regression CV macro-F1 stayed flat (0.920 → 0.923) but test macro-F1 fell 0.951 → 0.896.
+- **Root cause:** not the model. Changing HTML repositories changed the group list, so `StratifiedGroupKFold` reshuffled which repos of *every* language went to test (e.g. Python 90/24 → 93/21 train/test). With only 39 test repos, the test score is very sensitive to that draw.
+- **Evidence:** same v4 data and model, 10 different split seeds: test macro-F1 0.870-0.978, mean 0.929 ± 0.030, matching CV (0.923).
+- **Decision:** CV macro-F1 is the primary metric; single test scores are reported but not compared across dataset versions. Proposed: a stable split (per-language, hash-based repo assignment) so re-collecting one language cannot move other languages' test repos, and repeated-split test reporting for final results.
 
 ### M1. Feature vocabulary could leak across CV folds
 - **Risk:** fitting the n-gram vocabulary once on all training data, then cross-validating, lets n-grams that appear only in the validation fold shape the features. A subtle leak that inflates CV scores.
