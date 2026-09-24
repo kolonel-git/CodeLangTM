@@ -61,7 +61,29 @@ def _build_parser() -> argparse.ArgumentParser:
     base.add_argument("--features", type=int, default=500, help="binary features (M)")
     base.add_argument("--seed", type=int, default=0)
     base.add_argument("--out", type=Path, default=Path("docs/results.md"))
+
+    diag = sub.add_parser(
+        "diagnose", help="label-issue candidates and shortcut features (training data only)"
+    )
+    diag.add_argument("--data", type=Path, default=Path("data/processed"))
+    diag.add_argument("--out", type=Path, default=Path("data/processed/diagnostics.md"))
+    diag.add_argument("--features", type=int, default=500)
+    diag.add_argument("--top", type=int, default=15, help="features shown per language")
+    diag.add_argument("--seed", type=int, default=0)
     return parser
+
+
+def _diagnose(args: argparse.Namespace) -> int:
+    from .diagnostics import run_diagnostics
+
+    try:
+        result = run_diagnostics(args.data, args.out, args.features, args.seed, args.top)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"diagnose failed: {e}", file=sys.stderr)
+        return 1
+    print(result.summary())
+    print(f"\nreview file: {args.out}")
+    return 0
 
 
 def _baselines(args: argparse.Namespace) -> int:
@@ -163,6 +185,8 @@ def main(argv: list[str] | None = None) -> int:
         return _data_audit(args)
     if args.command == "baselines":
         return _baselines(args)
+    if args.command == "diagnose":
+        return _diagnose(args)
     parser.print_help()
     return 0
 
