@@ -15,7 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Dataset build: leak-free train/test/wild + CV folds + manifest (`build.py`, `codelangtm data build`).
 - Dataset audit: stats, quality flags and review samples (`audit.py`, `codelangtm data audit`).
 - Comment/string scanner (`syntax.py`) so windows never start or end mid-comment.
-- Dataset card for Stage A v3 (`docs/dataset-card.md`) and source ledger entries.
+- Dataset card (`docs/dataset-card.md`, now Stage A v5) and source ledger entries.
 - Classical baselines with repo-grouped CV and generated `docs/results.md` (`baselines.py`, `codelangtm baselines`).
 - Data diagnostics: confident-learning label-issue candidates and shortcut probe (`diagnostics.py`, `codelangtm diagnose`).
 

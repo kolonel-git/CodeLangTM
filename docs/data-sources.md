@@ -50,4 +50,6 @@ Prints per-language stats and quality flags (dominant repo > 10%, test files > 4
 | GitHub (Stage A v4) | https://github.com (search API) | MIT / Apache-2.0 / BSD per repo | python, cpp, java, javascript, rust, go, html | 792 from 175 repos | 2026-09-24 | 25 repos × <= 5 snippets, >= 50 stars; HTML re-collected for v4; repo list + commit SHAs in `data/raw/github/<lang>.manifest.json` |
 | GitHub (Stage A v4, SQL) | https://github.com (search API) | MIT / Apache-2.0 per repo | sql | 77 from 21 repos | 2026-09-24 | `--min-stars 10` (too few permissive SQL repos above 50 stars) |
 
+Dataset v5 uses the same v4 snippets; only the split changed (stable hash split), so there is no new collection row.
+
 Full description, statistics and limitations: [dataset-card.md](dataset-card.md).
