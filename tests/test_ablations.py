@@ -97,13 +97,25 @@ def test_never_fits_on_test_snippets(processed, monkeypatch):
     def spy(self, snippets, y=None):
         snippets = list(snippets)
         fitted.append(set(snippets))
+        assert y is not None and len(y) == len(snippets)  # labels of the same snippets only
         return original(self, snippets, y)
 
     monkeypatch.setattr(Binarizer, "fit", spy)
-    ab.run_ablations(make_cfg(processed, models=["naive_bayes"]), LANGS)
+    cfg = make_cfg(processed, {"sel": {"selection": ["chi2"]}}, models=["naive_bayes"])
+    ab.run_ablations(cfg, LANGS)
+    train = list(load_snippets(processed / "train.jsonl"))
+    folds = bl.load_folds(processed)
     test_texts = {s.text for s in load_snippets(processed / "test.jsonl")}
-    assert len(fitted) == 3 * 5  # settings x folds, no final fit on all of train
-    assert all(not f & test_texts for f in fitted)
+    assert len(fitted) == 2 * 5  # settings (base + chi2) x folds, no fit on all of train
+    for i, texts in enumerate(fitted):
+        held_out = {s.text for s, f in zip(train, folds, strict=True) if f == i % 5}
+        assert not texts & test_texts and not texts & held_out
+
+
+def test_describe_shows_non_default_options():
+    assert ab.describe(FeatureConfig()) == "M=500, n=2+3, delimiters on"
+    f = FeatureConfig(1000, (2,), False, "chi2", 3, True)
+    assert ab.describe(f) == "M=1000, n=2, delimiters off, select chi2, min_df=3, words on"
 
 
 def test_select_studies(processed):

@@ -167,6 +167,13 @@ def test_cli_config_file_and_override(processed, tmp_path, capsys):
 
 
 def test_binarizer_options_reach_pipeline(processed):
-    b = Binarizer(n_features=30, ngram_sizes=(3,), use_delimiters=False)
-    _, meta = bl.run_baselines(processed, ["naive_bayes"], languages=LANGS, repeats=0, binarizer=b)
-    assert meta["features"] == {"n_features": 30, "ngram_sizes": [3], "use_delimiters": False}
+    b = Binarizer(30, (3,), False, selection="chi2", min_df=2, word_tokens=True)
+    _, meta = bl.run_baselines(processed, ["naive_bayes"], languages=LANGS, repeats=1, binarizer=b)
+    assert meta["features"] == {
+        "n_features": 30, "ngram_sizes": [3], "use_delimiters": False,
+        "selection": "chi2", "min_df": 2, "word_tokens": True,
+    }  # fmt: skip
+    meta.update(generated="t", dataset_files={}, n_wild=0)
+    md = bl.render_results_md([result("naive_bayes", [0.9], 0.9)], meta, LANGS)
+    assert ("`Binarizer(n_features=30, ngram_sizes=(3), use_delimiters=False, "
+            "selection='chi2', min_df=2, word_tokens=True)`") in md  # fmt: skip

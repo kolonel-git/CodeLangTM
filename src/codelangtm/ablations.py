@@ -59,7 +59,8 @@ def evaluate_features(
 
     for k in sorted(set(folds.tolist())):
         train, val = folds != k, folds == k
-        binarizer = features.binarizer().fit(list(x_all[train]))
+        # Labels of the fold's training part only: label-based selection never sees val labels.
+        binarizer = features.binarizer().fit(list(x_all[train]), y_all[train])
         vocab_sizes.append(len(binarizer.vocabulary_))
         x_train = binarizer.transform(list(x_all[train]))
         start = time.perf_counter()
@@ -154,23 +155,33 @@ def run_ablations(
     return runs, meta
 
 
+def _option_label(key: str, value: object) -> str:
+    if key == "n_features":
+        return f"M={value}"
+    if key == "ngram_sizes":
+        return "n=" + "+".join(str(n) for n in value)
+    if key == "use_delimiters":
+        return "delimiters " + ("on" if value else "off")
+    if key == "word_tokens":
+        return "words " + ("on" if value else "off")
+    if key == "selection":
+        return f"select {value}"
+    return f"{key}={value}"
+
+
 def describe(features: FeatureConfig) -> str:
-    sizes = "+".join(str(n) for n in features.ngram_sizes)
-    delims = "on" if features.use_delimiters else "off"
-    return f"M={features.n_features}, n={sizes}, delimiters {delims}"
+    """Short label: M, n-grams and delimiters always; other options only when not default."""
+    always = ("n_features", "ngram_sizes", "use_delimiters")
+    parts = [_option_label(k, getattr(features, k)) for k in always]
+    default = FeatureConfig()
+    for key in ("selection", "min_df", "word_tokens"):
+        if getattr(features, key) != getattr(default, key):
+            parts.append(_option_label(key, getattr(features, key)))
+    return ", ".join(parts)
 
 
 def _setting_label(features: FeatureConfig, varied: Sequence[str]) -> str:
-    parts = []
-    for key in varied:
-        value = getattr(features, key)
-        if key == "ngram_sizes":
-            parts.append("n=" + "+".join(str(n) for n in value))
-        elif key == "use_delimiters":
-            parts.append("delimiters " + ("on" if value else "off"))
-        else:
-            parts.append(f"M={value}")
-    return ", ".join(parts)
+    return ", ".join(_option_label(key, getattr(features, key)) for key in varied)
 
 
 def _delta_cell(run: AblationRun, base: AblationRun) -> str:
@@ -269,12 +280,13 @@ def render_ablations_md(
 
 def summary_table(cfg: AblationConfig, runs: Runs) -> str:
     # ASCII only for Windows consoles.
-    rows = [f"{'setting':<40}" + "".join(f"{m[:20]:>22}" for m in cfg.models)]
+    width = max(len(describe(f)) for f in cfg.feature_settings()) + 2
+    rows = [f"{'setting':<{width}}" + "".join(f"{m[:20]:>22}" for m in cfg.models)]
     for features in cfg.feature_settings():
         cells = []
         for m in cfg.models:
             run = runs[features, m]
             mean, _ = paired_delta(run, runs[cfg.base, m])
             cells.append(f"{run.cv_mean:.3f} ({mean:+.3f})")
-        rows.append(f"{describe(features):<40}" + "".join(f"{c:>22}" for c in cells))
+        rows.append(f"{describe(features):<{width}}" + "".join(f"{c:>22}" for c in cells))
     return "\n".join(rows)

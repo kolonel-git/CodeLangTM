@@ -54,6 +54,9 @@ def test_empty_config_is_defaults():
         ({"features": {"ngram_sizes": []}}, "ngram_sizes"),
         ({"features": {"ngram_sizes": [2, 0]}}, "ngram_sizes"),
         ({"features": {"use_delimiters": "yes"}}, "use_delimiters"),
+        ({"features": {"word_tokens": 1}}, "word_tokens"),
+        ({"features": {"selection": "random"}}, "selection"),
+        ({"features": {"min_df": 0}}, "min_df"),
         ({"features": [1]}, "mapping"),
         ([1, 2], "mapping"),
     ],
@@ -138,5 +141,20 @@ def test_invalid_ablation_config_rejected(raw, match):
 
 
 def test_feature_config_builds_binarizer():
-    b = FeatureConfig(64, (3, 4), False).binarizer()
-    assert (b.n_features, b.ngram_sizes, b.use_delimiters) == (64, (3, 4), False)
+    b = FeatureConfig(64, (3, 4), False, "class_balanced", 2, True).binarizer()
+    assert b.get_params() == {
+        "n_features": 64, "ngram_sizes": (3, 4), "use_delimiters": False,
+        "selection": "class_balanced", "min_df": 2, "word_tokens": True,
+    }  # fmt: skip
+
+
+def test_feature_config_defaults_match_binarizer():
+    # One source of truth for defaults: an empty features block must build Binarizer().
+    from codelangtm.features import Binarizer
+
+    assert FeatureConfig().binarizer().get_params() == Binarizer().get_params()
+
+
+def test_parse_selection_options():
+    f = parse_features({"selection": "chi2", "min_df": 5, "word_tokens": True})
+    assert (f.selection, f.min_df, f.word_tokens) == ("chi2", 5, True)

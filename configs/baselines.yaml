@@ -12,3 +12,6 @@ features:
   n_features: 500        # vocabulary size M (delimiters first, then top n-grams)
   ngram_sizes: [2, 3]    # character n-gram lengths
   use_delimiters: true   # always include ; { } ( ) // # etc.
+  selection: frequency   # frequency | chi2 | class_balanced (how the M slots are filled)
+  min_df: 1              # candidates must occur in >= this many training snippets
+  word_tokens: false     # add whole identifier/keyword tokens (SELECT, fn) as candidates

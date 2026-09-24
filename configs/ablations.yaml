@@ -24,3 +24,19 @@ studies:
   ngrams_x_vocabulary:   # longer n-grams may need a larger vocabulary
     n_features: [250, 500, 1000]
     ngram_sizes: [[2, 3], [2, 3, 4]]
+
+  # Step 3: frequency ranking fills slots with generic n-grams (issues-and-fixes M6).
+  selection:
+    selection: [frequency, chi2, class_balanced]
+  selection_x_ngrams:
+    selection: [frequency, chi2, class_balanced]
+    ngram_sizes: [[2], [2, 3], [2, 3, 4]]
+  selection_x_vocabulary:
+    selection: [frequency, chi2, class_balanced]
+    n_features: [500, 1000, 2000]
+  min_df:                # rare n-grams can look distinctive by chance
+    selection: [chi2, class_balanced]
+    min_df: [1, 5, 20]
+  word_tokens:           # keywords such as SELECT, fn, impl (issues-and-fixes M5)
+    selection: [frequency, chi2, class_balanced]
+    word_tokens: [false, true]

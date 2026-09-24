@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from .features import Binarizer
+from .features import SELECTIONS, Binarizer
 
 
 @dataclass(frozen=True)
@@ -24,9 +24,19 @@ class FeatureConfig:
     n_features: int = 500
     ngram_sizes: tuple[int, ...] = (2, 3)
     use_delimiters: bool = True
+    selection: str = "frequency"
+    min_df: int = 1
+    word_tokens: bool = False
 
     def binarizer(self) -> Binarizer:
-        return Binarizer(self.n_features, self.ngram_sizes, self.use_delimiters)
+        return Binarizer(
+            n_features=self.n_features,
+            ngram_sizes=self.ngram_sizes,
+            use_delimiters=self.use_delimiters,
+            selection=self.selection,
+            min_df=self.min_df,
+            word_tokens=self.word_tokens,
+        )
 
 
 @dataclass(frozen=True)
@@ -76,10 +86,17 @@ def parse_features(raw: dict | None, section: str = "features") -> FeatureConfig
             raise ValueError(f"{section}.ngram_sizes: expected a non-empty list, got {sizes!r}")
         sizes = tuple(sorted({_int(section, "ngram_sizes", n, 1) for n in sizes}))
         cfg = replace(cfg, ngram_sizes=sizes)
-    if "use_delimiters" in raw:
-        if not isinstance(raw["use_delimiters"], bool):
-            raise ValueError(f"{section}.use_delimiters: expected true/false")
-        cfg = replace(cfg, use_delimiters=raw["use_delimiters"])
+    for key in ("use_delimiters", "word_tokens"):
+        if key in raw:
+            if not isinstance(raw[key], bool):
+                raise ValueError(f"{section}.{key}: expected true/false")
+            cfg = replace(cfg, **{key: raw[key]})
+    if "selection" in raw:
+        if raw["selection"] not in SELECTIONS:
+            raise ValueError(f"{section}.selection: expected one of {list(SELECTIONS)}")
+        cfg = replace(cfg, selection=raw["selection"])
+    if "min_df" in raw:
+        cfg = replace(cfg, min_df=_int(section, "min_df", raw["min_df"], 1))
     return cfg
 
 
