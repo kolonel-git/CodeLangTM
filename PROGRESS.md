@@ -29,8 +29,10 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: window extractor (20-50 contiguous lines), dedup, label sanity check
 - [x] M1: group-by-repo split + k-fold
 - [x] M1: GitHub collector (permissive licenses only; token from env var)
-- [ ] M1: smoke-test collector against real GitHub (`--language python --repos 2 --per-repo 2`)
-- [ ] M1: `codelangtm data build` command: merge sources → split → write train/test/wild
+- [x] M1: smoke-test collector against real GitHub (4 Python snippets, 2 Apache-2.0 repos, 0 drops)
+- [x] M1: `codelangtm data build` command: merge sources → split → write train/test/wild
+- [ ] M1: Stage A collection run (`uv run codelangtm collect github`) + review drop counts per language
+- [ ] M1: `uv run codelangtm data build` on Stage A data
 - [ ] M1: public-dataset loaders (The Stack, CodeSearchNet), wild set
 - [ ] M1: Stage A dataset (1,000 snippets) + dataset card
 - [ ] Log every data source in [docs/data-sources.md](docs/data-sources.md)
@@ -39,6 +41,13 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — Dataset build command (M1)
+- Collector smoke test passed and pushed (`feat/github-collector`).
+- `build.py`: `build_dataset` = load all `.jsonl` under sources → label check → cross-source dedup (training data first, so wild copies of training snippets are dropped) → group-by-repo train/test → k-fold ids for train → leakage checks (train/test, main/wild) → thin-language warnings.
+- Writes `data/processed/{train,test,wild}.jsonl`, `folds.json`, `dataset.json` (counts, drops, params, SHA-256 per file).
+- CLI: `codelangtm data build [--source DIR] --out data/processed --test-size 0.2 --folds 5 --seed 0`.
+- Tests: 70 passing, ruff clean.
 
 ### 2026-09-24 — GitHub collector (M1)
 - PR #1 merged (schema, windows, dedup, labels, splits).

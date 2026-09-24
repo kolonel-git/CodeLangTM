@@ -20,6 +20,12 @@ Outputs `data/raw/github/<language>.jsonl` (snippets) and `<language>.manifest.j
 
 Selection rules: MIT / Apache-2.0 / BSD licenses only; no forks or archived repos; repos spread across star bands (50-199, 200-999, 1000-4999, 5000+); vendored, generated, minified, tiny (< 400 B) and huge (> 200 KB) files skipped; one random 20-50 line window per file; every snippet passes the label check and dedup.
 
+## Building the dataset
+```bash
+uv run codelangtm data build   # reads data/raw/ recursively, writes data/processed/
+```
+Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). Needs at least 5 distinct repos.
+
 ## Snippet record schema
 | Field | Description |
 | --- | --- |

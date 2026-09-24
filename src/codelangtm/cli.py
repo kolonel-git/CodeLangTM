@@ -32,7 +32,34 @@ def _build_parser() -> argparse.ArgumentParser:
     gh.add_argument("--seed", type=int, default=0)
     gh.add_argument("--out", type=Path, default=Path("data/raw/github"))
     gh.add_argument("--cache", type=Path, default=Path("data/cache/github"))
+
+    data = sub.add_parser("data", help="dataset tools")
+    data_sub = data.add_subparsers(dest="data_command", required=True)
+    build = data_sub.add_parser("build", help="merge sources into train/test/wild splits")
+    build.add_argument(
+        "--source", action="append", type=Path,
+        help="directory (searched recursively) or .jsonl file; repeatable (default: data/raw)",
+    )  # fmt: skip
+    build.add_argument("--out", type=Path, default=Path("data/processed"))
+    build.add_argument("--test-size", type=float, default=0.2)
+    build.add_argument("--folds", type=int, default=5)
+    build.add_argument("--seed", type=int, default=0)
     return parser
+
+
+def _data_build(args: argparse.Namespace) -> int:
+    from .build import build_dataset
+
+    try:
+        report = build_dataset(
+            args.source or [Path("data/raw")], args.out, args.test_size, args.folds, args.seed
+        )
+    except (FileNotFoundError, ValueError) as e:
+        print(f"data build failed: {e}", file=sys.stderr)
+        return 1
+    print(report.summary())
+    print(f"wrote {args.out}")
+    return 0
 
 
 def _collect_github(args: argparse.Namespace) -> int:
@@ -82,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "collect" and args.source == "github":
         return _collect_github(args)
+    if args.command == "data" and args.data_command == "build":
+        return _data_build(args)
     parser.print_help()
     return 0
 
