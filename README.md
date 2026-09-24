@@ -19,10 +19,10 @@ python = has("def ") AND has(":") AND NOT has(";")
 ## Pipeline
 
 ```
-snippet -> n-gram/delimiter binarizer -> literals (x, NOT x) -> Tsetlin Machine (TMU) -> argmax vote -> language
+snippet -> n-gram/delimiter binarizer (top-M features) -> literals (x, NOT x) -> Tsetlin Machine (TMU) -> argmax vote -> language
 ```
 
-See [docs/architecture.md](docs/architecture.md).
+See [docs/architecture.md](docs/architecture.md). Data is real-world code only, from permissively licensed GitHub repositories ([dataset card](docs/dataset-card.md)).
 
 ## Targets
 
@@ -37,10 +37,18 @@ Languages: Python, C++, Java, JavaScript, Rust, Go, SQL, HTML.
 ## Quickstart
 
 ```bash
-uv sync                 # Python 3.12 env + dev tools
-uv sync --extra tm      # add TMU (needs C compiler)
+uv sync --extra tm --extra collect   # Python 3.12 env, dev tools, TMU, collector (plain `uv sync` drops extras)
 uv run codelangtm --version
 uv run pytest
+```
+
+Reproduce the pipeline (needs a read-only `GITHUB_TOKEN`, see [docs/data-sources.md](docs/data-sources.md)):
+
+```bash
+uv run codelangtm collect github                                  # data/raw/
+uv run codelangtm data build                                      # data/processed/
+uv run codelangtm baselines --config configs/baselines.yaml       # docs/results.md
+uv run codelangtm ablate                                          # docs/ablations.md
 ```
 
 ## Status
