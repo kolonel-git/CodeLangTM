@@ -18,16 +18,29 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
-### M6. Frequency-ranked vocabulary picks generic n-grams (open)
+### M6. Frequency-ranked vocabulary picks generic n-grams (fixed: label-aware selection)
 - **Symptom:** first ablation run (`docs/ablations.md`): bigrams alone beat the 2+3-gram base at the same M=500 (logistic regression CV 0.944 vs 0.917, paired Δ +0.027 ± 0.021; Naive Bayes +0.036 ± 0.021). Adding 4-grams (n=2+3+4) is worse still (-0.011).
 - **Root cause:** the binarizer keeps the top M n-grams by document frequency across all languages. With 2+3-grams, 183 of the 500 slots go to 3-grams that are common everywhere, such as `ing`, `ion`, `tio`, `ent`, `con` (English identifiers and comments) and runs of spaces. They push out 183 lower-ranked bigrams that separate languages better. Frequency is not discriminative power.
 - **Also seen:** vocabulary size is the largest effect (M=100: -0.131; M=1000: +0.014 and still rising), consistent with useful features sitting below the frequency cut-off.
-- **Planned fix:** ablate discriminative selection (e.g. top-k per language, or a class-association score such as chi²) in M2 step 3, alongside keyword features (M5). Selection must stay inside each CV fold.
+- **Fix:** `Binarizer(selection=...)` with two label-aware options, fit on each fold's training part only (a test spies on the labels `fit` receives):
+  - `chi2`: rank candidates by chi² association with the language labels;
+  - `class_balanced`: languages take turns picking their next most distinctive candidate, scored P(g | language) − P(g | other languages), so every language gets an equal share of M.
+- **Result (dataset v5, CV, M=500, 2+3-grams):**
 
-### M5. Repetitive list-like code predicted as SQL (open)
+  | Selection | Logistic regression | Naive Bayes |
+  | --- | --- | --- |
+  | frequency (old) | 0.917 | 0.857 |
+  | chi2 | 0.958 (Δ +0.041 ± 0.017) | 0.952 (+0.095 ± 0.037) |
+  | class_balanced | 0.959 (Δ +0.042 ± 0.014) | 0.960 (+0.103 ± 0.034) |
+
+  Largest per-language gains (LR): SQL 0.87 → 0.99, JavaScript 0.86 → 0.92, C++ 0.88 → 0.92. With label-aware selection the vocabulary size stops mattering (M=2000 adds +0.002 to +0.006, within noise), whereas frequency ranking needs M=2000 to reach the same level. `min_df` 1/5/20 makes no difference.
+- **Lesson:** the feature budget, not the model, was the bottleneck. Naive Bayes, which cannot re-weight away uninformative features, gained the most (+0.10).
+
+### M5. Repetitive list-like code predicted as SQL (fixed by M6, not by keywords)
 - **Symptom:** v4 confident learning flagged 3 correctly labelled Python, Java and C++ windows as SQL (p 0.77-0.85). All three are long runs of near-identical lines such as `mapDecoration("white_banner", 10),` or `Round::deregisterNode(pluginFn);`.
-- **Root cause:** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`). 2/3-character n-grams cannot see SQL keywords such as `SELECT` or `INSERT`.
-- **Planned fix:** keyword/token features in the M2 ablation study.
+- **Root cause (first guess):** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`), and 2/3-character n-grams cannot see whole keywords such as `SELECT`.
+- **Tested:** whole-word features (`word_tokens`: identifier and keyword tokens such as `SELECT`, `fn`, `impl` join the candidates). No gain: +0.003 ± 0.008 with frequency selection and within noise with label-aware selection (class_balanced 0.959 → 0.963 ± 0.019, chi2 0.958 → 0.955), at ~10% extra binarize time.
+- **Actual fix:** label-aware selection (M6). SQL out-of-fold F1 rose 0.87 → 0.99 without word features. The real cause was the frequency cut-off pushing SQL-specific n-grams out of the vocabulary, not the n-gram length: with `class_balanced`, SQL's first picks are `SE`, `EL`, `ELE`, `EC`, `ECT`, `SEL`, fragments of `SELECT` that 2/3-grams can see. Word tokens stay available but off.
 
 ### M4. Test score swung 5.5 points after an HTML-only change (fixed: stable split)
 - **Symptom:** after re-collecting only HTML (v3 → v4), logistic regression CV macro-F1 stayed flat (0.920 → 0.923) but test macro-F1 fell 0.951 → 0.896.

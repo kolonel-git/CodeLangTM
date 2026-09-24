@@ -49,7 +49,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2: push `feat/baselines`, open PR, merge (M2 part 1)
 - [x] M2 ablations step 1: YAML config system (`configs/baselines.yaml`, strict loader, settings hash in results)
 - [x] M2 ablations step 2: ablation runner (M, n-gram sizes, delimiters) → `docs/ablations.md`
-- [ ] M2 ablations step 3: discriminative vocabulary selection (issues-and-fixes M6) + token/keyword feature block (C++ → Rust confusion, SQL "data rows", M5); larger M (2000)
+- [x] M2 ablations step 3: label-aware vocabulary selection (fixes M6 and M5), word tokens (no gain), larger M (no gain once selection is on)
 - [ ] M2 ablations step 4: run, analyse, freeze the feature config for M3
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
@@ -59,6 +59,15 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — M2 part 2 step 3: label-aware selection, word tokens, larger M
+- `Binarizer` options: `selection` (`frequency` default, `chi2`, `class_balanced`), `min_df`, `word_tokens`. Defaults reproduce the old behaviour exactly (baselines rerun: identical numbers). Labels reach the binarizer only from each fold's training part (spy test).
+- Word features are stored with an internal marker so they never collide with n-grams; reports show them as `word:SELECT`.
+- 29-setting ablation on v5 (CV only). Main result: label-aware selection at M=500 lifts LR 0.917 → 0.958 (chi2) / 0.959 (class_balanced), Naive Bayes 0.857 → 0.952 / 0.960. Paired Δ ≈ 3× its fold std: a real effect.
+- SQL F1 0.87 → 0.99 (M5 fixed by selection; SQL's first picks are `SELECT` fragments). JavaScript 0.86 → 0.92, C++ 0.88 → 0.92.
+- No gain, within noise: M=1000/2000 once selection is on, `min_df` 5/20, word tokens (+10% binarize time).
+- Best single setting by CV: chi2, M=2000 (LR 0.964), but top settings are all within fold noise (0.956-0.964); choosing among them is step 4.
+- Tests: 216 passing.
 
 ### 2026-09-24 — M2 part 2 step 2: ablation runner and first results
 - `ablations.py` + `codelangtm ablate [--study NAME] [--config] [--out]`, driven by `configs/ablations.yaml`. Each study varies feature options (every combination), the rest from the base; each unique setting is evaluated once.
@@ -203,6 +212,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Baselines, same config | v4 | LR 0.923 / 0.896 (best) | SVM 0.913, RF 0.907, NB 0.876, DT 0.726; test not comparable to v3 (split reshuffled; seed spread 0.870-0.978) |
 | 2026-09-24 | Baselines, same config, stable split + 10 repeated splits | v5 | LR 0.917 / 0.943; repeated 0.931 ± 0.007 (best) | SVM 0.908 (rep 0.922), RF 0.897 (rep 0.924), NB 0.857 (rep 0.880), DT 0.729 (rep 0.745) |
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
+| 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.

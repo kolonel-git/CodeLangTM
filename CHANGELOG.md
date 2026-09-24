@@ -20,6 +20,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Data diagnostics: confident-learning label-issue candidates and shortcut probe (`diagnostics.py`, `codelangtm diagnose`).
 - YAML experiment configs (`config.py`, `configs/baselines.yaml`, `codelangtm baselines --config`): strict validation, CLI overrides, settings hash recorded in `docs/results.md`. New dependency `pyyaml`.
 - Feature ablation runner (`ablations.py`, `configs/ablations.yaml`, `codelangtm ablate`): train-only repo-grouped CV per feature setting, paired Δ vs base, per-language F1, binarize cost; generates `docs/ablations.md`.
+- `Binarizer` options `selection` (`frequency`, `chi2`, `class_balanced`), `min_df` and `word_tokens` (whole identifier/keyword features, shown as `word:NAME`); configurable in YAML. Defaults keep the previous behaviour.
 
 ### Changed
 - `data build` uses a stable hash-based per-language repo split (`stable_split`, `--salt`) instead of StratifiedGroupKFold; re-collecting one language no longer reshuffles other languages' test repos.
