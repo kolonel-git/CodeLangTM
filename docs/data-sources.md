@@ -26,6 +26,12 @@ uv run codelangtm data build   # reads data/raw/ recursively, writes data/proces
 ```
 Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). Needs at least 5 distinct repos.
 
+## Auditing the dataset
+```bash
+uv run codelangtm data audit   # writes data/processed/audit.md
+```
+Prints per-language stats and quality flags (dominant repo > 10%, test files > 40%, comment-heavy windows, class imbalance) and writes 10 seeded samples per language with GitHub permalinks for manual review. Regenerating overwrites the file; record findings in [issues-and-fixes.md](issues-and-fixes.md).
+
 ## Snippet record schema
 | Field | Description |
 | --- | --- |

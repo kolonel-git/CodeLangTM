@@ -1,17 +1,17 @@
 # CodeLangTM — Progress Log
 
-Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); this file records what is done and what is next.
+Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-24
 **Current milestone:** M1 — Data pipeline
-**Overall:** M0 complete, M1 in progress (schema done)
+**Overall:** M0 complete, M1 nearly done (Stage A dataset v3: 861 snippets, audit clean)
 
 ## Milestone overview
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | Next | Real-world data only |
+| M1 Data pipeline | In progress | Stage A v3 built and audited; dataset card left |
 | M2 Features & baselines | Planned | |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
@@ -31,16 +31,30 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: GitHub collector (permissive licenses only; token from env var)
 - [x] M1: smoke-test collector against real GitHub (4 Python snippets, 2 Apache-2.0 repos, 0 drops)
 - [x] M1: `codelangtm data build` command: merge sources → split → write train/test/wild
-- [ ] M1: Stage A collection run (`uv run codelangtm collect github`) + review drop counts per language
-- [ ] M1: `uv run codelangtm data build` on Stage A data
-- [ ] M1: public-dataset loaders (The Stack, CodeSearchNet), wild set
-- [ ] M1: Stage A dataset (1,000 snippets) + dataset card
-- [ ] Log every data source in [docs/data-sources.md](docs/data-sources.md)
+- [x] M1: Stage A collection run + review drop counts per language
+- [x] M1: `data build` on Stage A data
+- [x] M1: template-heavy SQL/HTML filter
+- [x] M1: `data audit` command + manual sample review
+- [x] M1: fix windows cutting comments/strings; re-collect (dataset v3)
+- [ ] M1: re-skim regenerated `audit.md` (Python, Java focus)
+- [ ] M1: dataset card (`docs/dataset-card.md`) + ledger rows in [docs/data-sources.md](docs/data-sources.md)
+- [ ] M1: push `feat/data-build`, open PR, merge → M1 done
+- [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
+- [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-24 — Stage A data quality: templates, audit, cut comments (M1)
+Details and numbers in [docs/issues-and-fixes.md](docs/issues-and-fixes.md) (D1-D4, W3).
+- Stage A v1: 829 snippets; SQL only 40 from 10 repos. SQL top-up with `--min-stars 10` → 77 from 21 repos.
+- Template filter (`labels.py`): SQL/HTML windows > 30% Jinja/Liquid/ERB lines dropped (21: HTML 15, SQL 6).
+- `audit.py` + `codelangtm data audit`: per-language stats (repo share, comment ratio, test-file share, licenses), flags, and `data/processed/audit.md` with 10 seeded samples per language + GitHub permalinks. Header shows generation time.
+- Manual review found windows cutting through comments/docstrings (40 of 866). Added `syntax.py` scanner; windows now snap to boundaries outside comments/strings; label check flags cut snippets. Re-collected → v3: 861 snippets, 0 drops, audit flags: none.
+- Watch: Go test-file share 40% (idiomatic `_test.go`), SQL still smallest class (77 vs 124).
+- Tests: 117 passing, ruff clean.
 
 ### 2026-09-24 — Dataset build command (M1)
 - Collector smoke test passed and pushed (`feat/github-collector`).
