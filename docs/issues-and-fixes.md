@@ -25,7 +25,7 @@ v3 audit: no flags; largest single repo <= 6% of any language; median windows 0-
 - **Label issues:** 6 of 689 (0.9%): 3 HTML windows that are entirely inside `<script>` blocks (content is JavaScript), 1 JavaScript window that is mostly an HTML template string, 1 Rust FFI struct mirroring C (`#[repr(C)]`, `c_uint`; label correct, hard example), 1 Java interface of bare signatures with Chinese Javadoc (label correct, little signal).
 - **Root cause of the HTML cases:** the "HTML must contain a tag" check used `<\s*[a-zA-Z]`, which also matches comparisons such as `i < elements`. Across the dataset, 9 of 92 HTML windows have < 20% markup lines.
 - **Shortcuts:** none. Every top feature appears in 13-20 repos and is real syntax (`def`, `func`, gofmt tabs, `::`, `let`, `public`, `--`, `<`). Test idioms (`assert`, `t.Run`, `@Test`) are not among top features, so the uneven test-file share is not acting as a shortcut.
-- **Status:** fix proposed (embedded-language rule for HTML + stricter tag regex); see D5.
+- **Status:** fixed with an embedded-language rule for HTML and a stricter tag pattern; see D5.
 
 ### M2. Latency is dominated by feature extraction
 - **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible.
@@ -35,11 +35,14 @@ v3 audit: no flags; largest single repo <= 6% of any language; median windows 0-
 
 ## Data quality
 
-### D5. HTML windows that are really JavaScript (open)
+### D5. HTML windows that are really JavaScript
 - **Symptom:** found by confident learning (M3): HTML-labelled windows consisting of `<script>` code; model predicts JavaScript with p > 0.8.
-- **Root cause:** window lies inside an inline `<script>` block, and the tag check was satisfied by comparison operators.
+- **Root cause:** window lies inside an inline `<script>` block, and the tag check `<\s*[a-zA-Z]` was satisfied by comparison operators (`i < elements`).
 - **Measured:** markup-line share < 10%: 6 of 92 HTML windows; < 20%: 9; < 30%: 16.
-- **Proposed fix:** tag regex requires a real tag (`<name` / `</name` followed by space, `>` or `/`); drop HTML windows where fewer than 20% of non-blank lines contain markup (embedded-language rule). Pending decision.
+- **Fix:**
+  1. `HTML_TAG` requires a real tag: `<name` or `</name` ending in space, `>`, `/` or end of line, not directly after an identifier or `)`/`]` (so `a<b` does not match), or `<!`.
+  2. Embedded-language rule: HTML windows with tags on fewer than 20% of non-blank lines are dropped as `mostly embedded script/style`.
+- **Result on v3 raw data:** exactly the 9 predicted windows dropped (5 mostly script, 4 with no real tags); no other language affected. A 25%-markup window (VisualDL) is kept as a hard example.
 
 ### D4. Windows cut through comments and strings
 - **Symptom:** during manual review of `audit.md`, some snippets began or ended mid-comment. Prose looked like code, and real code after a closing `*/` or `"""` looked commented out.

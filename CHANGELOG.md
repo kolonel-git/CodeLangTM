@@ -23,5 +23,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - `Binarizer` is a scikit-learn transformer (refit per CV fold), with alphabetical tie-breaking, JSON save/load, a `use_delimiters` switch and set-based transform. When `n_features` is smaller than the delimiter list, delimiters are now truncated too.
 
 ### Fixed
+- HTML label check accepted comparisons (`i < x`) as tags; HTML windows that are mostly inline script/style are now dropped (embedded-language rule).
 - TMU crash on NumPy 2: `tm` extra pins `numpy<2`, `scipy<1.14`.
 - Windows splitting block comments, docstrings and multi-line strings (4.6% of Stage A v2 snippets).

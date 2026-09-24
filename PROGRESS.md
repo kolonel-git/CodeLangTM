@@ -42,7 +42,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2: harden Binarizer (sklearn transformer, deterministic vocabulary, save/load, faster transform)
 - [x] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
 - [x] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
-- [ ] M2: embedded-language rule for HTML (decision pending: drop windows with < 20% markup lines)
+- [x] M2: embedded-language rule for HTML (drop windows with < 20% markup lines; stricter tag pattern)
+- [ ] M2: re-collect HTML → dataset v4; rerun build, audit, baselines, diagnose; update dataset card + results
 - [ ] M2: ablations (M, n-gram sizes, delimiters, token features) with YAML configs
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
@@ -52,6 +53,11 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — HTML embedded-language rule
+- `labels.py`: `HTML_TAG` now requires a real tag (not `i < x` or `a<b` comparisons); HTML windows with < 20% markup lines dropped as `mostly embedded script/style`.
+- On v3 raw data: exactly the 9 predicted HTML windows dropped (5 mostly script, 4 no real tags); 0 other languages affected. Issues-and-fixes D5 closed.
+- Tests: 145 passing.
 
 ### 2026-09-24 — M2 data checks with the baseline
 - `diagnostics.py` + `codelangtm diagnose`: out-of-fold logistic-regression probabilities (train only) → confident-learning label-issue candidates; shortcut probe = top features per language with repo spread and cross-language share. Review file `data/processed/diagnostics.md`.

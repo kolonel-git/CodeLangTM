@@ -48,7 +48,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] YAML config system + seed control (with the ablation runner)
 - [x] Auto-generated `docs/results.md`
 - [x] Confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
-- [ ] Embedded-language rule for HTML (windows that are mostly `<script>`)
+- [x] Embedded-language rule for HTML (windows that are mostly `<script>`)
 - [ ] Faster binarization (currently ~0.31 ms/snippet, ~100% of end-to-end latency)
 
 **Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.
