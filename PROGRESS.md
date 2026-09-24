@@ -3,16 +3,16 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-24
-**Current milestone:** M1 — Data pipeline
-**Overall:** M0 complete, M1 nearly done (Stage A dataset v3: 861 snippets, audit clean)
+**Current milestone:** M1 → M2 (M1 Stage A done once `feat/data-build` is merged)
+**Overall:** M0 complete, M1 Stage A complete (dataset v3: 861 snippets, [dataset card](docs/dataset-card.md))
 
 ## Milestone overview
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | In progress | Stage A v3 built and audited; dataset card left |
-| M2 Features & baselines | Planned | |
+| M1 Data pipeline | Stage A done | v3: 861 snippets, 196 repos; Stage B items deferred |
+| M2 Features & baselines | Next | |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -36,9 +36,12 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: template-heavy SQL/HTML filter
 - [x] M1: `data audit` command + manual sample review
 - [x] M1: fix windows cutting comments/strings; re-collect (dataset v3)
-- [ ] M1: re-skim regenerated `audit.md` (Python, Java focus)
-- [ ] M1: dataset card (`docs/dataset-card.md`) + ledger rows in [docs/data-sources.md](docs/data-sources.md)
-- [ ] M1: push `feat/data-build`, open PR, merge → M1 done
+- [x] M1: re-skim regenerated `audit.md` (no problems found)
+- [x] M1: dataset card (`docs/dataset-card.md`) + ledger rows in [docs/data-sources.md](docs/data-sources.md)
+- [ ] M1: push `feat/data-build`, open PR, merge → M1 Stage A done
+- [ ] M2: harden Binarizer (save/load, deterministic vocabulary) + feature matrix from dataset v3
+- [ ] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
+- [ ] M2: confident-learning check + shortcut probe on baseline features
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 
@@ -46,6 +49,12 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — Dataset card, M1 Stage A closed
+- Manual re-review of v3 audit samples: no problems found.
+- `docs/dataset-card.md` (Datasheets for Datasets structure): composition per language, collection and cleaning steps with drop counts, splits, licensing (MIT 505, Apache-2.0 315, BSD 41), known biases (SQL star floor 10 and imbalance, test-file share up to 40% for Go, 20-50 line windows only), intended use, reproduction commands, v3 file hashes.
+- `docs/data-sources.md` ledger rows for the two GitHub collection runs; roadmap M1 ticked, Stage B items marked deferred; README status updated.
+- Stage A target was 1,000 snippets; reached 861 (SQL limited by permissive repos). Accepted and documented.
 
 ### 2026-09-24 — Stage A data quality: templates, audit, cut comments (M1)
 Details and numbers in [docs/issues-and-fixes.md](docs/issues-and-fixes.md) (D1-D4, W3).
