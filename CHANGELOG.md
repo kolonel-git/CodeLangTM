@@ -17,6 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Comment/string scanner (`syntax.py`) so windows never start or end mid-comment.
 - Dataset card for Stage A v3 (`docs/dataset-card.md`) and source ledger entries.
 - Classical baselines with repo-grouped CV and generated `docs/results.md` (`baselines.py`, `codelangtm baselines`).
+- Data diagnostics: confident-learning label-issue candidates and shortcut probe (`diagnostics.py`, `codelangtm diagnose`).
 
 ### Changed
 - `Binarizer` is a scikit-learn transformer (refit per CV fold), with alphabetical tie-breaking, JSON save/load, a `use_delimiters` switch and set-based transform. When `n_features` is smaller than the delimiter list, delimiters are now truncated too.

@@ -41,7 +41,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M1: push `feat/data-build`, open PR, merge → M1 Stage A done (PR merged)
 - [x] M2: harden Binarizer (sklearn transformer, deterministic vocabulary, save/load, faster transform)
 - [x] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
-- [ ] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
+- [x] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
+- [ ] M2: embedded-language rule for HTML (decision pending: drop windows with < 20% markup lines)
 - [ ] M2: ablations (M, n-gram sizes, delimiters, token features) with YAML configs
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
@@ -51,6 +52,13 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — M2 data checks with the baseline
+- `diagnostics.py` + `codelangtm diagnose`: out-of-fold logistic-regression probabilities (train only) → confident-learning label-issue candidates; shortcut probe = top features per language with repo spread and cross-language share. Review file `data/processed/diagnostics.md`.
+- Result: 6 of 689 candidates (0.9%). 3 HTML windows are inline `<script>` code (tag check fooled by `<` comparisons), 1 JS window is mostly an HTML template, 2 are correct but hard (Rust FFI mirroring C, bare Java interface).
+- Shortcut probe: none; top features are real syntax in 13-20 repos; test idioms not among them.
+- Measured: 9 of 92 HTML windows have < 20% markup lines. Fix proposed, decision pending. Details: issues-and-fixes M3, D5.
+- Tests: 140 passing.
 
 ### 2026-09-24 — M2 baselines
 - `features.py`: `Binarizer` is now a scikit-learn transformer so the vocabulary is refit inside each CV fold (fitting it once on all train would leak validation n-grams). Alphabetical tie-break makes the vocabulary independent of input order; JSON save/load; `use_delimiters` switch for ablations; transform uses n-gram set lookups instead of substring search.

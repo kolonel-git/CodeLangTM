@@ -84,11 +84,11 @@ Command: `codelangtm data build` (`src/codelangtm/build.py`, `splits.py`).
 - **Popularity bias:** repos come from GitHub search ordering within star bands; very obscure code styles are under-represented.
 - **Class imbalance:** SQL (77) and HTML (92) are smaller than Go (124). Report macro-F1, not only accuracy.
 - **SQL quality and dialects:** lower-star repos, dialect mix unmeasured (Postgres, MySQL, T-SQL, PL/SQL all present), some lightly templated dbt code (< 30% template lines).
-- **Test code share varies:** Go 40%, JavaScript 29%, Python 23%, Java 22%, others <= 13%. Test idioms (`t.Run`, `assert`, `@Test`) can act as weak language cues; check feature importances in M2.
+- **Test code share varies:** Go 40%, JavaScript 29%, Python 23%, Java 22%, others <= 13%. Checked in M2: test idioms (`t.Run`, `assert`, `@Test`) are not among the top baseline features, so this is not acting as a shortcut.
 - **Window length:** 20-50 lines only. Accuracy on one-line or very short snippets is not measured by this dataset.
 - **Embedded languages:** HTML windows may contain inline JS/CSS; Python/Java may contain SQL strings. No explicit policy yet (Stage B).
 - **Snapshot:** single collection date; languages evolve (e.g. newer syntax) after it.
-- **Label noise:** labels come from file extensions with heuristic content checks, not human annotation. Manual review of 80 random samples (10 per language) after v3 found no mislabelled snippets.
+- **Label noise:** labels come from file extensions with heuristic content checks, not human annotation. Manual review of 80 random samples (10 per language) after v3 found no mislabelled snippets. Confident learning on the training split (M2) flagged 6 of 689: 3 HTML windows whose content is inline JavaScript (see issues-and-fixes D5), 1 JavaScript window dominated by an HTML template string, and 2 correct but hard examples.
 
 ## Intended use
 - **In scope:** training and evaluating language identifiers on multi-line snippets of the 8 languages; comparing interpretable and classical models under leak-free evaluation.
