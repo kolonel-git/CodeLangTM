@@ -18,6 +18,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Dataset card (`docs/dataset-card.md`, now Stage A v5) and source ledger entries.
 - Classical baselines with repo-grouped CV and generated `docs/results.md` (`baselines.py`, `codelangtm baselines`).
 - Data diagnostics: confident-learning label-issue candidates and shortcut probe (`diagnostics.py`, `codelangtm diagnose`).
+- YAML experiment configs (`config.py`, `configs/baselines.yaml`, `codelangtm baselines --config`): strict validation, CLI overrides, settings hash recorded in `docs/results.md`. New dependency `pyyaml`.
 
 ### Changed
 - `data build` uses a stable hash-based per-language repo split (`stable_split`, `--salt`) instead of StratifiedGroupKFold; re-collecting one language no longer reshuffles other languages' test repos.

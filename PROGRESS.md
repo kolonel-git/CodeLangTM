@@ -12,7 +12,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
-| M2 Features & baselines | In progress | Baselines, data checks, stable split done; ablations next |
+| M2 Features & baselines | In progress | Part 1 merged (baselines, data checks, stable split); part 2 (ablations) on `feat/ablations` |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -46,7 +46,11 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2: re-collect HTML → dataset v4; rerun build, baselines, diagnose; update dataset card + results
 - [x] M2: stable split (hash-based per-language repo assignment) + repeated-split test reporting → dataset v5
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
-- [ ] M2: ablations (M, n-gram sizes, delimiters, token features) with YAML configs
+- [x] M2: push `feat/baselines`, open PR, merge (M2 part 1)
+- [x] M2 ablations step 1: YAML config system (`configs/baselines.yaml`, strict loader, settings hash in results)
+- [ ] M2 ablations step 2: ablation runner (grid over M, n-gram sizes, delimiters) → `docs/ablations.md`
+- [ ] M2 ablations step 3: token/keyword feature block (targets C++ → Rust confusion and SQL "data rows", issues-and-fixes M5)
+- [ ] M2 ablations step 4: run, analyse, freeze the feature config for M3
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end)
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
@@ -55,6 +59,14 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-24 — M2 part 2 step 1: YAML experiment configs
+- `feat/baselines` merged (M2 part 1). New branch `feat/ablations`.
+- `config.py`: `FeatureConfig` (M, n-gram sizes, delimiters) and `BaselinesConfig` (data, out, models, seed, repeats, features). Strict loading: unknown keys and wrong types are errors, so a typo cannot silently fall back to a default.
+- `configs/baselines.yaml` documents the current setup; `codelangtm baselines --config configs/baselines.yaml` regenerates `docs/results.md`. CLI flags still work and override the file.
+- `results.md` now records the config file, which flags overrode it, and a hash of the effective settings, plus the full binarizer options (n-gram sizes and delimiters were hard-coded before).
+- Dependency: `pyyaml>=6`.
+- Check: rerun from the config reproduces v5 exactly (LR CV 0.917 ± 0.008, test 0.943, repeated 0.931 ± 0.007). Tests: 177 passing.
 
 ### 2026-09-24 — Stable split and repeated-split reporting (dataset v5)
 - Decision (option A after weighing A/B/C, see issues-and-fixes M4): stable hash-based per-language split + repeated test splits for baselines now and for the final TM comparison.
