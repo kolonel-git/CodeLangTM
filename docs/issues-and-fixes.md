@@ -18,10 +18,36 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
-### M5. Repetitive list-like code predicted as SQL (open)
+### M7. First resource numbers were misleading (fixed before commit)
+- **Symptom:** the first "Resources" table showed fit CPU 2.7 s against 0.45 s wall time, and an identical 71.7 MB peak memory for all five models.
+- **Root cause:** both came from one memory-traced fit. `tracemalloc` slows code down about 6×, which inflated CPU time; and the peak was the binarizer's candidate table (same for every model), which hid the differences between classifiers.
+- **Fix:** CPU time is taken from a plain fit; memory is measured in two separate traced runs, binarizer (fit + transform) and classifier (on the binarized matrix), and reported in separate columns. Result: CPU ≈ wall time (random forest 0.94 s vs 0.76 s wall: threads); binarizer 71.7 MB for every model; classifier 1.4 MB (decision tree) to 4.3 MB (Naive Bayes).
+- **Known limit:** `tracemalloc` sees only Python/NumPy allocations, not memory allocated inside C extensions (liblinear, TMU). The TM comparison in M3 therefore also measures process-level peak memory in a subprocess, for baselines and TM alike (roadmap M3).
+- **Finding (baselines):** the pipeline is dominated by the binarizer, not the classifier: 72 MB and ~0.18 ms/snippet of feature extraction against ≤ 4 MB and ~0.01 ms for the classifier (except random forest at 7 MB pickled, 0.2 ms).
+
+### M6. Frequency-ranked vocabulary picks generic n-grams (fixed: label-aware selection)
+- **Symptom:** first ablation run (`docs/ablations.md`): bigrams alone beat the 2+3-gram base at the same M=500 (logistic regression CV 0.944 vs 0.917, paired Δ +0.027 ± 0.021; Naive Bayes +0.036 ± 0.021). Adding 4-grams (n=2+3+4) is worse still (-0.011).
+- **Root cause:** the binarizer keeps the top M n-grams by document frequency across all languages. With 2+3-grams, 183 of the 500 slots go to 3-grams that are common everywhere, such as `ing`, `ion`, `tio`, `ent`, `con` (English identifiers and comments) and runs of spaces. They push out 183 lower-ranked bigrams that separate languages better. Frequency is not discriminative power.
+- **Also seen:** vocabulary size is the largest effect (M=100: -0.131; M=1000: +0.014 and still rising), consistent with useful features sitting below the frequency cut-off.
+- **Fix:** `Binarizer(selection=...)` with two label-aware options, fit on each fold's training part only (a test spies on the labels `fit` receives):
+  - `chi2`: rank candidates by chi² association with the language labels;
+  - `class_balanced`: languages take turns picking their next most distinctive candidate, scored P(g | language) − P(g | other languages), so every language gets an equal share of M.
+- **Result (dataset v5, CV, M=500, 2+3-grams):**
+
+  | Selection | Logistic regression | Naive Bayes |
+  | --- | --- | --- |
+  | frequency (old) | 0.917 | 0.857 |
+  | chi2 | 0.958 (Δ +0.041 ± 0.017) | 0.952 (+0.095 ± 0.037) |
+  | class_balanced | 0.959 (Δ +0.042 ± 0.014) | 0.960 (+0.103 ± 0.034) |
+
+  Largest per-language gains (LR): SQL 0.87 → 0.99, JavaScript 0.86 → 0.92, C++ 0.88 → 0.92. With label-aware selection the vocabulary size stops mattering (M=2000 adds +0.002 to +0.006, within noise), whereas frequency ranking needs M=2000 to reach the same level. `min_df` 1/5/20 makes no difference.
+- **Lesson:** the feature budget, not the model, was the bottleneck. Naive Bayes, which cannot re-weight away uninformative features, gained the most (+0.10).
+
+### M5. Repetitive list-like code predicted as SQL (fixed by M6, not by keywords)
 - **Symptom:** v4 confident learning flagged 3 correctly labelled Python, Java and C++ windows as SQL (p 0.77-0.85). All three are long runs of near-identical lines such as `mapDecoration("white_banner", 10),` or `Round::deregisterNode(pluginFn);`.
-- **Root cause:** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`). 2/3-character n-grams cannot see SQL keywords such as `SELECT` or `INSERT`.
-- **Planned fix:** keyword/token features in the M2 ablation study.
+- **Root cause (first guess):** many SQL windows are `INSERT ... VALUES` rows, so SQL's top features are punctuation (`),`, `␠(`, `(\n`), and 2/3-character n-grams cannot see whole keywords such as `SELECT`.
+- **Tested:** whole-word features (`word_tokens`: identifier and keyword tokens such as `SELECT`, `fn`, `impl` join the candidates). No gain: +0.003 ± 0.008 with frequency selection and within noise with label-aware selection (class_balanced 0.959 → 0.963 ± 0.019, chi2 0.958 → 0.955), at ~10% extra binarize time.
+- **Actual fix:** label-aware selection (M6). SQL out-of-fold F1 rose 0.87 → 0.99 without word features. The real cause was the frequency cut-off pushing SQL-specific n-grams out of the vocabulary, not the n-gram length: with `class_balanced`, SQL's first picks are `SE`, `EL`, `ELE`, `EC`, `ECT`, `SEL`, fragments of `SELECT` that 2/3-grams can see. Word tokens stay available but off.
 
 ### M4. Test score swung 5.5 points after an HTML-only change (fixed: stable split)
 - **Symptom:** after re-collecting only HTML (v3 → v4), logistic regression CV macro-F1 stayed flat (0.920 → 0.923) but test macro-F1 fell 0.951 → 0.896.
@@ -47,6 +73,12 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 ### M2. Latency is dominated by feature extraction
 - **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible. Measured latency varies between runs (0.31 on v4, 0.43-0.48 on v5 for the same pipeline, on the same machine with other load); treat single-run latency as approximate until a dedicated benchmark (M6).
 - **Implication:** the < 0.1 ms target is a feature-extraction problem. Planned: faster Python binarization in M2, and C feature extraction in M6.
+- **Ablation finding:** delimiters cost ~40% of binarize time (0.315 vs 0.185 ms/snippet) for a gain within fold noise (+0.012 ± 0.014). The frozen feature config therefore drops them (delimiters add nothing once selection is label-aware).
+- **Profile (frozen config, 1,174 chars/snippet):** 92% of `transform` was building the set of all 2- and 3-character substrings of each snippet (0.20 of 0.22 ms); the 500 membership tests were the other 8%.
+- **Fix:** `Binarizer.transform` no longer builds substring sets. Each snippet becomes an array of code points; characters map to small ids, and 1-3 character terms are found by indexing a direct-address table (`table[id_a * base + id_b]`) with NumPy. Terms longer than 3 characters and word features keep the set method; if the alphabet were so large that a table would exceed 4M entries, the code falls back to a sorted-key binary search (5-6× slower than the table). Lookup tables are derived from the vocabulary, built once, and not pickled.
+- **Correctness:** output is identical to testing `term in snippet` for every term. Fuzz tests compare against that definition on random ASCII, control, BMP and non-BMP strings (empty, 1-character and unseen-character inputs included), with n-gram lengths 1-4, word tokens, the delimiter list and the forced binary-search fallback. A mutation check (breaking the unknown-character id) fails 5 tests. Baseline scores are bit-for-bit unchanged (0.963 / 0.959 / 0.968).
+- **Result:** interleaved old-vs-new runs in one process (so both see the same machine load), 5 runs: **5.4-6.0× faster** (old 0.47-0.54, new 0.078-0.099 ms/snippet on a machine running ~2× slower than earlier that day). The set method took 0.22 ms on the quieter machine, so the same ratio suggests ≈ 0.04 ms there; that figure is an inference, not a measurement. Absolute timings on this machine vary ±50% with background load, so whether the < 0.1 ms end-to-end target is met is still to be confirmed by the M6 benchmark on a quiet machine.
+- **Next lever:** the remaining cost is per-snippet NumPy call overhead; the C export (M6) removes it.
 
 ---
 

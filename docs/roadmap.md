@@ -38,30 +38,38 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M2 — Features & baselines
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-**Status:** baselines, data checks and stable split done (best: logistic regression, CV macro-F1 0.917, repeated test 0.931 ± 0.007 on dataset v5; see [results.md](results.md)). Ablations next.
+**Status:** baselines, data checks, stable split, ablations and the frozen feature config done. Bar for the TM (dataset v5, frozen features, see [results.md](results.md)): Naive Bayes CV macro-F1 0.963, repeated test 0.968 ± 0.009; logistic regression 0.953 / 0.968. Label-aware vocabulary selection was the key (0.917 → ~0.96, [ablations.md](ablations.md)); binarization is 5-6× faster. Only the PR is left.
 
 - [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
-- [ ] Token-level features (keywords, identifiers shape, indentation stats) as optional feature block
-- [ ] Ablation study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off; +token features
+- [x] Token-level features: whole-word tokens (`word_tokens`) tested, no gain over label-aware n-gram selection
+- [x] Ablation runner + first study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off ([ablations.md](ablations.md))
+- [x] Ablation: label-aware vocabulary selection (chi2, class_balanced; issues-and-fixes M6), word tokens, M=2000, min_df
+- [x] Freeze the feature config for M3 and rerun baselines with it (`configs/baselines.yaml`: class_balanced, M=500, 2+3-grams, no forced delimiters)
+- [x] Resource metrics in the baselines report (fit CPU, peak memory, size split, throughput), reusable for the TM
 - [x] Baselines on identical features: Bernoulli NB (binary features, not Multinomial), Decision Tree, Logistic Regression, linear SVM, Random Forest
 - [x] Metrics: macro-F1, per-language F1, confusion matrix, on CV, test, and wild sets (wild when available)
-- [ ] YAML config system + seed control (with the ablation runner)
+- [x] YAML config system + seed control (`configs/*.yaml`, settings hash in results)
 - [x] Auto-generated `docs/results.md`
 - [x] Confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
 - [x] Embedded-language rule for HTML (windows that are mostly `<script>`)
 - [x] Stable split: per-language hash-based repo assignment; repeated-split test reporting (dataset v5)
-- [ ] Faster binarization (currently ~0.31 ms/snippet, ~100% of end-to-end latency)
+- [x] Faster binarization: 5.4-6.0× faster transform, identical output ([issues-and-fixes](issues-and-fixes.md) M2); the < 0.1 ms end-to-end target is confirmed on a quiet machine in M6
 
 **Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.
 
 ## M3 — Tsetlin Machine training
 **Goal:** working TMU classifier with fair comparison.
 
-- [ ] Verify TMU install (C backend; CUDA optional); document Windows/WSL/Docker path
+- [x] Verify TMU install: TMU 0.8.3 builds natively on Windows with `numpy<2` (see [architecture.md](architecture.md) install notes); CUDA optional
 - [ ] `TMLanguageClassifier` fit/predict/save/load with tests
 - [ ] Baseline run: N_c=100, T=30, s=3.5
 - [ ] Training curves (accuracy vs epoch); throughput
-- [ ] TM vs baselines table on CV / test / wild
+- [ ] TM vs baselines table on CV / test / wild, using the repeated-split protocol
+- [ ] Resource comparison, same protocol for every model (baselines already report the first block in [results.md](results.md)):
+  - training: wall time, CPU time, peak memory (Python heap for baselines; process-level peak RSS, measured in a subprocess, for both baselines and the TM, since TMU allocates in C), epochs to converge;
+  - model: size in KB (pickled, and for the TM also the bit-packed clause size that the C export will use), vocabulary size, number of clauses and average literals per clause (TM) or non-zero weights (linear models);
+  - inference: latency (median, p95) and throughput, split into binarize vs predict;
+  - reported as measured, including where the TM loses
 - [ ] Error analysis: confusable pairs, short snippets
 
 **Exit:** TM results in `docs/results.md`, comparable to baselines on the same splits.
@@ -80,7 +88,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M5 — Explainability
 **Goal:** make the interpretability claim demonstrable.
 
-- [ ] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`)
+- [ ] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`); name features via `Binarizer.get_feature_names_out()` so word features read `word("SELECT")`, not the internal marker
 - [ ] Per-prediction explanation: `codelangtm predict --explain` shows winning clauses and vote totals
 - [ ] Rule quality metrics: length, coverage, precision, overlap between classes
 - [ ] HTML report: matched n-grams highlighted in the snippet, votes per language

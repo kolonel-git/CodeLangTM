@@ -1,4 +1,4 @@
-"""Extract human-readable AND-rules from trained clauses. Phase 3."""
+"""Extract human-readable AND-rules from trained clauses. Milestone M5."""
 
 from __future__ import annotations
 
@@ -10,4 +10,4 @@ def format_rule(language: str, included: list[str], negated: list[str]) -> str:
 
 
 def extract_rules(model, vocabulary: list[str]) -> list[str]:
-    raise NotImplementedError("Phase 3: clause extraction")
+    raise NotImplementedError("M5: clause extraction")

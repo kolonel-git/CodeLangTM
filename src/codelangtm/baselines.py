@@ -12,6 +12,7 @@ import pickle
 import platform
 import statistics
 import time
+import tracemalloc
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -34,6 +35,7 @@ from .features import Binarizer
 from .splits import SPLIT_SALT, check_no_leakage, stable_split
 
 LATENCY_REPEATS = 5
+FEATURE_DEFAULTS = Binarizer().get_params()  # only non-default options are shown in reports
 
 
 def make_models(seed: int = 0) -> dict[str, object]:
@@ -63,6 +65,15 @@ class ModelResult:
     size_kb: float
     wild_f1: float | None = None
     repeat_f1: list[float] = field(default_factory=list)  # test F1 over extra repo-level splits
+    fit_cpu_seconds: float | None = None  # process CPU time of one fit (all threads)
+    peak_binarize_mb: float | None = None  # peak Python/NumPy heap: binarizer fit + transform
+    peak_model_mb: float | None = None  # peak Python/NumPy heap: classifier fit (see measure_fit)
+    vocab_kb: float | None = None  # size of the fitted vocabulary alone (JSON), part of size_kb
+
+    @property
+    def throughput(self) -> float:
+        """Snippets per second, end to end (binarize + predict)."""
+        return 1000 / self.latency_ms
 
     @property
     def cv_mean(self) -> float:
@@ -88,6 +99,41 @@ def _macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def _pipeline(model: object, binarizer: Binarizer) -> Pipeline:
     return Pipeline([("binarize", clone(binarizer)), ("model", clone(model))])
+
+
+def _peak_mb(fn):
+    """(result, peak MB of Python/NumPy allocations while running fn)."""
+    tracemalloc.start()
+    try:
+        out = fn()
+        return out, tracemalloc.get_traced_memory()[1] / 1024**2
+    finally:
+        tracemalloc.stop()
+
+
+def measure_fit(
+    pipe: Pipeline, texts: Sequence[str], labels: np.ndarray
+) -> tuple[float, float, float]:
+    """(CPU seconds, binarizer peak MB, classifier peak MB) of fitting `pipe` on the data.
+
+    CPU time comes from a plain fit. `tracemalloc` slows code down several-fold, so memory is
+    measured in separate runs, once for the binarizer (fit + transform) and once for the
+    classifier on the binarized matrix; they are reported apart because the binarizer is the same
+    for every model and would otherwise hide the differences between classifiers. Only Python and
+    NumPy allocations are seen: memory allocated inside C extensions (liblinear, TMU) is not, so
+    process-level memory is measured separately for the TM in M3.
+    """
+    texts = list(texts)
+    step_binarizer, step_model = pipe.steps[0][1], pipe.steps[1][1]
+
+    start = time.process_time()
+    clone(pipe).fit(texts, labels)
+    cpu = time.process_time() - start
+
+    binarizer = clone(step_binarizer)
+    x, peak_binarize = _peak_mb(lambda: binarizer.fit(texts, labels).transform(texts))
+    _, peak_model = _peak_mb(lambda: clone(step_model).fit(x, labels))
+    return cpu, peak_binarize, peak_model
 
 
 def repeated_split_f1(
@@ -146,6 +192,11 @@ def evaluate_model(
     pipe.fit(list(x_train), y_train)
     fit_seconds = time.perf_counter() - start
 
+    fit_cpu, peak_binarize, peak_model = measure_fit(
+        _pipeline(model, binarizer), list(x_train), y_train
+    )
+    vocab_kb = len(json.dumps(pipe.named_steps["binarize"].vocabulary_).encode("utf-8")) / 1024
+
     x_test = [s.text for s in test]
     y_test = np.asarray([s.language for s in test])
     timings = []
@@ -175,6 +226,10 @@ def evaluate_model(
         size_kb=len(pickle.dumps(pipe)) / 1024,
         wild_f1=wild_f1,
         repeat_f1=repeated_split_f1(model, [*train, *test], binarizer, repeats),
+        fit_cpu_seconds=fit_cpu,
+        peak_binarize_mb=peak_binarize,
+        peak_model_mb=peak_model,
+        vocab_kb=vocab_kb,
     )
 
 
@@ -185,7 +240,9 @@ def run_baselines(
     seed: int = 0,
     languages: Sequence[str] = LANGUAGES,
     repeats: int = 10,
+    binarizer: Binarizer | None = None,
 ) -> tuple[list[ModelResult], dict]:
+    """`binarizer` (unfitted) sets all feature options; if omitted, `Binarizer(n_features)`."""
     data_dir = Path(data_dir)
     dataset = load_dataset(data_dir)
     folds = load_folds(data_dir)
@@ -193,18 +250,29 @@ def run_baselines(
     unknown = set(models or ()) - set(available)
     if unknown:
         raise ValueError(f"unknown model(s): {sorted(unknown)}")
-    binarizer = Binarizer(n_features=n_features)
+    binarizer = binarizer or Binarizer(n_features=n_features)
     results = [
         evaluate_model(name, available[name], dataset, folds, binarizer, languages, repeats)
         for name in (models or available)
     ]
+    meta = {
+        **dataset_meta(data_dir, dataset, folds),
+        "n_features": binarizer.n_features,
+        "features": {**binarizer.get_params(), "ngram_sizes": list(binarizer.ngram_sizes)},
+        "seed": seed,
+        "repeats": repeats,
+    }
+    return results, meta
 
+
+def dataset_meta(data_dir: Path, dataset: dict[str, list], folds: np.ndarray) -> dict:
+    """Provenance shared by generated reports: dataset hashes, sizes, split, versions, CPU."""
     manifest_path = data_dir / "dataset.json"
     files, split_params = {}, {}
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         files, split_params = manifest.get("files", {}), manifest.get("params", {})
-    meta = {
+    return {
         "generated": datetime.now().isoformat(sep=" ", timespec="seconds"),
         "data_dir": str(data_dir),
         "dataset_files": {k: v[:12] for k, v in files.items()},
@@ -212,9 +280,6 @@ def run_baselines(
         "n_test": len(dataset["test"]),
         "n_wild": len(dataset.get("wild", [])),
         "n_folds": len(set(folds.tolist())),
-        "n_features": n_features,
-        "seed": seed,
-        "repeats": repeats,
         "split": split_params,
         "versions": {
             "python": platform.python_version(),
@@ -223,7 +288,6 @@ def run_baselines(
         },
         "cpu": platform.processor() or platform.machine(),
     }
-    return results, meta
 
 
 def best_by_cv(results: Sequence[ModelResult]) -> ModelResult:
@@ -243,6 +307,10 @@ def summary_table(results: Sequence[ModelResult]) -> str:
             f"{r.latency_ms:>9.3f}{r.size_kb:>8.0f}"
         )
     return "\n".join(rows)
+
+
+def _opt(value: float | None, fmt: str) -> str:
+    return "-" if value is None else format(value, fmt)
 
 
 def _repeat_cell(r: ModelResult) -> str:
@@ -273,6 +341,27 @@ def _split_text(params: dict) -> str:
     return "repo-grouped (StratifiedGroupKFold)" if params else "n/a"
 
 
+def _features_text(meta: dict) -> str:
+    f = meta.get("features") or {"n_features": meta["n_features"], "ngram_sizes": [2, 3]}
+    sizes = ", ".join(str(n) for n in f["ngram_sizes"])
+    extras = "".join(
+        f", {key}={f[key]!r}"
+        for key in ("use_delimiters", "selection", "min_df", "word_tokens")  # signature order
+        if key in f and f[key] != FEATURE_DEFAULTS[key]
+    )
+    return f"`Binarizer(n_features={f['n_features']}, ngram_sizes=({sizes}){extras})`"
+
+
+def _config_text(meta: dict) -> str:
+    cfg = meta.get("config")
+    if not cfg:
+        return "n/a"
+    source = f"`{cfg['path']}`" if cfg.get("path") else "defaults"
+    if cfg.get("overrides"):
+        source += " + CLI overrides " + ", ".join(f"`{k}`" for k in cfg["overrides"])
+    return f"{source} (settings hash `{cfg['hash']}`)"
+
+
 def render_results_md(
     results: Sequence[ModelResult], meta: dict, languages: Sequence[str] = LANGUAGES
 ) -> str:
@@ -286,10 +375,10 @@ def render_results_md(
         "## Setup",
         "",
         f"- Generated: {meta['generated']}",
+        f"- Config: {_config_text(meta)}",
         f"- Dataset: `{meta['data_dir']}` (train {meta['n_train']}, test {meta['n_test']}, "
         f"wild {meta['n_wild']}); SHA-256 prefixes: {files}",
-        f"- Features: `Binarizer(n_features={meta['n_features']}, ngram_sizes=(2, 3))`, "
-        "refit inside every fold",
+        f"- Features: {_features_text(meta)}, refit inside every fold",
         f"- Split: {_split_text(meta.get('split', {}))}",
         f"- Protocol: {meta['n_folds']}-fold repo-grouped CV on train (model selection), then "
         "refit on all of train and score test once",
@@ -317,6 +406,29 @@ def render_results_md(
     md += [
         "",
         f"Best by CV: **{best.name}** (CV {best.cv_mean:.3f}, test {best.test_f1:.3f}).",
+        "",
+        "## Resources",
+        "",
+        "Same measurement for every model, so the Tsetlin Machine can be added as another row. "
+        "Size is the whole pickled pipeline (vocabulary + classifier); vocabulary is the JSON "
+        "size of the feature list alone. Fit CPU is process CPU time of a plain fit (above wall "
+        "time when threads are used). Peak memory counts Python/NumPy allocations only "
+        "(`tracemalloc`, measured in separate runs), not C-extension memory; the binarizer "
+        "figure is the same feature-extraction step for every model.",
+        "",
+        "| Model | Fit wall (s) | Fit CPU (s) | Peak memory: binarizer (MB) "
+        "| Peak memory: classifier (MB) | Size (KB) | of which vocabulary (KB) "
+        "| Latency (ms/snippet) | Throughput (snippets/s) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for r in results:
+        md.append(
+            f"| {r.name} | {r.fit_seconds:.2f} | {_opt(r.fit_cpu_seconds, '.2f')} | "
+            f"{_opt(r.peak_binarize_mb, '.1f')} | {_opt(r.peak_model_mb, '.1f')} | "
+            f"{r.size_kb:.0f} | {_opt(r.vocab_kb, '.1f')} | "
+            f"{r.latency_ms:.3f} | {r.throughput:,.0f} |"
+        )
+    md += [
         "",
         "## Test F1 per language",
         "",
