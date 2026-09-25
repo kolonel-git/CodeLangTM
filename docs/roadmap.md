@@ -38,13 +38,14 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M2 — Features & baselines
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-**Status:** baselines, data checks and stable split done (best: logistic regression, CV macro-F1 0.917, repeated test 0.931 ± 0.007 on dataset v5; see [results.md](results.md)). Ablations done (see [ablations.md](ablations.md)): label-aware vocabulary selection lifts CV to ~0.96 for both LR and Naive Bayes. Freezing the feature config next.
+**Status:** baselines, data checks, stable split, ablations and the frozen feature config done. Bar for the TM (dataset v5, frozen features, see [results.md](results.md)): Naive Bayes CV macro-F1 0.963, repeated test 0.968 ± 0.009; logistic regression 0.953 / 0.968. Label-aware vocabulary selection was the key (0.917 → ~0.96, [ablations.md](ablations.md)). Faster binarization left.
 
 - [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
 - [x] Token-level features: whole-word tokens (`word_tokens`) tested, no gain over label-aware n-gram selection
 - [x] Ablation runner + first study: M in {100, 250, 500, 1000}; n-grams in {2, 3, 4, mixed}; delimiters on/off ([ablations.md](ablations.md))
 - [x] Ablation: label-aware vocabulary selection (chi2, class_balanced; issues-and-fixes M6), word tokens, M=2000, min_df
-- [ ] Freeze the feature config for M3 and rerun baselines with it
+- [x] Freeze the feature config for M3 and rerun baselines with it (`configs/baselines.yaml`: class_balanced, M=500, 2+3-grams, no forced delimiters)
+- [x] Resource metrics in the baselines report (fit CPU, peak memory, size split, throughput), reusable for the TM
 - [x] Baselines on identical features: Bernoulli NB (binary features, not Multinomial), Decision Tree, Logistic Regression, linear SVM, Random Forest
 - [x] Metrics: macro-F1, per-language F1, confusion matrix, on CV, test, and wild sets (wild when available)
 - [x] YAML config system + seed control (`configs/*.yaml`, settings hash in results)
@@ -63,7 +64,12 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] `TMLanguageClassifier` fit/predict/save/load with tests
 - [ ] Baseline run: N_c=100, T=30, s=3.5
 - [ ] Training curves (accuracy vs epoch); throughput
-- [ ] TM vs baselines table on CV / test / wild
+- [ ] TM vs baselines table on CV / test / wild, using the repeated-split protocol
+- [ ] Resource comparison, same protocol for every model (baselines already report the first block in [results.md](results.md)):
+  - training: wall time, CPU time, peak memory (Python heap for baselines; process-level peak RSS, measured in a subprocess, for both baselines and the TM, since TMU allocates in C), epochs to converge;
+  - model: size in KB (pickled, and for the TM also the bit-packed clause size that the C export will use), vocabulary size, number of clauses and average literals per clause (TM) or non-zero weights (linear models);
+  - inference: latency (median, p95) and throughput, split into binarize vs predict;
+  - reported as measured, including where the TM loses
 - [ ] Error analysis: confusable pairs, short snippets
 
 **Exit:** TM results in `docs/results.md`, comparable to baselines on the same splits.

@@ -31,11 +31,11 @@ Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test
 `Binarizer` (scikit-learn transformer; refit inside every CV fold):
 - **Candidates:** character n-grams of the configured sizes (default 2 and 3); optionally whole identifier/keyword tokens (`word_tokens`, shown as `word:NAME`).
 - **Structural delimiters** (`;`, `{`, `->`, `#`, `::`, tabs, 4-space indent, comment tokens) always included when `use_delimiters` is on.
-- **Selection of the M slots** (`selection`, default M=500):
-  - `frequency`: top M by document frequency (current default, unsupervised);
+- **Selection of the M slots** (`selection`):
+  - `frequency`: top M by document frequency (code default, unsupervised);
   - `chi2`: top M by chi² association with the language labels;
   - `class_balanced`: languages take turns picking their most distinctive feature (P(g | language) − P(g | other languages)).
-  Label-aware selection lifts CV macro-F1 from 0.917 to ~0.96 (see [ablations.md](ablations.md)); the frozen choice for M3 is pending.
+- **Frozen for M3** (`configs/baselines.yaml`): `class_balanced`, M=500, 2+3-grams, no forced delimiters, no word tokens. Label-aware selection lifts CV macro-F1 from 0.917 to ~0.96 ([ablations.md](ablations.md)).
 - **Literals:** `L = [x_1..x_M, NOT x_1..NOT x_M]`.
 
 ## Evaluation
@@ -54,3 +54,5 @@ Feedback: Type I (pattern discovery, erasure with prob 1/s), Type II (false-alar
 
 ## Targets
 Macro-F1 >= 96% over 8 languages; < 0.1 ms/snippet; < 500 KB model.
+
+Every model, baseline or TM, is compared on accuracy (CV, test, repeated test) and on the same resource metrics: training wall/CPU time, peak memory, model size, latency and throughput ([results.md](results.md), protocol in the roadmap under M3).

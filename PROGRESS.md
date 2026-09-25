@@ -4,7 +4,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 **Last updated:** 2026-09-24
 **Current milestone:** M2 — Features & baselines
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 baselines + data checks done (LR CV macro-F1 0.917, repeated test 0.931, [results](docs/results.md)); M2 ablations: label-aware feature selection reaches CV ~0.96 ([ablations](docs/ablations.md)); next: freeze the feature config
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 nearly done: feature config frozen (label-aware selection, [ablations](docs/ablations.md)); bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); next: faster binarization, PR, then M3 TM training
 
 ## Milestone overview
 
@@ -12,7 +12,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
-| M2 Features & baselines | In progress | Part 1 merged (baselines, data checks, stable split); part 2 (ablations) on `feat/ablations` |
+| M2 Features & baselines | Nearly done | Part 1 merged; part 2 (configs, ablations, frozen features, resource metrics) on `feat/ablations`; faster binarization left |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -49,7 +49,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2 ablations step 1: YAML config system (`configs/baselines.yaml`, strict loader, settings hash in results)
 - [x] M2 ablations step 2: ablation runner (M, n-gram sizes, delimiters) → `docs/ablations.md`
 - [x] M2 ablations step 3: label-aware vocabulary selection (fixes M6 and M5), word tokens (no gain), larger M (no gain once selection is on)
-- [ ] M2 ablations step 4: run, analyse, freeze the feature config for M3
+- [x] M2 ablations step 4: delimiters check, freeze the feature config for M3 (`configs/baselines.yaml`), rerun baselines; resource metrics added to the report
+- [ ] M2: push `feat/ablations`, open PR, merge (M2 part 2)
 - [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end; first cheap win: test delimiters by substring, see issues-and-fixes M2)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
@@ -59,6 +60,14 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-25 — M2 part 2 step 4: frozen feature config, new baseline bar, resource metrics
+- **Delimiters check** (`delimiters_x_selection` study): with label-aware selection, turning delimiters off changes LR by -0.006 and Naive Bayes by +0.003 (within noise) and cuts binarize time 44% (0.312 → 0.176 ms/snippet).
+- **Frozen feature config** (in `configs/baselines.yaml`, guarded by a test): `class_balanced`, M=500, 2+3-grams, delimiters off, word tokens off, `min_df` 1. Reasons: top of the fold-noise band, every language gets its own features (cleaner TM rules), M=500 keeps the TM small (larger M adds < 0.005), everything else adds nothing. Code defaults unchanged (old behaviour), so earlier runs stay reproducible from flags.
+- **New baseline bar** (dataset v5, frozen features, the one test look): Naive Bayes best by CV 0.963 ± 0.005, test 0.959, repeated test 0.968 ± 0.009; LR CV 0.953, test 0.971, repeated 0.968 ± 0.017; SVM 0.946 / 0.964; RF 0.950 / 0.944; DT 0.843. The ≥ 0.96 target is reached by simple models: the TM must match it, and its case rests on interpretability, size and speed.
+- **Resource metrics** in `docs/results.md`, same for every model so the TM is just another row: fit wall and CPU time, peak memory (binarizer and classifier separately), size and its vocabulary part, latency and throughput. First version was misleading (memory tracing inflated CPU time and hid classifier differences); fixed before commit, issues-and-fixes M7. Process-level memory and the full TM resource protocol are in the roadmap under M3.
+- Finding: the binarizer dominates everything (72 MB peak, ~0.18 ms/snippet) while the classifier needs ≤ 4 MB and ~0.01 ms. Faster binarization is now the main latency lever.
+- Tests: 219 passing.
 
 ### 2026-09-24 — M2 part 2 step 3: label-aware selection, word tokens, larger M
 - `Binarizer` options: `selection` (`frequency` default, `chi2`, `class_balanced`), `min_df`, `word_tokens`. Defaults reproduce the old behaviour exactly (baselines rerun: identical numbers). Labels reach the binarizer only from each fold's training part (spy test).
@@ -213,6 +222,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Baselines, same config, stable split + 10 repeated splits | v5 | LR 0.917 / 0.943; repeated 0.931 ± 0.007 (best) | SVM 0.908 (rep 0.922), RF 0.897 (rep 0.924), NB 0.857 (rep 0.880), DT 0.729 (rep 0.745) |
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
+| 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.
