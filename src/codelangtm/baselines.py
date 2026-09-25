@@ -12,6 +12,7 @@ import pickle
 import platform
 import statistics
 import time
+import tracemalloc
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -64,6 +65,15 @@ class ModelResult:
     size_kb: float
     wild_f1: float | None = None
     repeat_f1: list[float] = field(default_factory=list)  # test F1 over extra repo-level splits
+    fit_cpu_seconds: float | None = None  # process CPU time of one fit (all threads)
+    peak_binarize_mb: float | None = None  # peak Python/NumPy heap: binarizer fit + transform
+    peak_model_mb: float | None = None  # peak Python/NumPy heap: classifier fit (see measure_fit)
+    vocab_kb: float | None = None  # size of the fitted vocabulary alone (JSON), part of size_kb
+
+    @property
+    def throughput(self) -> float:
+        """Snippets per second, end to end (binarize + predict)."""
+        return 1000 / self.latency_ms
 
     @property
     def cv_mean(self) -> float:
@@ -89,6 +99,41 @@ def _macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def _pipeline(model: object, binarizer: Binarizer) -> Pipeline:
     return Pipeline([("binarize", clone(binarizer)), ("model", clone(model))])
+
+
+def _peak_mb(fn):
+    """(result, peak MB of Python/NumPy allocations while running fn)."""
+    tracemalloc.start()
+    try:
+        out = fn()
+        return out, tracemalloc.get_traced_memory()[1] / 1024**2
+    finally:
+        tracemalloc.stop()
+
+
+def measure_fit(
+    pipe: Pipeline, texts: Sequence[str], labels: np.ndarray
+) -> tuple[float, float, float]:
+    """(CPU seconds, binarizer peak MB, classifier peak MB) of fitting `pipe` on the data.
+
+    CPU time comes from a plain fit. `tracemalloc` slows code down several-fold, so memory is
+    measured in separate runs, once for the binarizer (fit + transform) and once for the
+    classifier on the binarized matrix; they are reported apart because the binarizer is the same
+    for every model and would otherwise hide the differences between classifiers. Only Python and
+    NumPy allocations are seen: memory allocated inside C extensions (liblinear, TMU) is not, so
+    process-level memory is measured separately for the TM in M3.
+    """
+    texts = list(texts)
+    step_binarizer, step_model = pipe.steps[0][1], pipe.steps[1][1]
+
+    start = time.process_time()
+    clone(pipe).fit(texts, labels)
+    cpu = time.process_time() - start
+
+    binarizer = clone(step_binarizer)
+    x, peak_binarize = _peak_mb(lambda: binarizer.fit(texts, labels).transform(texts))
+    _, peak_model = _peak_mb(lambda: clone(step_model).fit(x, labels))
+    return cpu, peak_binarize, peak_model
 
 
 def repeated_split_f1(
@@ -147,6 +192,11 @@ def evaluate_model(
     pipe.fit(list(x_train), y_train)
     fit_seconds = time.perf_counter() - start
 
+    fit_cpu, peak_binarize, peak_model = measure_fit(
+        _pipeline(model, binarizer), list(x_train), y_train
+    )
+    vocab_kb = len(json.dumps(pipe.named_steps["binarize"].vocabulary_).encode("utf-8")) / 1024
+
     x_test = [s.text for s in test]
     y_test = np.asarray([s.language for s in test])
     timings = []
@@ -176,6 +226,10 @@ def evaluate_model(
         size_kb=len(pickle.dumps(pipe)) / 1024,
         wild_f1=wild_f1,
         repeat_f1=repeated_split_f1(model, [*train, *test], binarizer, repeats),
+        fit_cpu_seconds=fit_cpu,
+        peak_binarize_mb=peak_binarize,
+        peak_model_mb=peak_model,
+        vocab_kb=vocab_kb,
     )
 
 
@@ -253,6 +307,10 @@ def summary_table(results: Sequence[ModelResult]) -> str:
             f"{r.latency_ms:>9.3f}{r.size_kb:>8.0f}"
         )
     return "\n".join(rows)
+
+
+def _opt(value: float | None, fmt: str) -> str:
+    return "-" if value is None else format(value, fmt)
 
 
 def _repeat_cell(r: ModelResult) -> str:
@@ -348,6 +406,29 @@ def render_results_md(
     md += [
         "",
         f"Best by CV: **{best.name}** (CV {best.cv_mean:.3f}, test {best.test_f1:.3f}).",
+        "",
+        "## Resources",
+        "",
+        "Same measurement for every model, so the Tsetlin Machine can be added as another row. "
+        "Size is the whole pickled pipeline (vocabulary + classifier); vocabulary is the JSON "
+        "size of the feature list alone. Fit CPU is process CPU time of a plain fit (above wall "
+        "time when threads are used). Peak memory counts Python/NumPy allocations only "
+        "(`tracemalloc`, measured in separate runs), not C-extension memory; the binarizer "
+        "figure is the same feature-extraction step for every model.",
+        "",
+        "| Model | Fit wall (s) | Fit CPU (s) | Peak memory: binarizer (MB) "
+        "| Peak memory: classifier (MB) | Size (KB) | of which vocabulary (KB) "
+        "| Latency (ms/snippet) | Throughput (snippets/s) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for r in results:
+        md.append(
+            f"| {r.name} | {r.fit_seconds:.2f} | {_opt(r.fit_cpu_seconds, '.2f')} | "
+            f"{_opt(r.peak_binarize_mb, '.1f')} | {_opt(r.peak_model_mb, '.1f')} | "
+            f"{r.size_kb:.0f} | {_opt(r.vocab_kb, '.1f')} | "
+            f"{r.latency_ms:.3f} | {r.throughput:,.0f} |"
+        )
+    md += [
         "",
         "## Test F1 per language",
         "",

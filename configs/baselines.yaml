@@ -8,10 +8,15 @@ seed: 0          # model seeds (decision tree, SVM, random forest)
 repeats: 10      # extra repo-level splits for the repeated test score (0 = off)
 models: [naive_bayes, decision_tree, logistic_regression, linear_svm, random_forest]
 
+# FROZEN feature config for M3 (chosen from docs/ablations.md, CV only; see PROGRESS.md):
+#   class_balanced is at the top of the fold-noise band (LR 0.953-0.959, NB 0.960-0.963) and gives
+#   every language its own features; M=500 keeps the TM small (larger M adds < 0.005, within noise);
+#   delimiters add nothing once selection is label-aware (-0.006 / +0.003) but cost 44% of
+#   binarize time; word tokens and min_df add nothing.
 features:
-  n_features: 500        # vocabulary size M (delimiters first, then top n-grams)
+  n_features: 500        # vocabulary size M
   ngram_sizes: [2, 3]    # character n-gram lengths
-  use_delimiters: true   # always include ; { } ( ) // # etc.
-  selection: frequency   # frequency | chi2 | class_balanced (how the M slots are filled)
+  use_delimiters: false  # force-include ; { } ( ) // # etc.
+  selection: class_balanced   # frequency | chi2 | class_balanced (how the M slots are filled)
   min_df: 1              # candidates must occur in >= this many training snippets
   word_tokens: false     # add whole identifier/keyword tokens (SELECT, fn) as candidates
