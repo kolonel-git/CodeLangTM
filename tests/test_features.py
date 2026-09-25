@@ -1,3 +1,6 @@
+import random
+import re
+
 import numpy as np
 import pytest
 from sklearn.base import clone
@@ -162,6 +165,78 @@ def test_pipeline_passes_labels_to_binarizer():
     pipe = Pipeline([("b", fit_labelled(selection="chi2")), ("m", BernoulliNB())])
     pipe.fit(TEXTS, LABELS)  # would raise "needs labels" if y were not forwarded
     assert list(pipe.predict(["zz xa zz", "zz yb zz"])) == ["x", "y"]
+
+
+def reference_transform(vocabulary, texts):
+    """The definition of the features: does the snippet contain the term as a substring?"""
+    rows = []
+    for text in texts:
+        grams = {t for t in vocabulary if not t.startswith("\x00") and t in text}
+        words = {w for w in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text)}
+        rows.append(
+            [(t[1:] in words) if t.startswith("\x00") else (t in grams) for t in vocabulary]
+        )
+    return np.asarray(rows, dtype=np.uint32).reshape(len(texts), len(vocabulary))
+
+
+ALPHABET = list("ab_ ;{}()\n\t:<>=+-*/#\"'.,0Zé中😀")  # ASCII, control, BMP and non-BMP
+
+
+def random_text(rng, max_len=60):
+    return "".join(rng.choice(ALPHABET) for _ in range(rng.randint(0, max_len)))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},  # 1-3 char terms + 4-space delimiter (n=4 path) + delimiters
+        {"ngram_sizes": (1, 2, 3, 4), "use_delimiters": False},
+        {"ngram_sizes": (2, 3), "use_delimiters": False, "word_tokens": True},
+        {"ngram_sizes": (3,), "selection": "class_balanced", "use_delimiters": False},
+    ],
+)
+def test_fast_transform_equals_substring_definition(kwargs):
+    rng = random.Random(7)
+    train = [random_text(rng, 80) for _ in range(120)]
+    labels = [rng.choice("xyz") for _ in train]
+    b = Binarizer(n_features=200, **kwargs).fit(train, labels)
+    # held-out strings, including empty, 1-char and strings with unseen characters
+    test = [random_text(rng, 40) for _ in range(150)] + ["", "a", "é", "😀😀😀", "zzzz é中 xyzq"]
+    assert np.array_equal(b.transform(test), reference_transform(b.vocabulary_, test))
+
+
+def test_fast_transform_binary_search_fallback(monkeypatch):
+    # Force the large-alphabet path (no direct tables); results must not change.
+    rng = random.Random(3)
+    train = [random_text(rng, 80) for _ in range(100)]
+    test = [random_text(rng, 40) for _ in range(80)] + ["", "ab"]
+    direct = Binarizer(n_features=150, ngram_sizes=(1, 2, 3)).fit(train)
+    expected = direct.transform(test)
+    monkeypatch.setattr("codelangtm.features.DIRECT_MAX", 0)
+    fallback = Binarizer(n_features=150, ngram_sizes=(1, 2, 3)).fit(train)
+    assert not fallback._lookup().direct  # really took the fallback
+    assert np.array_equal(fallback.transform(test), expected)
+    assert np.array_equal(expected, reference_transform(direct.vocabulary_, test))
+
+
+def test_transform_survives_pickle_and_vocabulary_change():
+    import pickle
+
+    b = Binarizer(n_features=80).fit(SNIPPETS)
+    before = b.transform(SNIPPETS)
+    assert b._lookup_cache is not None
+    clone_ = pickle.loads(pickle.dumps(b))
+    assert "_lookup_cache" not in pickle.loads(pickle.dumps(b)).__dict__  # derived, not pickled
+    assert np.array_equal(clone_.transform(SNIPPETS), before)
+    b.fit(SNIPPETS[:2])  # refit: the cached tables must follow the new vocabulary
+    assert np.array_equal(
+        b.transform(SNIPPETS), reference_transform(b.vocabulary_, SNIPPETS)
+    )
+
+
+def test_lone_surrogate_does_not_crash():
+    b = Binarizer(n_features=30).fit(SNIPPETS)
+    assert b.transform(["ab\ud800cd"]).shape == (1, 30)
 
 
 def test_expand_literals():
