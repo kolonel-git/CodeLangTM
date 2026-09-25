@@ -84,6 +84,122 @@ def _class_balanced_order(x: csr_matrix, y: np.ndarray, budget: int) -> list[int
     return list(chosen)
 
 
+PACK_MAX = 3  # n-grams up to this length pack exactly into int64 (21 bits per code point)
+_BITS = 21  # code points are < 0x110000 < 2**21
+DIRECT_MAX = 1 << 22  # largest direct-address table (entries); beyond it, binary search
+
+
+def _code_points(text: str) -> np.ndarray:
+    return np.frombuffer(text.encode("utf-32-le", "surrogatepass"), dtype=np.uint32).astype(
+        np.int64
+    )
+
+
+def _pack(codes: np.ndarray, n: int) -> np.ndarray:
+    """All n-grams (n <= PACK_MAX) of a code-point array as exact int64 keys, one per position."""
+    if len(codes) < n:
+        return np.empty(0, dtype=np.int64)
+    key = codes[: len(codes) - n + 1]
+    for k in range(1, n):
+        key = (key << _BITS) | codes[k : len(codes) - n + 1 + k]
+    return key
+
+
+def _key(term: str) -> int:
+    key = 0
+    for ch in term:
+        key = (key << _BITS) | ord(ch)
+    return key
+
+
+class _Lookup:
+    """Where each vocabulary term lives, grouped by how it is matched."""
+
+    def __init__(self, vocabulary: list[str]) -> None:
+        self.vocabulary = vocabulary
+        packed: dict[int, list[tuple[int, int]]] = {}
+        long_terms: dict[int, list[tuple[str, int]]] = {}
+        words: list[tuple[str, int]] = []
+        for col, term in enumerate(vocabulary):
+            if term.startswith(WORD_PREFIX):
+                words.append((term, col))
+            elif len(term) <= PACK_MAX:
+                packed.setdefault(len(term), []).append((_key(term), col))
+            else:
+                long_terms.setdefault(len(term), []).append((term, col))
+        self.packed: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+        for n, pairs in packed.items():
+            pairs.sort()
+            self.packed[n] = (
+                np.asarray([k for k, _ in pairs], dtype=np.int64),
+                np.asarray([c for _, c in pairs], dtype=np.intp),
+            )
+        self._build_direct_tables(vocabulary, packed)
+        self.long_terms = long_terms
+        self.words = words
+
+    def _build_direct_tables(self, vocabulary: list[str], packed: dict) -> None:
+        """Direct-address tables: char -> small id, then n-gram of ids -> column (or -1).
+
+        Much faster than binary search. Characters outside the vocabulary share one "unknown" id
+        whose n-grams are never in the table, so they can never match. A length whose table would
+        be too large keeps the binary-search path (`self.packed`).
+        """
+        chars = sorted({ch for term in vocabulary if len(term) <= PACK_MAX for ch in term})
+        self.base = len(chars) + 1  # ids 0..len(chars)-1 are known chars; len(chars) is unknown
+        self.max_code = max((ord(c) for c in chars), default=0) + 1
+        self.char_id = np.full(self.max_code + 1, self.base - 1, dtype=np.intp)
+        ids = {ch: i for i, ch in enumerate(chars)}
+        for ch, i in ids.items():
+            self.char_id[ord(ch)] = i
+        self.direct: dict[int, np.ndarray] = {}
+        for n in packed:
+            size = self.base**n
+            if size > DIRECT_MAX:
+                continue
+            self.direct[n] = np.full(size, -1, dtype=np.int32)
+        for col, term in enumerate(vocabulary):
+            table = self.direct.get(len(term))
+            if table is not None and not term.startswith(WORD_PREFIX):
+                key = 0
+                for ch in term:
+                    key = key * self.base + ids[ch]
+                table[key] = col
+
+    def fill(self, row: np.ndarray, text: str) -> None:
+        if self.packed:
+            codes = _code_points(text)
+            small = None
+            for n, (keys, cols) in self.packed.items():
+                if len(codes) < n:
+                    continue
+                table = self.direct.get(n)
+                if table is not None:
+                    if small is None:
+                        small = self.char_id[np.minimum(codes, self.max_code)]
+                    key = small[: len(small) - n + 1]
+                    for k in range(1, n):
+                        key = key * self.base + small[k : len(small) - n + 1 + k]
+                    hit = table[key]
+                    row[hit[hit >= 0]] = 1
+                    continue
+                grams = _pack(codes, n)
+                pos = np.searchsorted(keys, grams)
+                pos[pos == len(keys)] = 0  # any in-range index; the equality test rejects it
+                hit = keys[pos] == grams
+                row[cols[pos[hit]]] = 1
+        for n, terms in self.long_terms.items():
+            present = _ngrams(text, (n,))
+            for term, col in terms:
+                if term in present:
+                    row[col] = 1
+        if self.words:
+            present = _words(text)
+            for term, col in self.words:
+                if term in present:
+                    row[col] = 1
+
+
 class Binarizer(BaseEstimator, TransformerMixin):
     """Top-M character n-grams (plus structural delimiters) as binary presence features.
 
@@ -150,17 +266,32 @@ class Binarizer(BaseEstimator, TransformerMixin):
         self.vocabulary_: list[str] = (base + ranked)[: self.n_features]
         return self
 
+    def _lookup(self) -> _Lookup:
+        """Lookup tables for `transform`, built once per fitted vocabulary (not pickled)."""
+        cached = self.__dict__.get("_lookup_cache")
+        if cached is None or cached.vocabulary is not self.vocabulary_:
+            cached = _Lookup(self.vocabulary_)
+            self._lookup_cache = cached
+        return cached
+
+    def __getstate__(self) -> dict:
+        state = super().__getstate__()
+        state.pop("_lookup_cache", None)  # derived from vocabulary_; keeps pickles small
+        return state
+
     def transform(self, snippets: Iterable[str]) -> np.ndarray:
+        """Binary presence matrix (n_snippets, len(vocabulary_)), dtype uint32.
+
+        Same values as testing `term in snippet` for every term, computed without building the
+        set of all substrings: 1-3 character terms are matched on packed integers with NumPy.
+        """
         check_is_fitted(self, "vocabulary_")
-        lengths = sorted({len(t) for t in self.vocabulary_ if not t.startswith(WORD_PREFIX)})
-        use_words = any(t.startswith(WORD_PREFIX) for t in self.vocabulary_)
-        rows = []
-        for s in snippets:
-            present = _ngrams(s, lengths)  # same result as substring search, much faster
-            if use_words:
-                present |= _words(s)
-            rows.append([t in present for t in self.vocabulary_])
-        return np.asarray(rows, dtype=np.uint32).reshape(len(rows), len(self.vocabulary_))
+        lookup = self._lookup()
+        snippets = list(snippets)
+        out = np.zeros((len(snippets), len(self.vocabulary_)), dtype=np.uint32)
+        for row, text in zip(out, snippets, strict=True):
+            lookup.fill(row, text)
+        return out
 
     def get_feature_names_out(self, input_features: object = None) -> np.ndarray:
         check_is_fitted(self, "vocabulary_")
