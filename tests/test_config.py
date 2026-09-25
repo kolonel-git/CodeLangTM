@@ -17,12 +17,24 @@ from codelangtm.config import (
 REPO_CONFIG = Path(__file__).resolve().parents[1] / "configs" / "baselines.yaml"
 
 
-def test_repo_config_matches_defaults():
-    # configs/baselines.yaml documents the defaults; `codelangtm baselines` alone == the file.
+FROZEN_FEATURES = FeatureConfig(
+    n_features=500, ngram_sizes=(2, 3), use_delimiters=False, selection="class_balanced"
+)
+
+
+def test_repo_config_is_frozen_feature_config():
+    # configs/baselines.yaml holds the feature config frozen for M3 (chosen from the ablations).
+    # Changing it changes every reported baseline and the TM comparison: do it deliberately.
     cfg = load_baselines_config(REPO_CONFIG)
     assert cfg.models == MODEL_NAMES
-    assert cfg.features == FeatureConfig()
-    assert config_hash(cfg) == config_hash(BaselinesConfig(models=MODEL_NAMES))
+    assert cfg.features == FROZEN_FEATURES
+    expected = BaselinesConfig(models=MODEL_NAMES, features=FROZEN_FEATURES)
+    assert config_hash(cfg) == config_hash(expected)
+
+
+def test_code_defaults_unchanged():
+    # Code defaults keep the pre-ablation behaviour so old runs stay reproducible from flags.
+    assert FeatureConfig() == FeatureConfig(500, (2, 3), True, "frequency", 1, False)
 
 
 def test_parse_full_config():

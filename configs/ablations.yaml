@@ -40,3 +40,6 @@ studies:
   word_tokens:           # keywords such as SELECT, fn, impl (issues-and-fixes M5)
     selection: [frequency, chi2, class_balanced]
     word_tokens: [false, true]
+  delimiters_x_selection:   # do delimiters still matter once selection is label-aware?
+    selection: [class_balanced, chi2]
+    use_delimiters: [true, false]
