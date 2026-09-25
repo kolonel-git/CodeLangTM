@@ -59,7 +59,7 @@ Pre-alpha. Full plan in [docs/roadmap.md](docs/roadmap.md).
 | --- | --- |
 | M0 Foundations | done |
 | M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
-| M2 Features & baselines | nearly done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
+| M2 Features & baselines | done (PR pending): best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
 | M3 TM training | planned |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |

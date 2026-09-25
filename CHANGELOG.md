@@ -24,6 +24,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Resource metrics in `docs/results.md` for every model: fit CPU time, peak memory (binarizer and classifier separately), size split into vocabulary and classifier, throughput.
 
 ### Changed
+- `Binarizer.transform` is 5.4-6.0× faster (direct-address lookup of 1-3 character terms instead of building substring sets) with identical output; verified by fuzz tests against the `term in snippet` definition.
 - `data build` uses a stable hash-based per-language repo split (`stable_split`, `--salt`) instead of StratifiedGroupKFold; re-collecting one language no longer reshuffles other languages' test repos.
 - `codelangtm baselines` reports repeated test macro-F1 over 10 extra balanced splits (`--repeats`).
 - `Binarizer` is a scikit-learn transformer (refit per CV fold), with alphabetical tie-breaking, JSON save/load, a `use_delimiters` switch and set-based transform. When `n_features` is smaller than the delimiter list, delimiters are now truncated too.

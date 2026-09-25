@@ -37,6 +37,7 @@ Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test
   - `class_balanced`: languages take turns picking their most distinctive feature (P(g | language) − P(g | other languages)).
 - **Frozen for M3** (`configs/baselines.yaml`): `class_balanced`, M=500, 2+3-grams, no forced delimiters, no word tokens. Label-aware selection lifts CV macro-F1 from 0.917 to ~0.96 ([ablations.md](ablations.md)).
 - **Literals:** `L = [x_1..x_M, NOT x_1..NOT x_M]`.
+- **Speed:** `transform` matches 1-3 character terms with direct-address tables over code points (identical to substring tests, fuzz-verified); lookup tables are derived from the vocabulary and never pickled.
 
 ## Evaluation
 - Repo-grouped splits: no repository in both train and test; stable per-language hash split, so re-collecting one language does not move others ([dataset-card.md](dataset-card.md)).

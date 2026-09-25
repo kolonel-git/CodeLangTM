@@ -38,7 +38,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M2 — Features & baselines
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-**Status:** baselines, data checks, stable split, ablations and the frozen feature config done. Bar for the TM (dataset v5, frozen features, see [results.md](results.md)): Naive Bayes CV macro-F1 0.963, repeated test 0.968 ± 0.009; logistic regression 0.953 / 0.968. Label-aware vocabulary selection was the key (0.917 → ~0.96, [ablations.md](ablations.md)). Faster binarization left.
+**Status:** baselines, data checks, stable split, ablations and the frozen feature config done. Bar for the TM (dataset v5, frozen features, see [results.md](results.md)): Naive Bayes CV macro-F1 0.963, repeated test 0.968 ± 0.009; logistic regression 0.953 / 0.968. Label-aware vocabulary selection was the key (0.917 → ~0.96, [ablations.md](ablations.md)); binarization is 5-6× faster. Only the PR is left.
 
 - [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
 - [x] Token-level features: whole-word tokens (`word_tokens`) tested, no gain over label-aware n-gram selection
@@ -53,7 +53,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
 - [x] Embedded-language rule for HTML (windows that are mostly `<script>`)
 - [x] Stable split: per-language hash-based repo assignment; repeated-split test reporting (dataset v5)
-- [ ] Faster binarization (currently ~0.31 ms/snippet, ~100% of end-to-end latency)
+- [x] Faster binarization: 5.4-6.0× faster transform, identical output ([issues-and-fixes](issues-and-fixes.md) M2); the < 0.1 ms end-to-end target is confirmed on a quiet machine in M6
 
 **Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.
 
