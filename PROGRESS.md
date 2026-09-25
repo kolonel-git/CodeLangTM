@@ -4,7 +4,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 **Last updated:** 2026-09-24
 **Current milestone:** M2 — Features & baselines
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 nearly done: feature config frozen (label-aware selection, [ablations](docs/ablations.md)); bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); next: faster binarization, PR, then M3 TM training
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done except the PR: feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); next: PR, then M3 TM training
 
 ## Milestone overview
 
@@ -12,7 +12,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
-| M2 Features & baselines | Nearly done | Part 1 merged; part 2 (configs, ablations, frozen features, resource metrics) on `feat/ablations`; faster binarization left |
+| M2 Features & baselines | Done, PR pending | Part 1 merged; part 2 (configs, ablations, frozen features, resource metrics, faster binarization) on `feat/ablations` |
 | M3 TM training | Planned | |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
@@ -51,7 +51,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2 ablations step 3: label-aware vocabulary selection (fixes M6 and M5), word tokens (no gain), larger M (no gain once selection is on)
 - [x] M2 ablations step 4: delimiters check, freeze the feature config for M3 (`configs/baselines.yaml`), rerun baselines; resource metrics added to the report
 - [ ] M2: push `feat/ablations`, open PR, merge (M2 part 2)
-- [ ] M2: faster binarization (0.31 ms/snippet now; target budget < 0.1 ms end-to-end; first cheap win: test delimiters by substring, see issues-and-fixes M2)
+- [x] M2: faster binarization: 5.4-6.0× faster transform, identical output (issues-and-fixes M2); < 0.1 ms end-to-end to be confirmed on a quiet machine in M6
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
@@ -60,6 +60,14 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - None.
 
 ## Done log
+
+### 2026-09-25 — M2: faster binarization
+- Profile: 92% of `Binarizer.transform` was building substring sets; the vocabulary lookups were 8%.
+- Fix: code-point arrays + direct-address tables for 1-3 character terms (NumPy), set method kept for longer terms and word features, binary-search fallback for huge alphabets; lookup tables derived from the vocabulary and not pickled. Details and numbers: issues-and-fixes M2.
+- Correctness: output identical to `term in snippet` (fuzz tests incl. non-BMP, unseen characters, lengths 1-4, words, delimiters, fallback path; mutation check fails 5 tests). Baseline scores unchanged to the digit.
+- Speed: 5.4-6.0× faster over 5 interleaved runs (same process, same load). Absolute timings on this machine swing ±50% with background load (0.078-0.099 ms/snippet for transform during the measurement), so the < 0.1 ms end-to-end target is not yet confirmed; M6 benchmarks it on a quiet machine.
+- Tests: 226 passing.
+- M2 is now complete apart from the PR.
 
 ### 2026-09-25 — M2 part 2 step 4: frozen feature config, new baseline bar, resource metrics
 - **Delimiters check** (`delimiters_x_selection` study): with label-aware selection, turning delimiters off changes LR by -0.006 and Naive Bayes by +0.003 (within noise) and cuts binarize time 44% (0.312 → 0.176 ms/snippet).
@@ -223,6 +231,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 | 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
+| 2026-09-25 | Same, after faster binarization | v5 | identical scores | 0.08-0.13 ms/snippet end-to-end (linear models / NB) on a loaded machine; binarize alone 5.4-6.0× faster than before (interleaved A/B); RF 0.75 |
 
 ## Targets
 Macro-F1 >= 96% (8 languages) · < 0.1 ms per snippet · < 500 KB model.
