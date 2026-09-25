@@ -18,6 +18,13 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
+### M7. First resource numbers were misleading (fixed before commit)
+- **Symptom:** the first "Resources" table showed fit CPU 2.7 s against 0.45 s wall time, and an identical 71.7 MB peak memory for all five models.
+- **Root cause:** both came from one memory-traced fit. `tracemalloc` slows code down about 6×, which inflated CPU time; and the peak was the binarizer's candidate table (same for every model), which hid the differences between classifiers.
+- **Fix:** CPU time is taken from a plain fit; memory is measured in two separate traced runs, binarizer (fit + transform) and classifier (on the binarized matrix), and reported in separate columns. Result: CPU ≈ wall time (random forest 0.94 s vs 0.76 s wall: threads); binarizer 71.7 MB for every model; classifier 1.4 MB (decision tree) to 4.3 MB (Naive Bayes).
+- **Known limit:** `tracemalloc` sees only Python/NumPy allocations, not memory allocated inside C extensions (liblinear, TMU). The TM comparison in M3 therefore also measures process-level peak memory in a subprocess, for baselines and TM alike (roadmap M3).
+- **Finding (baselines):** the pipeline is dominated by the binarizer, not the classifier: 72 MB and ~0.18 ms/snippet of feature extraction against ≤ 4 MB and ~0.01 ms for the classifier (except random forest at 7 MB pickled, 0.2 ms).
+
 ### M6. Frequency-ranked vocabulary picks generic n-grams (fixed: label-aware selection)
 - **Symptom:** first ablation run (`docs/ablations.md`): bigrams alone beat the 2+3-gram base at the same M=500 (logistic regression CV 0.944 vs 0.917, paired Δ +0.027 ± 0.021; Naive Bayes +0.036 ± 0.021). Adding 4-grams (n=2+3+4) is worse still (-0.011).
 - **Root cause:** the binarizer keeps the top M n-grams by document frequency across all languages. With 2+3-grams, 183 of the 500 slots go to 3-grams that are common everywhere, such as `ing`, `ion`, `tio`, `ent`, `con` (English identifiers and comments) and runs of spaces. They push out 183 lower-ranked bigrams that separate languages better. Frequency is not discriminative power.

@@ -21,11 +21,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - YAML experiment configs (`config.py`, `configs/baselines.yaml`, `codelangtm baselines --config`): strict validation, CLI overrides, settings hash recorded in `docs/results.md`. New dependency `pyyaml`.
 - Feature ablation runner (`ablations.py`, `configs/ablations.yaml`, `codelangtm ablate`): train-only repo-grouped CV per feature setting, paired Δ vs base, per-language F1, binarize cost; generates `docs/ablations.md`.
 - `Binarizer` options `selection` (`frequency`, `chi2`, `class_balanced`), `min_df` and `word_tokens` (whole identifier/keyword features, shown as `word:NAME`); configurable in YAML. Defaults keep the previous behaviour.
+- Resource metrics in `docs/results.md` for every model: fit CPU time, peak memory (binarizer and classifier separately), size split into vocabulary and classifier, throughput.
 
 ### Changed
 - `data build` uses a stable hash-based per-language repo split (`stable_split`, `--salt`) instead of StratifiedGroupKFold; re-collecting one language no longer reshuffles other languages' test repos.
 - `codelangtm baselines` reports repeated test macro-F1 over 10 extra balanced splits (`--repeats`).
 - `Binarizer` is a scikit-learn transformer (refit per CV fold), with alphabetical tie-breaking, JSON save/load, a `use_delimiters` switch and set-based transform. When `n_features` is smaller than the delimiter list, delimiters are now truncated too.
+- `configs/baselines.yaml` now holds the feature config frozen for M3: `class_balanced` selection, M=500, 2+3-grams, no forced delimiters. Baseline CV macro-F1 rises from 0.917 to 0.963 (best model now Naive Bayes); latency 0.31 → 0.19 ms/snippet. Code defaults are unchanged.
 - Dependencies: removed unused `pandas`; declared `scipy` (used directly by `features.py`).
 
 ### Fixed
