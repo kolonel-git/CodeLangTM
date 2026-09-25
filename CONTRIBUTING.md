@@ -2,9 +2,9 @@
 
 ## Setup
 ```bash
-uv sync            # Python 3.12 venv + dev tools
-uv sync --extra tm # add TMU (needs a C compiler)
+uv sync --extra tm --extra collect   # Python 3.12 venv, dev tools, TMU, collector
 ```
+A plain `uv sync` removes the `tm` and `collect` extras again.
 
 ## Workflow
 - Branch from `main`: `feat/<topic>`, `fix/<topic>`.
@@ -12,7 +12,8 @@ uv sync --extra tm # add TMU (needs a C compiler)
 - Before PR: `uv run ruff check . && uv run pytest`.
 - One roadmap item per PR; link the issue (`Closes #N`). Issues belong to a milestone (M1-M7, see [docs/roadmap.md](docs/roadmap.md)).
 - Feature branches only; no direct commits to `main`. See [docs/github-setup.md](docs/github-setup.md).
-- Experiments: use YAML configs and fixed seeds; commit resulting tables to `docs/results.md`.
+- Experiments: define them in `configs/*.yaml` (fixed seeds) and commit the generated reports (`docs/results.md`, `docs/ablations.md`); never edit generated reports by hand.
+- Log problems and their fixes in `docs/issues-and-fixes.md`, and session progress in `PROGRESS.md`.
 
 ## Data
 Datasets live in `data/` and are gitignored. Do not commit code with unclear licensing; record each source and its license in `docs/data-sources.md`.

@@ -1,4 +1,4 @@
-"""Multi-class Tsetlin Machine wrapper (TMU backend). Phase 2."""
+"""Multi-class Tsetlin Machine wrapper (TMU backend). Milestone M3."""
 
 from __future__ import annotations
 

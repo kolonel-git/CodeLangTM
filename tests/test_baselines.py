@@ -57,6 +57,26 @@ def test_results_shape(processed):
     assert meta["repeats"] == 2 and meta["split"]["split"] == "stable-hash"
 
 
+def test_resource_metrics_measured(processed):
+    results, _ = run(processed, models=["naive_bayes", "decision_tree"], repeats=0)
+    for r in results:
+        assert r.fit_cpu_seconds is not None and r.fit_cpu_seconds >= 0
+        assert r.peak_binarize_mb > 0 and r.peak_model_mb > 0  # both stages allocate
+        assert 0 < r.vocab_kb < r.size_kb  # vocabulary is a part of the pickled pipeline
+        assert r.throughput == pytest.approx(1000 / r.latency_ms)
+
+
+def test_measure_fit_leaves_tracemalloc_off(processed):
+    import tracemalloc
+
+    texts = [s.text for s in load_snippets(processed / "train.jsonl")]
+    labels = np.asarray([s.language for s in load_snippets(processed / "train.jsonl")])
+    pipe = bl._pipeline(bl.make_models()["naive_bayes"], Binarizer(60))
+    cpu, peak_binarize, peak_model = bl.measure_fit(pipe, texts, labels)
+    assert cpu >= 0 and peak_binarize > 0 and peak_model > 0 and not tracemalloc.is_tracing()
+    assert not hasattr(pipe.steps[0][1], "vocabulary_")  # measured on clones; pipe untouched
+
+
 def test_repeated_splits_differ_and_never_leak(processed):
     pool = [*load_snippets(processed / "train.jsonl"), *load_snippets(processed / "test.jsonl")]
     splits = [
@@ -83,7 +103,8 @@ def test_vocabulary_never_sees_held_out_text(processed, monkeypatch):
     test_texts = {s.text for s in load_snippets(processed / "test.jsonl")}
     train = list(load_snippets(processed / "train.jsonl"))
     folds = json.loads((processed / "folds.json").read_text(encoding="utf-8"))["folds"]
-    assert len(seen) == 6  # 5 folds + final fit
+    # 5 folds + final fit + 2 resource-measurement fits (CPU pipeline, binarizer), all on train only
+    assert len(seen) == 8
     for fitted in seen:
         assert not fitted & test_texts
     for k, fitted in enumerate(seen[:5]):
@@ -119,6 +140,12 @@ def test_render_results_md():
     md = bl.render_results_md([result("a", [0.9], 0.8), result("b", [0.5], 0.9)], meta, LANGS)
     assert "| **a** | 0.900" in md and "Best by CV: **a**" in md
     assert "## Confusion matrix: a (test)" in md and "Most frequent confusions: none" in md
+    assert "## Resources" in md and "| a | 0.10 | - | - | - | 1 | - | 0.010 | 100,000 |" in md
+    full = result("c", [0.9], 0.8)
+    full.fit_cpu_seconds, full.vocab_kb = 0.25, 3.21
+    full.peak_binarize_mb, full.peak_model_mb = 12.34, 0.56
+    md = bl.render_results_md([full], meta, LANGS)
+    assert "| c | 0.10 | 0.25 | 12.3 | 0.6 | 1 | 3.2 | 0.010 | 100,000 |" in md
 
 
 def test_unknown_model_rejected(processed):
@@ -144,3 +171,36 @@ def test_cli(processed, tmp_path, capsys):
     assert "best by CV: naive_bayes" in capsys.readouterr().out
     assert out.read_text(encoding="utf-8").startswith("# Results")
     assert main(["baselines", "--data", str(tmp_path / "none")]) == 1
+
+
+def test_cli_config_file_and_override(processed, tmp_path, capsys):
+    out = tmp_path / "results.md"
+    cfg = tmp_path / "exp.yaml"
+    cfg.write_text(
+        f"data: {processed.as_posix()}\nout: {out.as_posix()}\nrepeats: 0\n"
+        "models: [naive_bayes, decision_tree]\n"
+        "features: {n_features: 40, ngram_sizes: [3], use_delimiters: false}\n",
+        encoding="utf-8",
+    )
+    assert main(["baselines", "--config", str(cfg), "--model", "naive_bayes"]) == 0
+    assert "best by CV: naive_bayes" in capsys.readouterr().out  # --model overrode the list
+    md = out.read_text(encoding="utf-8")
+    assert f"`{cfg.as_posix()}` + CLI overrides `models`" in md
+    assert "`Binarizer(n_features=40, ngram_sizes=(3), use_delimiters=False)`" in md
+
+    cfg.write_text("featurs: {}\n", encoding="utf-8")
+    assert main(["baselines", "--config", str(cfg)]) == 1
+    assert "unknown key" in capsys.readouterr().err
+
+
+def test_binarizer_options_reach_pipeline(processed):
+    b = Binarizer(30, (3,), False, selection="chi2", min_df=2, word_tokens=True)
+    _, meta = bl.run_baselines(processed, ["naive_bayes"], languages=LANGS, repeats=1, binarizer=b)
+    assert meta["features"] == {
+        "n_features": 30, "ngram_sizes": [3], "use_delimiters": False,
+        "selection": "chi2", "min_df": 2, "word_tokens": True,
+    }  # fmt: skip
+    meta.update(generated="t", dataset_files={}, n_wild=0)
+    md = bl.render_results_md([result("naive_bayes", [0.9], 0.9)], meta, LANGS)
+    assert ("`Binarizer(n_features=30, ngram_sizes=(3), use_delimiters=False, "
+            "selection='chi2', min_df=2, word_tokens=True)`") in md  # fmt: skip

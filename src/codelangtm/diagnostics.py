@@ -114,7 +114,7 @@ def shortcut_probe(
     labels = np.asarray([s.language for s in train])
     repos = np.asarray([s.repo for s in train])
     pipe = _lr_pipeline(n_features, seed).fit(texts, labels)
-    vocab = pipe.named_steps["binarize"].vocabulary_
+    vocab = pipe.named_steps["binarize"].get_feature_names_out()
     x = pipe.named_steps["binarize"].transform(texts).astype(bool)
     model = pipe.named_steps["model"]
     coef = model.coef_
