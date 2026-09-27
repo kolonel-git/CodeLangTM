@@ -13,7 +13,8 @@ A plain `uv sync` removes the `tm`, `collect` and `viz` extras again.
 - One roadmap item per PR; link the issue (`Closes #N`). Issues belong to a milestone (M1-M7, see [docs/roadmap.md](docs/roadmap.md)).
 - Feature branches only; no direct commits to `main`. See [docs/github-setup.md](docs/github-setup.md).
 - Experiments: define them in `configs/*.yaml` (fixed seeds) and commit the generated reports (`docs/results.md`, `docs/ablations.md` and their `.json` sidecars), then `uv run codelangtm report` for `docs/figures/`; never edit generated reports by hand. `docs/report.md` is hand-written: update its numbers when results change.
-- Log problems and their fixes in `docs/issues-and-fixes.md`, and session progress in `PROGRESS.md`.
+- TM results: report means over 5 seeds with spread, paired significance tests against the baselines on the same folds, and commit the raw runs (JSON); choose settings on CV only.
+- Log problems and their fixes in `docs/issues-and-fixes.md`, and session progress in `PROGRESS.md`; explain new concepts in `docs/concepts.md`.
 
 ## Data
 Datasets live in `data/` and are gitignored. Do not commit code with unclear licensing; record each source and its license in `docs/data-sources.md`.

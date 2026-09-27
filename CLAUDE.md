@@ -25,3 +25,6 @@ Tsetlin Machine (TMU) classifier that identifies a snippet's programming languag
 - Real-world data only, collected by the maintainer into `data/raw/` (GitHub: `data/raw/github/<language>.jsonl`, gitignored). No synthetic generators.
 - TMU (`tm`) and matplotlib (`viz`) are optional extras; core code must import without them.
 - `tests/test_docs.py` checks every relative link/image in the markdown; keep docs links valid.
+- Reporting (from M3): TM numbers are means over 5 seeds with spread; TM vs baselines uses a paired significance test on the same folds; save raw per-seed/per-fold runs as JSON; choose settings on CV only, never on test.
+- `docs/concepts.md` explains ideas in plain language; add an entry when a step introduces a new concept.
+- Project direction (portfolio now, research write-up later; CLI + C runtime + web demo): see the Principles in docs/roadmap.md.

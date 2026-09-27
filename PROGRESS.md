@@ -26,15 +26,28 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - [x] M3 branch A `feat/report`: A0 housekeeping, A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + [docs/report.md](docs/report.md)
 - [x] Push `feat/report`, PR #6 merged; CI green with TMU and matplotlib installed (TMU builds on the Ubuntu runner)
 - [x] B1 spike: timing, NumPy-vs-TMU equivalence, first CV numbers (issues-and-fixes M8)
-- [ ] Confirm the B3 main TM setting (proposed N_c=400, T=100, s=5; planned 100/30/3.5 kept as a reference row)
+- [x] B3 main TM setting chosen: N_c=400, T=100, s=5 (planned 100/30/3.5 kept as a reference row)
+- [x] Direction agreed (see done log 2026-09-27): portfolio + later research write-up, research-ready rigor, Stage B after M3, CLI + C runtime + web demo, concepts guide
 - [ ] M3 branch B `feat/tm-training`: B2 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
-- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
-- [ ] Later: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
+- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison (5 seeds, paired significance test)
+- [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-27 — Direction agreed, B3 setting chosen, concepts guide
+- Branch `feat/tm-training` created from the updated `main`; B1 findings committed.
+- Decisions (alignment questions):
+  - **Purpose:** portfolio piece first, convertible into a research write-up later.
+  - **Rigor from now on:** every TM number is a mean over 5 seeds with spread; paired significance test against Naive Bayes on the same folds; raw per-seed runs saved as JSON.
+  - **Accuracy vs readability:** balance both. Report the accurate TM (N_c=400, T=100, s=5; option A for B3) and, in M4, the smallest model within ~1 F1 point, with the curve between them.
+  - **Data:** stay on v5 through M3; Stage B (more data, stretch languages) after M3 and before M4 tuning.
+  - **End product:** CLI + zero-dependency C runtime, plus a web demo. The demo technology is decided later; the saved model format must stay portable and documented.
+  - **Check-ins:** at the start and end of each step.
+  - **Explanations:** new plain-language [docs/concepts.md](docs/concepts.md), linked from the README and the report.
+- Docs updated for these decisions: roadmap (Principles, Stage B timing, B2 portable format, B3 multi-seed + test, M4 smallest model, M6 web demo, M7 research write-up), README, report, CLAUDE.md, CONTRIBUTING, issues-and-fixes M8.
 
 ### 2026-09-27 — M3 branch B, B1: TMU spike (throwaway scripts, not committed)
 - `feat/report` merged (PR #6); CI green, so TMU compiles on the Ubuntu runner and the figure tests pass there.

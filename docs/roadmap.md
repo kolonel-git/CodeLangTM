@@ -1,12 +1,15 @@
 # Roadmap
 
-Ordered milestones, no fixed deadlines. Each milestone maps to a GitHub milestone; each task checkbox becomes an issue. Work happens on feature branches merged via PR.
+Ordered milestones, no fixed deadlines. The project is a portfolio piece built so that it can later become a research write-up: results are reported with research-level care from M3 on (see Principles). Each milestone maps to a GitHub milestone; each task checkbox becomes an issue. Work happens on feature branches merged via PR.
 
 ## Principles
 - **Real data only.** No synthetic snippet generators. Every snippet records its source repo and license.
 - **No leakage.** Splits are grouped by source repo; a separate "wild" test set comes from sources never seen in training.
 - **Reproducible.** YAML configs, fixed seeds, results committed to `docs/results.md`; every number regenerates from one command.
 - **Honest claims.** Targets (macro-F1 >= 96%, < 0.1 ms/snippet, < 500 KB) are reported as measured, including misses.
+- **Research-ready results (from M3).** Every reported TM number is a mean over 5 seeds with its spread; headline comparisons with the baselines use a paired significance test on the same folds; the raw per-seed, per-fold runs are saved as JSON next to the reports. Design choices are made on CV only.
+- **Accuracy and readability together.** Report the most accurate TM and the smallest TM within about 1 F1 point of it, and the curve between them (M4).
+- **Plain-language docs.** New concepts are explained in [concepts.md](concepts.md).
 
 ## M0 — Foundations (done)
 - [x] Package layout, `uv` env pinned to Python 3.12, MIT license
@@ -18,7 +21,7 @@ Ordered milestones, no fixed deadlines. Each milestone maps to a GitHub mileston
 
 Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch set added in Stage B: C, C#, TypeScript, Kotlin, PHP, Ruby, to stress confusable pairs (JS/TS, C/C++, Java/C#).
 
-**Status:** Stage A complete (dataset v5, 869 snippets, stable split, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred and do not block M2.
+**Status:** Stage A complete (dataset v5, 869 snippets, stable split, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred: they are scheduled **after M3 and before M4 tuning** (decided 2026-09-27), so the TM is first compared on v5 and then tuned on the larger dataset.
 
 - [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
 - [x] Collector: GitHub API, permissive licenses only (MIT / Apache-2.0 / BSD)
@@ -65,8 +68,8 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Results report: JSON sidecars for generated reports, deterministic figures (`figures.py`, `codelangtm report` → `docs/figures/`), hand-written [report.md](report.md) (branch `feat/report`)
 - [x] Verify TMU install: TMU 0.8.3 builds natively on Windows with `numpy<2` (see [architecture.md](architecture.md) install notes); CUDA optional
 - [x] B1 spike (not committed): 0.03-0.04 s/epoch; NumPy prediction matches TMU exactly (empty clauses output 0); planned N_c=100/T=30/s=3.5 reaches ~0.93 CV, N_c=400/T=100/s=5 ~0.96 ([issues-and-fixes](issues-and-fixes.md) M8)
-- [ ] B2 `TMLanguageClassifier` (scikit-learn estimator: fit/partial_fit/predict/decision_function) + TMU-free NumPy `TMState` (predict, save/load) with tests
-- [ ] B3 `TMConfig` + `configs/tm.yaml`; main run N_c=400, T=100, s=5 (from B1, CV only) plus the planned N_c=100, T=30, s=3.5 as a reference row, through the same CV / test / repeated-split protocol → `docs/tm-results.md` + `.json`
+- [ ] B2 `TMLanguageClassifier` (scikit-learn estimator: fit/partial_fit/predict/decision_function) + TMU-free NumPy `TMState` (predict, save/load in a documented, portable format that the C export and the web demo can read) with tests
+- [ ] B3 `TMConfig` + `configs/tm.yaml`; main run N_c=400, T=100, s=5 (from B1, CV only) plus the planned N_c=100, T=30, s=3.5 as a reference row, through the same CV / test / repeated-split protocol, each over 5 seeds (mean ± std), with a paired significance test against Naive Bayes on the same folds → `docs/tm-results.md` + `.json` (raw per-seed runs included)
 - [ ] B4 training curves (macro-F1 vs epoch, train and held-out folds; epoch chosen without test data); B4b `codelangtm tm-train` saves the final model (`models/`, gitignored)
 - [ ] B5 resource comparison, same protocol for every model (baselines already report the first block in [results.md](results.md)):
   - training: wall time, CPU time, peak memory (Python heap for baselines; process-level peak RSS, measured in a subprocess, for both baselines and the TM, since TMU allocates in C), epochs to converge;
@@ -80,12 +83,13 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 **Exit:** TM results in `docs/tm-results.md`, comparable to baselines on the same splits; reported as measured, including where the TM loses; every learned clause is inspectable and any prediction can be traced to the clauses that fired.
 
 ## M4 — Tuning & compression
-**Goal:** best accuracy per byte and per rule.
+**Goal:** best accuracy per byte and per rule. Runs on the Stage B dataset (after M3).
 
 - [ ] Grid search over s, T, N_c; heatmaps saved to `docs/figures/`
 - [ ] Optuna refinement: epochs, drop-clause rate, literal budget (seeded)
 - [ ] Drop clause + literal budgeting to prune redundant literals
 - [ ] Trade-off curves: macro-F1 vs model size vs average rule length
+- [ ] Smallest model within ~1 F1 point of the most accurate one (fewer clauses, literal budget), reported next to it
 - [ ] Pick and freeze a release configuration
 
 **Exit:** frozen config in `configs/`; trade-off plots committed.
@@ -104,13 +108,14 @@ Rule extraction, per-prediction explanation and the per-language gallery move in
 **Exit:** for any snippet, the report shows exactly which rules drove the prediction.
 
 ## M6 — Deployment & benchmarks
-**Goal:** zero-dependency runtime meeting size/latency targets.
+**Goal:** zero-dependency runtime meeting size/latency targets, plus a web demo.
 
 - [ ] Pure C export of trained clauses (`export_c.export_c`)
 - [ ] Equivalence test: C predictions == Python predictions on the full test set
 - [ ] CLI: `codelangtm predict <file|->`
 - [ ] Benchmark script: latency per snippet (median, p95) and compiled model size
 - [ ] Results vs targets in README (< 0.1 ms, < 500 KB), reported as measured
+- [ ] Web demo: paste code, see the prediction, the votes and the clauses that fired. Technology decided later (options: static page with JavaScript inference, WebAssembly from the C runtime, or a hosted Python app); until then the saved model format stays portable and documented
 
 **Exit:** C runtime builds with a plain compiler; benchmarks reproducible.
 
@@ -118,13 +123,14 @@ Rule extraction, per-prediction explanation and the per-language gallery move in
 - [ ] README: results table, figures, rule examples
 - [ ] Demo notebook (`notebooks/demo.ipynb`)
 - [ ] Write-up / blog post: method, ablations, findings, limitations
+- [ ] Research write-up (later): paper-style version of the report, built on the saved multi-seed runs
 - [ ] Tag `v0.1.0`, update CHANGELOG
 
 ## Future
 - Short-snippet evaluation: accuracy on 1-10 line snippets (collect or cut short windows from the same repos, report F1 by snippet length). Skipped in M3 by decision; the current dataset only has 20-50 line windows ([dataset card](dataset-card.md), Known limitations)
 - Relational TM over ASTs (Horn clauses)
 - Convolutional TM over 2D code layout
-- VS Code extension; WebAssembly browser demo
+- VS Code extension
 - FPGA/ASIC via MATADOR
 - Federated TM (FedTMOS)
 - Sparse TM for vulnerability detection
