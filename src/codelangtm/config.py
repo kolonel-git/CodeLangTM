@@ -190,13 +190,17 @@ def parse_ablations(raw: dict | None) -> AblationConfig:
     return replace(cfg, studies=tuple(parse_study(n, s, base) for n, s in studies.items()))
 
 
+EPOCH_RULES = ("plateau", "max")
+
+
 @dataclass(frozen=True)
 class CurveConfig:
     """Training-curve scan (B4): how far to train and how to pick the epoch count."""
 
     max_epochs: int = 150
     smooth_window: int = 11  # moving-average width over epochs (odd)
-    plateau_tolerance: float = 0.005  # first epoch within this of the smoothed maximum
+    plateau_tolerance: float = 0.005  # plateau rule: first epoch within this of the smoothed max
+    epoch_rule: str = "plateau"  # "plateau" (first levelled-off epoch) or "max" (smoothed peak)
 
 
 @dataclass(frozen=True)
@@ -300,6 +304,10 @@ def parse_tm(raw: dict | None) -> TMConfig:
             if isinstance(tol, bool) or not isinstance(tol, int | float) or tol < 0:
                 raise ValueError("curves.plateau_tolerance: expected a number >= 0")
             curves = replace(curves, plateau_tolerance=float(tol))
+        if "epoch_rule" in c:
+            if c["epoch_rule"] not in EPOCH_RULES:
+                raise ValueError(f"curves.epoch_rule: expected one of {list(EPOCH_RULES)}")
+            curves = replace(curves, epoch_rule=c["epoch_rule"])
         cfg = replace(cfg, curves=curves)
     tm = raw.get("tm")
     if not isinstance(tm, dict) or not tm:
