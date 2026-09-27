@@ -24,6 +24,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Resource metrics in `docs/results.md` for every model: fit CPU time, peak memory (binarizer and classifier separately), size split into vocabulary and classifier, throughput.
 
 - JSON sidecars for generated reports: `codelangtm baselines` writes `results.json` and `codelangtm ablate` writes `ablations.json` next to the markdown (same runs, machine-readable). Report metadata now includes per-language dataset composition (snippets and repos per split).
+- Report figures (`figures.py`): 8 deterministic PNGs drawn from the JSON sidecars (dataset, baselines, per-language F1, confusion, resources, ablations).
 - Optional `viz` extra (matplotlib) for figures and the report; `docs/figures/` for generated plots.
 
 ### Changed
