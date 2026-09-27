@@ -23,7 +23,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - `Binarizer` options `selection` (`frequency`, `chi2`, `class_balanced`), `min_df` and `word_tokens` (whole identifier/keyword features, shown as `word:NAME`); configurable in YAML. Defaults keep the previous behaviour.
 - Resource metrics in `docs/results.md` for every model: fit CPU time, peak memory (binarizer and classifier separately), size split into vocabulary and classifier, throughput.
 
+- Optional `viz` extra (matplotlib) for figures and the report; `docs/figures/` for generated plots.
+
 ### Changed
+- CI installs the `tm` and `viz` extras so TM and figure tests run in CI.
 - `Binarizer.transform` is 5.4-6.0× faster (direct-address lookup of 1-3 character terms instead of building substring sets) with identical output; verified by fuzz tests against the `term in snippet` definition.
 - `data build` uses a stable hash-based per-language repo split (`stable_split`, `--salt`) instead of StratifiedGroupKFold; re-collecting one language no longer reshuffles other languages' test repos.
 - `codelangtm baselines` reports repeated test macro-F1 over 10 extra balanced splits (`--repeats`).

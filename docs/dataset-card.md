@@ -90,7 +90,7 @@ Command: `codelangtm data build` (`src/codelangtm/build.py`, `splits.py`).
 - **SQL learned partly as "data rows":** many SQL windows are `INSERT ... VALUES` rows. With the default frequency-ranked features, baselines assign repetitive list-like code in other languages (long runs of `call("x", 6),` lines) to SQL. Labels are correct; the cause was feature selection: label-aware selection (M2 ablations) keeps `SELECT` fragments and raises SQL CV F1 from 0.87 to 0.99 ([issues-and-fixes](issues-and-fixes.md) M5, M6).
 - **Test code share varies:** Go 40%, JavaScript 29%, Python 23%, Java 22%, others <= 13%. Checked in M2: test idioms (`t.Run`, `assert`, `@Test`) are not among the top baseline features, so this is not acting as a shortcut.
 - **Embedded languages:** HTML windows that are mostly inline `<script>`/`<style>` are excluded (< 20% markup lines); HTML with some script (>= 20% markup) is kept. JavaScript windows dominated by HTML template strings and Python/Java with embedded SQL strings are not filtered.
-- **Window length:** 20-50 lines only. Accuracy on one-line or very short snippets is not measured by this dataset.
+- **Window length:** 20-50 lines only. Accuracy on one-line or very short snippets is not measured by this dataset. Short-snippet evaluation is a Future item in the [roadmap](roadmap.md).
 - **Snapshot:** single collection date; languages evolve (e.g. newer syntax) after it.
 - **Label noise:** labels come from file extensions with heuristic content checks, not human annotation. Manual review of 80 random samples found no mislabels. Confident learning on the training split flagged 6 of 689 in v3 (3 HTML windows of inline script, fixed in v4) and 5 of 696 in v4, all with correct labels (hard or list-like examples).
 
