@@ -25,7 +25,7 @@ Code snippet
 | Label-issue and shortcut checks | `diagnostics.py` | `codelangtm diagnose` |
 | TM model, rules, C export | `model.py`, `rules.py`, `export_c.py` | stubs (M3, M5, M6) |
 
-Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`).
+Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`), each with a JSON sidecar (`results.json`, `ablations.json`: same runs, machine-readable, read by the figure code).
 
 ## Features
 `Binarizer` (scikit-learn transformer; refit inside every CV fold):

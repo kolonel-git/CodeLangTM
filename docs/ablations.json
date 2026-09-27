@@ -1,0 +1,2387 @@
+{
+  "schema": "codelangtm.ablations/1",
+  "meta": {
+    "generated": "2026-09-27 15:44:15",
+    "data_dir": "data/processed",
+    "dataset_files": {
+      "train.jsonl": "8cdc4c91ebe6",
+      "test.jsonl": "54649be8e4e0",
+      "wild.jsonl": "e3b0c44298fc",
+      "folds.json": "77229e0f7668"
+    },
+    "n_train": 696,
+    "n_test": 173,
+    "n_wild": 0,
+    "n_folds": 5,
+    "composition": {
+      "train": {
+        "cpp": {
+          "snippets": 90,
+          "repos": 20
+        },
+        "go": {
+          "snippets": 99,
+          "repos": 20
+        },
+        "html": {
+          "snippets": 76,
+          "repos": 20
+        },
+        "java": {
+          "snippets": 94,
+          "repos": 20
+        },
+        "javascript": {
+          "snippets": 85,
+          "repos": 20
+        },
+        "python": {
+          "snippets": 93,
+          "repos": 20
+        },
+        "rust": {
+          "snippets": 98,
+          "repos": 20
+        },
+        "sql": {
+          "snippets": 61,
+          "repos": 17
+        }
+      },
+      "test": {
+        "cpp": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "go": {
+          "snippets": 25,
+          "repos": 5
+        },
+        "html": {
+          "snippets": 24,
+          "repos": 5
+        },
+        "java": {
+          "snippets": 20,
+          "repos": 5
+        },
+        "javascript": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "python": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "rust": {
+          "snippets": 25,
+          "repos": 5
+        },
+        "sql": {
+          "snippets": 16,
+          "repos": 4
+        }
+      },
+      "wild": {}
+    },
+    "split": {
+      "split": "stable-hash",
+      "test_size": 0.2,
+      "n_folds": 5,
+      "salt": "codelangtm-v1"
+    },
+    "versions": {
+      "python": "3.12.12",
+      "scikit-learn": "1.9.1",
+      "numpy": "1.26.4"
+    },
+    "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "seed": 0,
+    "config_hash": "cbee32844951",
+    "studies": [
+      "vocabulary_size",
+      "ngram_sizes",
+      "delimiters",
+      "ngrams_x_vocabulary",
+      "selection",
+      "selection_x_ngrams",
+      "selection_x_vocabulary",
+      "min_df",
+      "word_tokens",
+      "delimiters_x_selection"
+    ],
+    "n_settings": 31,
+    "config_path": "configs/ablations.yaml"
+  },
+  "languages": [
+    "python",
+    "cpp",
+    "java",
+    "javascript",
+    "rust",
+    "go",
+    "sql",
+    "html"
+  ],
+  "models": [
+    "logistic_regression",
+    "naive_bayes"
+  ],
+  "base": 0,
+  "studies": [
+    {
+      "name": "vocabulary_size",
+      "varied": [
+        "n_features"
+      ],
+      "settings": [
+        1,
+        2,
+        0,
+        3
+      ]
+    },
+    {
+      "name": "ngram_sizes",
+      "varied": [
+        "ngram_sizes"
+      ],
+      "settings": [
+        4,
+        5,
+        6,
+        0,
+        7
+      ]
+    },
+    {
+      "name": "delimiters",
+      "varied": [
+        "use_delimiters"
+      ],
+      "settings": [
+        0,
+        8
+      ]
+    },
+    {
+      "name": "ngrams_x_vocabulary",
+      "varied": [
+        "n_features",
+        "ngram_sizes"
+      ],
+      "settings": [
+        2,
+        9,
+        0,
+        7,
+        3,
+        10
+      ]
+    },
+    {
+      "name": "selection",
+      "varied": [
+        "selection"
+      ],
+      "settings": [
+        0,
+        11,
+        12
+      ]
+    },
+    {
+      "name": "selection_x_ngrams",
+      "varied": [
+        "selection",
+        "ngram_sizes"
+      ],
+      "settings": [
+        4,
+        0,
+        7,
+        13,
+        11,
+        14,
+        15,
+        12,
+        16
+      ]
+    },
+    {
+      "name": "selection_x_vocabulary",
+      "varied": [
+        "selection",
+        "n_features"
+      ],
+      "settings": [
+        0,
+        3,
+        17,
+        11,
+        18,
+        19,
+        12,
+        20,
+        21
+      ]
+    },
+    {
+      "name": "min_df",
+      "varied": [
+        "selection",
+        "min_df"
+      ],
+      "settings": [
+        11,
+        22,
+        23,
+        12,
+        24,
+        25
+      ]
+    },
+    {
+      "name": "word_tokens",
+      "varied": [
+        "selection",
+        "word_tokens"
+      ],
+      "settings": [
+        0,
+        26,
+        11,
+        27,
+        12,
+        28
+      ]
+    },
+    {
+      "name": "delimiters_x_selection",
+      "varied": [
+        "selection",
+        "use_delimiters"
+      ],
+      "settings": [
+        12,
+        29,
+        11,
+        30
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "id": 0,
+      "label": "M=500, n=2+3, delimiters on",
+      "is_base": true,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.11407,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.912839,
+            0.902996,
+            0.926531,
+            0.918034,
+            0.924204
+          ],
+          "cv_mean": 0.916921,
+          "cv_std": 0.008452,
+          "delta_mean": 0.0,
+          "delta_std": 0.0,
+          "per_language_f1": {
+            "python": 0.931217,
+            "cpp": 0.88,
+            "java": 0.93617,
+            "javascript": 0.858824,
+            "rust": 0.958763,
+            "go": 0.99,
+            "sql": 0.866142,
+            "html": 0.926174
+          },
+          "fit_seconds": 0.870968
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.82265,
+            0.812452,
+            0.875048,
+            0.913203,
+            0.861687
+          ],
+          "cv_mean": 0.857008,
+          "cv_std": 0.036526,
+          "delta_mean": 0.0,
+          "delta_std": 0.0,
+          "per_language_f1": {
+            "python": 0.914894,
+            "cpp": 0.775281,
+            "java": 0.920455,
+            "javascript": 0.79558,
+            "rust": 0.880829,
+            "go": 0.984615,
+            "sql": 0.748092,
+            "html": 0.866667
+          },
+          "fit_seconds": 0.039387
+        }
+      }
+    },
+    {
+      "id": 1,
+      "label": "M=100, n=2+3, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 100,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 100,
+      "binarize_ms": 0.109894,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.821975,
+            0.770847,
+            0.766255,
+            0.747373,
+            0.820695
+          ],
+          "cv_mean": 0.785429,
+          "cv_std": 0.030357,
+          "delta_mean": -0.131492,
+          "delta_std": 0.030974,
+          "per_language_f1": {
+            "python": 0.876289,
+            "cpp": 0.666667,
+            "java": 0.745946,
+            "javascript": 0.73224,
+            "rust": 0.767677,
+            "go": 0.915423,
+            "sql": 0.754386,
+            "html": 0.835616
+          },
+          "fit_seconds": 1.555408
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.69163,
+            0.67809,
+            0.73804,
+            0.754557,
+            0.711154
+          ],
+          "cv_mean": 0.714694,
+          "cv_std": 0.028349,
+          "delta_mean": -0.142314,
+          "delta_std": 0.010519,
+          "per_language_f1": {
+            "python": 0.842105,
+            "cpp": 0.536913,
+            "java": 0.606452,
+            "javascript": 0.717949,
+            "rust": 0.744186,
+            "go": 0.877358,
+            "sql": 0.626866,
+            "html": 0.774648
+          },
+          "fit_seconds": 0.010183
+        }
+      }
+    },
+    {
+      "id": 2,
+      "label": "M=250, n=2+3, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 250,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 250,
+      "binarize_ms": 0.114879,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.888626,
+            0.841648,
+            0.875124,
+            0.851676,
+            0.908195
+          ],
+          "cv_mean": 0.873054,
+          "cv_std": 0.024187,
+          "delta_mean": -0.043867,
+          "delta_std": 0.020153,
+          "per_language_f1": {
+            "python": 0.941176,
+            "cpp": 0.781609,
+            "java": 0.885417,
+            "javascript": 0.77907,
+            "rust": 0.877551,
+            "go": 0.984772,
+            "sql": 0.845528,
+            "html": 0.900662
+          },
+          "fit_seconds": 1.014726
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.801867,
+            0.735373,
+            0.829329,
+            0.821648,
+            0.804685
+          ],
+          "cv_mean": 0.798581,
+          "cv_std": 0.033229,
+          "delta_mean": -0.058427,
+          "delta_std": 0.024601,
+          "per_language_f1": {
+            "python": 0.907104,
+            "cpp": 0.691824,
+            "java": 0.842105,
+            "javascript": 0.697436,
+            "rust": 0.823529,
+            "go": 0.974619,
+            "sql": 0.686131,
+            "html": 0.794521
+          },
+          "fit_seconds": 0.021351
+        }
+      }
+    },
+    {
+      "id": 3,
+      "label": "M=1000, n=2+3, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 1000,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 1000,
+      "binarize_ms": 0.117758,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.899701,
+            0.921218,
+            0.942133,
+            0.94311,
+            0.947233
+          ],
+          "cv_mean": 0.930679,
+          "cv_std": 0.017938,
+          "delta_mean": 0.013758,
+          "delta_std": 0.013862,
+          "per_language_f1": {
+            "python": 0.951351,
+            "cpp": 0.896552,
+            "java": 0.924731,
+            "javascript": 0.872093,
+            "rust": 0.969072,
+            "go": 0.985075,
+            "sql": 0.90625,
+            "html": 0.947368
+          },
+          "fit_seconds": 0.754144
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.837623,
+            0.88548,
+            0.886198,
+            0.932115,
+            0.884736
+          ],
+          "cv_mean": 0.88523,
+          "cv_std": 0.029886,
+          "delta_mean": 0.028222,
+          "delta_std": 0.022751,
+          "per_language_f1": {
+            "python": 0.905263,
+            "cpp": 0.833333,
+            "java": 0.927374,
+            "javascript": 0.836158,
+            "rust": 0.931937,
+            "go": 0.984615,
+            "sql": 0.753846,
+            "html": 0.92
+          },
+          "fit_seconds": 0.068115
+        }
+      }
+    },
+    {
+      "id": 4,
+      "label": "M=500, n=2, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.102495,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.907165,
+            0.953956,
+            0.955039,
+            0.930337,
+            0.971638
+          ],
+          "cv_mean": 0.943627,
+          "cv_std": 0.022484,
+          "delta_mean": 0.026706,
+          "delta_std": 0.02134,
+          "per_language_f1": {
+            "python": 0.961749,
+            "cpp": 0.902857,
+            "java": 0.938144,
+            "javascript": 0.900585,
+            "rust": 0.963731,
+            "go": 0.994975,
+            "sql": 0.936508,
+            "html": 0.953642
+          },
+          "fit_seconds": 0.762278
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.838151,
+            0.887957,
+            0.906386,
+            0.9384,
+            0.893624
+          ],
+          "cv_mean": 0.892904,
+          "cv_std": 0.032479,
+          "delta_mean": 0.035896,
+          "delta_std": 0.020668,
+          "per_language_f1": {
+            "python": 0.905263,
+            "cpp": 0.826816,
+            "java": 0.945055,
+            "javascript": 0.868571,
+            "rust": 0.902564,
+            "go": 0.974093,
+            "sql": 0.793651,
+            "html": 0.934211
+          },
+          "fit_seconds": 0.038987
+        }
+      }
+    },
+    {
+      "id": 5,
+      "label": "M=500, n=3, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.111883,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.876034,
+            0.916069,
+            0.903471,
+            0.917816,
+            0.915952
+          ],
+          "cv_mean": 0.905868,
+          "cv_std": 0.015775,
+          "delta_mean": -0.011053,
+          "delta_std": 0.017405,
+          "per_language_f1": {
+            "python": 0.930481,
+            "cpp": 0.882682,
+            "java": 0.945652,
+            "javascript": 0.837209,
+            "rust": 0.95288,
+            "go": 0.985075,
+            "sql": 0.822581,
+            "html": 0.896104
+          },
+          "fit_seconds": 0.476868
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.837867,
+            0.853234,
+            0.889332,
+            0.886855,
+            0.878543
+          ],
+          "cv_mean": 0.869166,
+          "cv_std": 0.020204,
+          "delta_mean": 0.012158,
+          "delta_std": 0.021624,
+          "per_language_f1": {
+            "python": 0.928962,
+            "cpp": 0.79096,
+            "java": 0.94382,
+            "javascript": 0.80663,
+            "rust": 0.93617,
+            "go": 0.969697,
+            "sql": 0.73913,
+            "html": 0.85906
+          },
+          "fit_seconds": 0.038084
+        }
+      }
+    },
+    {
+      "id": 6,
+      "label": "M=500, n=4, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          4
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.112469,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.905612,
+            0.922736,
+            0.912753,
+            0.928888,
+            0.923829
+          ],
+          "cv_mean": 0.918764,
+          "cv_std": 0.008403,
+          "delta_mean": 0.001842,
+          "delta_std": 0.012105,
+          "per_language_f1": {
+            "python": 0.920635,
+            "cpp": 0.908046,
+            "java": 0.940541,
+            "javascript": 0.886364,
+            "rust": 0.932642,
+            "go": 0.980198,
+            "sql": 0.864,
+            "html": 0.932432
+          },
+          "fit_seconds": 0.397326
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.884182,
+            0.870197,
+            0.942684,
+            0.886853,
+            0.902234
+          ],
+          "cv_mean": 0.89723,
+          "cv_std": 0.024899,
+          "delta_mean": 0.040222,
+          "delta_std": 0.034481,
+          "per_language_f1": {
+            "python": 0.94382,
+            "cpp": 0.844444,
+            "java": 0.945055,
+            "javascript": 0.837209,
+            "rust": 0.92973,
+            "go": 0.970297,
+            "sql": 0.802721,
+            "html": 0.931507
+          },
+          "fit_seconds": 0.035243
+        }
+      }
+    },
+    {
+      "id": 7,
+      "label": "M=500, n=2+3+4, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3,
+          4
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.124944,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.891005,
+            0.902826,
+            0.92812,
+            0.908257,
+            0.900083
+          ],
+          "cv_mean": 0.906058,
+          "cv_std": 0.012364,
+          "delta_mean": -0.010863,
+          "delta_std": 0.010646,
+          "per_language_f1": {
+            "python": 0.925532,
+            "cpp": 0.840237,
+            "java": 0.941176,
+            "javascript": 0.855491,
+            "rust": 0.929293,
+            "go": 0.980198,
+            "sql": 0.864,
+            "html": 0.92
+          },
+          "fit_seconds": 0.75685
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.807802,
+            0.75671,
+            0.8463,
+            0.868407,
+            0.854334
+          ],
+          "cv_mean": 0.826711,
+          "cv_std": 0.040356,
+          "delta_mean": -0.030297,
+          "delta_std": 0.018029,
+          "per_language_f1": {
+            "python": 0.907104,
+            "cpp": 0.710059,
+            "java": 0.890173,
+            "javascript": 0.736264,
+            "rust": 0.858586,
+            "go": 0.97,
+            "sql": 0.724638,
+            "html": 0.85906
+          },
+          "fit_seconds": 0.040181
+        }
+      }
+    },
+    {
+      "id": 8,
+      "label": "M=500, n=2+3, delimiters off",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": false,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.029294,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.897593,
+            0.87899,
+            0.935087,
+            0.890019,
+            0.923319
+          ],
+          "cv_mean": 0.905002,
+          "cv_std": 0.02096,
+          "delta_mean": -0.01192,
+          "delta_std": 0.013836,
+          "per_language_f1": {
+            "python": 0.931217,
+            "cpp": 0.845714,
+            "java": 0.915789,
+            "javascript": 0.863905,
+            "rust": 0.938776,
+            "go": 0.99,
+            "sql": 0.857143,
+            "html": 0.911565
+          },
+          "fit_seconds": 0.723439
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.800051,
+            0.801225,
+            0.862656,
+            0.889825,
+            0.884484
+          ],
+          "cv_mean": 0.847648,
+          "cv_std": 0.03945,
+          "delta_mean": -0.00936,
+          "delta_std": 0.016844,
+          "per_language_f1": {
+            "python": 0.909091,
+            "cpp": 0.779661,
+            "java": 0.921348,
+            "javascript": 0.793103,
+            "rust": 0.870466,
+            "go": 0.979381,
+            "sql": 0.705036,
+            "html": 0.853333
+          },
+          "fit_seconds": 0.040024
+        }
+      }
+    },
+    {
+      "id": 9,
+      "label": "M=250, n=2+3+4, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 250,
+        "ngram_sizes": [
+          2,
+          3,
+          4
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 250,
+      "binarize_ms": 0.115286,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.871475,
+            0.829666,
+            0.860874,
+            0.862873,
+            0.866938
+          ],
+          "cv_mean": 0.858365,
+          "cv_std": 0.014803,
+          "delta_mean": -0.058556,
+          "delta_std": 0.010747,
+          "per_language_f1": {
+            "python": 0.930481,
+            "cpp": 0.744186,
+            "java": 0.849741,
+            "javascript": 0.755814,
+            "rust": 0.873096,
+            "go": 0.979798,
+            "sql": 0.845528,
+            "html": 0.893333
+          },
+          "fit_seconds": 1.07271
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.799283,
+            0.711157,
+            0.811802,
+            0.799998,
+            0.793704
+          ],
+          "cv_mean": 0.783189,
+          "cv_std": 0.036495,
+          "delta_mean": -0.073819,
+          "delta_std": 0.031615,
+          "per_language_f1": {
+            "python": 0.917127,
+            "cpp": 0.636943,
+            "java": 0.797619,
+            "javascript": 0.673575,
+            "rust": 0.8,
+            "go": 0.946341,
+            "sql": 0.720588,
+            "html": 0.789116
+          },
+          "fit_seconds": 0.021587
+        }
+      }
+    },
+    {
+      "id": 10,
+      "label": "M=1000, n=2+3+4, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 1000,
+        "ngram_sizes": [
+          2,
+          3,
+          4
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 1000,
+      "binarize_ms": 0.122996,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.899402,
+            0.939595,
+            0.941292,
+            0.929456,
+            0.931114
+          ],
+          "cv_mean": 0.928172,
+          "cv_std": 0.015104,
+          "delta_mean": 0.011251,
+          "delta_std": 0.01602,
+          "per_language_f1": {
+            "python": 0.951351,
+            "cpp": 0.885057,
+            "java": 0.924731,
+            "javascript": 0.873563,
+            "rust": 0.964103,
+            "go": 0.985075,
+            "sql": 0.912,
+            "html": 0.934211
+          },
+          "fit_seconds": 0.738168
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.852966,
+            0.853694,
+            0.892736,
+            0.923328,
+            0.893213
+          ],
+          "cv_mean": 0.883187,
+          "cv_std": 0.026781,
+          "delta_mean": 0.026179,
+          "delta_std": 0.010977,
+          "per_language_f1": {
+            "python": 0.919786,
+            "cpp": 0.829545,
+            "java": 0.932584,
+            "javascript": 0.829545,
+            "rust": 0.932642,
+            "go": 0.969697,
+            "sql": 0.764706,
+            "html": 0.905405
+          },
+          "fit_seconds": 0.073709
+        }
+      }
+    },
+    {
+      "id": 11,
+      "label": "M=500, n=2+3, delimiters on, select chi2",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.112538,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.925821,
+            0.95587,
+            0.956231,
+            0.96826,
+            0.984802
+          ],
+          "cv_mean": 0.958197,
+          "cv_std": 0.019321,
+          "delta_mean": 0.041276,
+          "delta_std": 0.01745,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.932584,
+            "java": 0.941799,
+            "javascript": 0.902857,
+            "rust": 0.974093,
+            "go": 0.994975,
+            "sql": 0.968254,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.425553
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.952446,
+            0.954306,
+            0.956622,
+            0.955668,
+            0.938732
+          ],
+          "cv_mean": 0.951555,
+          "cv_std": 0.006563,
+          "delta_mean": 0.094547,
+          "delta_std": 0.036517,
+          "per_language_f1": {
+            "python": 0.967742,
+            "cpp": 0.918033,
+            "java": 0.950276,
+            "javascript": 0.914286,
+            "rust": 0.962963,
+            "go": 0.975124,
+            "sql": 0.936508,
+            "html": 0.980132
+          },
+          "fit_seconds": 0.033526
+        }
+      }
+    },
+    {
+      "id": 12,
+      "label": "M=500, n=2+3, delimiters on, select class_balanced",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.112861,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.931784,
+            0.965759,
+            0.963141,
+            0.961681,
+            0.97329
+          ],
+          "cv_mean": 0.959131,
+          "cv_std": 0.014247,
+          "delta_mean": 0.04221,
+          "delta_std": 0.014453,
+          "per_language_f1": {
+            "python": 0.967742,
+            "cpp": 0.921348,
+            "java": 0.936842,
+            "javascript": 0.91954,
+            "rust": 0.963731,
+            "go": 1.0,
+            "sql": 0.99187,
+            "html": 0.96
+          },
+          "fit_seconds": 0.381779
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.950335,
+            0.962656,
+            0.956622,
+            0.96783,
+            0.960852
+          ],
+          "cv_mean": 0.959659,
+          "cv_std": 0.005888,
+          "delta_mean": 0.102651,
+          "delta_std": 0.033617,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.923077,
+            "java": 0.967391,
+            "javascript": 0.917647,
+            "rust": 0.973822,
+            "go": 0.985075,
+            "sql": 0.944882,
+            "html": 0.987013
+          },
+          "fit_seconds": 0.036019
+        }
+      }
+    },
+    {
+      "id": 13,
+      "label": "M=500, n=2, delimiters on, select chi2",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.10234,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.909057,
+            0.965565,
+            0.940793,
+            0.967923,
+            0.97404
+          ],
+          "cv_mean": 0.951476,
+          "cv_std": 0.024048,
+          "delta_mean": 0.034554,
+          "delta_std": 0.02504,
+          "per_language_f1": {
+            "python": 0.957447,
+            "cpp": 0.937853,
+            "java": 0.919192,
+            "javascript": 0.900585,
+            "rust": 0.957447,
+            "go": 1.0,
+            "sql": 0.975207,
+            "html": 0.953642
+          },
+          "fit_seconds": 0.424524
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.898247,
+            0.941155,
+            0.956059,
+            0.955672,
+            0.963908
+          ],
+          "cv_mean": 0.943008,
+          "cv_std": 0.023556,
+          "delta_mean": 0.086,
+          "delta_std": 0.028687,
+          "per_language_f1": {
+            "python": 0.947368,
+            "cpp": 0.913295,
+            "java": 0.931937,
+            "javascript": 0.901734,
+            "rust": 0.969072,
+            "go": 0.975369,
+            "sql": 0.932203,
+            "html": 0.973333
+          },
+          "fit_seconds": 0.033194
+        }
+      }
+    },
+    {
+      "id": 14,
+      "label": "M=500, n=2+3+4, delimiters on, select chi2",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3,
+          4
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.11731,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.914169,
+            0.93956,
+            0.963191,
+            0.956216,
+            0.959513
+          ],
+          "cv_mean": 0.94653,
+          "cv_std": 0.018088,
+          "delta_mean": 0.029609,
+          "delta_std": 0.014169,
+          "per_language_f1": {
+            "python": 0.951351,
+            "cpp": 0.939227,
+            "java": 0.935484,
+            "javascript": 0.909091,
+            "rust": 0.973822,
+            "go": 0.994975,
+            "sql": 0.912,
+            "html": 0.95302
+          },
+          "fit_seconds": 0.382385
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.910309,
+            0.926863,
+            0.950007,
+            0.949566,
+            0.922608
+          ],
+          "cv_mean": 0.931871,
+          "cv_std": 0.015607,
+          "delta_mean": 0.074863,
+          "delta_std": 0.026094,
+          "per_language_f1": {
+            "python": 0.961749,
+            "cpp": 0.861702,
+            "java": 0.916201,
+            "javascript": 0.893855,
+            "rust": 0.957447,
+            "go": 0.964824,
+            "sql": 0.912,
+            "html": 0.980132
+          },
+          "fit_seconds": 0.031009
+        }
+      }
+    },
+    {
+      "id": 15,
+      "label": "M=500, n=2, delimiters on, select class_balanced",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.103525,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.916687,
+            0.96376,
+            0.96242,
+            0.955328,
+            0.980254
+          ],
+          "cv_mean": 0.95569,
+          "cv_std": 0.021143,
+          "delta_mean": 0.038769,
+          "delta_std": 0.020061,
+          "per_language_f1": {
+            "python": 0.978261,
+            "cpp": 0.912088,
+            "java": 0.927835,
+            "javascript": 0.911243,
+            "rust": 0.973822,
+            "go": 1.0,
+            "sql": 0.97561,
+            "html": 0.953642
+          },
+          "fit_seconds": 0.510328
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.93335,
+            0.950014,
+            0.956231,
+            0.981226,
+            0.977361
+          ],
+          "cv_mean": 0.959636,
+          "cv_std": 0.017751,
+          "delta_mean": 0.102628,
+          "delta_std": 0.024952,
+          "per_language_f1": {
+            "python": 0.967391,
+            "cpp": 0.934783,
+            "java": 0.968085,
+            "javascript": 0.912281,
+            "rust": 0.96875,
+            "go": 0.994975,
+            "sql": 0.951613,
+            "html": 0.973333
+          },
+          "fit_seconds": 0.036778
+        }
+      }
+    },
+    {
+      "id": 16,
+      "label": "M=500, n=2+3+4, delimiters on, select class_balanced",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3,
+          4
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.117788,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.929056,
+            0.95586,
+            0.963661,
+            0.967754,
+            0.977454
+          ],
+          "cv_mean": 0.958757,
+          "cv_std": 0.016402,
+          "delta_mean": 0.041836,
+          "delta_std": 0.014089,
+          "per_language_f1": {
+            "python": 0.968085,
+            "cpp": 0.931034,
+            "java": 0.947368,
+            "javascript": 0.913295,
+            "rust": 0.979592,
+            "go": 0.994975,
+            "sql": 0.983333,
+            "html": 0.947368
+          },
+          "fit_seconds": 0.425229
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.937134,
+            0.941365,
+            0.956622,
+            0.954967,
+            0.945114
+          ],
+          "cv_mean": 0.94704,
+          "cv_std": 0.007598,
+          "delta_mean": 0.090032,
+          "delta_std": 0.030182,
+          "per_language_f1": {
+            "python": 0.978022,
+            "cpp": 0.886486,
+            "java": 0.939227,
+            "javascript": 0.912281,
+            "rust": 0.973822,
+            "go": 0.98,
+            "sql": 0.938462,
+            "html": 0.960526
+          },
+          "fit_seconds": 0.035032
+        }
+      }
+    },
+    {
+      "id": 17,
+      "label": "M=2000, n=2+3, delimiters on",
+      "is_base": false,
+      "features": {
+        "n_features": 2000,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 2000,
+      "binarize_ms": 0.127743,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.913723,
+            0.953585,
+            0.96263,
+            0.981082,
+            0.977245
+          ],
+          "cv_mean": 0.957653,
+          "cv_std": 0.0241,
+          "delta_mean": 0.040732,
+          "delta_std": 0.021707,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.949721,
+            "java": 0.962567,
+            "javascript": 0.918605,
+            "rust": 0.958333,
+            "go": 0.99,
+            "sql": 0.953125,
+            "html": 0.953642
+          },
+          "fit_seconds": 1.480058
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.885069,
+            0.916585,
+            0.912249,
+            0.963112,
+            0.915798
+          ],
+          "cv_mean": 0.918562,
+          "cv_std": 0.025131,
+          "delta_mean": 0.061554,
+          "delta_std": 0.022794,
+          "per_language_f1": {
+            "python": 0.925532,
+            "cpp": 0.861878,
+            "java": 0.956044,
+            "javascript": 0.88,
+            "rust": 0.947917,
+            "go": 0.979592,
+            "sql": 0.830769,
+            "html": 0.959459
+          },
+          "fit_seconds": 0.132651
+        }
+      }
+    },
+    {
+      "id": 18,
+      "label": "M=1000, n=2+3, delimiters on, select chi2",
+      "is_base": false,
+      "features": {
+        "n_features": 1000,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 1000,
+      "binarize_ms": 0.113564,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.924994,
+            0.957606,
+            0.963729,
+            0.967923,
+            0.979404
+          ],
+          "cv_mean": 0.958731,
+          "cv_std": 0.01831,
+          "delta_mean": 0.04181,
+          "delta_std": 0.016181,
+          "per_language_f1": {
+            "python": 0.978261,
+            "cpp": 0.923077,
+            "java": 0.931217,
+            "javascript": 0.906977,
+            "rust": 0.979167,
+            "go": 0.994975,
+            "sql": 0.983871,
+            "html": 0.96
+          },
+          "fit_seconds": 0.451141
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.938191,
+            0.971293,
+            0.956622,
+            0.968067,
+            0.952728
+          ],
+          "cv_mean": 0.95738,
+          "cv_std": 0.011817,
+          "delta_mean": 0.100372,
+          "delta_std": 0.0351,
+          "per_language_f1": {
+            "python": 0.967742,
+            "cpp": 0.923913,
+            "java": 0.962162,
+            "javascript": 0.91954,
+            "rust": 0.968421,
+            "go": 0.99,
+            "sql": 0.951613,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.057128
+        }
+      }
+    },
+    {
+      "id": 19,
+      "label": "M=2000, n=2+3, delimiters on, select chi2",
+      "is_base": false,
+      "features": {
+        "n_features": 2000,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 2000,
+      "binarize_ms": 0.116968,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.929423,
+            0.972037,
+            0.963141,
+            0.981227,
+            0.971682
+          ],
+          "cv_mean": 0.963502,
+          "cv_std": 0.017975,
+          "delta_mean": 0.046581,
+          "delta_std": 0.01887,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.944444,
+            "java": 0.942408,
+            "javascript": 0.924855,
+            "rust": 0.979167,
+            "go": 0.994975,
+            "sql": 0.976,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.982937
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.944583,
+            0.978966,
+            0.956632,
+            0.975784,
+            0.958308
+          ],
+          "cv_mean": 0.962855,
+          "cv_std": 0.012806,
+          "delta_mean": 0.105847,
+          "delta_std": 0.036014,
+          "per_language_f1": {
+            "python": 0.978261,
+            "cpp": 0.930481,
+            "java": 0.962567,
+            "javascript": 0.923977,
+            "rust": 0.973822,
+            "go": 0.99,
+            "sql": 0.97561,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.115245
+        }
+      }
+    },
+    {
+      "id": 20,
+      "label": "M=1000, n=2+3, delimiters on, select class_balanced",
+      "is_base": false,
+      "features": {
+        "n_features": 1000,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 1000,
+      "binarize_ms": 0.117906,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.908819,
+            0.972556,
+            0.962636,
+            0.967923,
+            0.971501
+          ],
+          "cv_mean": 0.956687,
+          "cv_std": 0.024184,
+          "delta_mean": 0.039766,
+          "delta_std": 0.024403,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.923077,
+            "java": 0.931217,
+            "javascript": 0.923977,
+            "rust": 0.963731,
+            "go": 1.0,
+            "sql": 0.983871,
+            "html": 0.947368
+          },
+          "fit_seconds": 0.500814
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.911876,
+            0.970944,
+            0.963191,
+            0.981226,
+            0.953609
+          ],
+          "cv_mean": 0.956169,
+          "cv_std": 0.023933,
+          "delta_mean": 0.099161,
+          "delta_std": 0.030862,
+          "per_language_f1": {
+            "python": 0.961749,
+            "cpp": 0.940541,
+            "java": 0.967391,
+            "javascript": 0.918605,
+            "rust": 0.973822,
+            "go": 0.99,
+            "sql": 0.921875,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.063328
+        }
+      }
+    },
+    {
+      "id": 21,
+      "label": "M=2000, n=2+3, delimiters on, select class_balanced",
+      "is_base": false,
+      "features": {
+        "n_features": 2000,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 2000,
+      "binarize_ms": 0.121587,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.923747,
+            0.964654,
+            0.955998,
+            0.968539,
+            0.993163
+          ],
+          "cv_mean": 0.96122,
+          "cv_std": 0.022438,
+          "delta_mean": 0.044299,
+          "delta_std": 0.021368,
+          "per_language_f1": {
+            "python": 0.978495,
+            "cpp": 0.926554,
+            "java": 0.942408,
+            "javascript": 0.918605,
+            "rust": 0.969072,
+            "go": 0.994975,
+            "sql": 1.0,
+            "html": 0.953642
+          },
+          "fit_seconds": 1.245215
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.913328,
+            0.970944,
+            0.963729,
+            0.993746,
+            0.961907
+          ],
+          "cv_mean": 0.960731,
+          "cv_std": 0.026274,
+          "delta_mean": 0.103723,
+          "delta_std": 0.028091,
+          "per_language_f1": {
+            "python": 0.967033,
+            "cpp": 0.95082,
+            "java": 0.967391,
+            "javascript": 0.91954,
+            "rust": 0.974093,
+            "go": 0.994975,
+            "sql": 0.9375,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.130225
+        }
+      }
+    },
+    {
+      "id": 22,
+      "label": "M=500, n=2+3, delimiters on, select chi2, min_df=5",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 5,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.109872,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.925821,
+            0.95587,
+            0.956231,
+            0.96826,
+            0.984802
+          ],
+          "cv_mean": 0.958197,
+          "cv_std": 0.019321,
+          "delta_mean": 0.041276,
+          "delta_std": 0.01745,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.932584,
+            "java": 0.941799,
+            "javascript": 0.902857,
+            "rust": 0.974093,
+            "go": 0.994975,
+            "sql": 0.968254,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.420636
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.952446,
+            0.954306,
+            0.956622,
+            0.955668,
+            0.938732
+          ],
+          "cv_mean": 0.951555,
+          "cv_std": 0.006563,
+          "delta_mean": 0.094547,
+          "delta_std": 0.036517,
+          "per_language_f1": {
+            "python": 0.967742,
+            "cpp": 0.918033,
+            "java": 0.950276,
+            "javascript": 0.914286,
+            "rust": 0.962963,
+            "go": 0.975124,
+            "sql": 0.936508,
+            "html": 0.980132
+          },
+          "fit_seconds": 0.032957
+        }
+      }
+    },
+    {
+      "id": 23,
+      "label": "M=500, n=2+3, delimiters on, select chi2, min_df=20",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 20,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.113212,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.919326,
+            0.963509,
+            0.956231,
+            0.967923,
+            0.984802
+          ],
+          "cv_mean": 0.958358,
+          "cv_std": 0.021658,
+          "delta_mean": 0.041437,
+          "delta_std": 0.020793,
+          "per_language_f1": {
+            "python": 0.983607,
+            "cpp": 0.938547,
+            "java": 0.93617,
+            "javascript": 0.891429,
+            "rust": 0.974093,
+            "go": 0.994975,
+            "sql": 0.976,
+            "html": 0.96
+          },
+          "fit_seconds": 0.388112
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.951968,
+            0.946556,
+            0.956622,
+            0.962424,
+            0.938372
+          ],
+          "cv_mean": 0.951189,
+          "cv_std": 0.008272,
+          "delta_mean": 0.094181,
+          "delta_std": 0.032603,
+          "per_language_f1": {
+            "python": 0.978261,
+            "cpp": 0.918033,
+            "java": 0.945055,
+            "javascript": 0.908046,
+            "rust": 0.962963,
+            "go": 0.975124,
+            "sql": 0.9375,
+            "html": 0.980132
+          },
+          "fit_seconds": 0.032888
+        }
+      }
+    },
+    {
+      "id": 24,
+      "label": "M=500, n=2+3, delimiters on, select class_balanced, min_df=5",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 5,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.113789,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.931784,
+            0.965759,
+            0.963141,
+            0.961681,
+            0.97329
+          ],
+          "cv_mean": 0.959131,
+          "cv_std": 0.014247,
+          "delta_mean": 0.04221,
+          "delta_std": 0.014453,
+          "per_language_f1": {
+            "python": 0.967742,
+            "cpp": 0.921348,
+            "java": 0.936842,
+            "javascript": 0.91954,
+            "rust": 0.963731,
+            "go": 1.0,
+            "sql": 0.99187,
+            "html": 0.96
+          },
+          "fit_seconds": 0.361065
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.950335,
+            0.962656,
+            0.956622,
+            0.96783,
+            0.960852
+          ],
+          "cv_mean": 0.959659,
+          "cv_std": 0.005888,
+          "delta_mean": 0.102651,
+          "delta_std": 0.033617,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.923077,
+            "java": 0.967391,
+            "javascript": 0.917647,
+            "rust": 0.973822,
+            "go": 0.985075,
+            "sql": 0.944882,
+            "html": 0.987013
+          },
+          "fit_seconds": 0.037438
+        }
+      }
+    },
+    {
+      "id": 25,
+      "label": "M=500, n=2+3, delimiters on, select class_balanced, min_df=20",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 20,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.118122,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.925278,
+            0.972037,
+            0.963141,
+            0.962244,
+            0.97329
+          ],
+          "cv_mean": 0.959198,
+          "cv_std": 0.017543,
+          "delta_mean": 0.042277,
+          "delta_std": 0.018378,
+          "per_language_f1": {
+            "python": 0.972973,
+            "cpp": 0.921348,
+            "java": 0.927083,
+            "javascript": 0.913295,
+            "rust": 0.969072,
+            "go": 1.0,
+            "sql": 0.99187,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.398725
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.950205,
+            0.962656,
+            0.956622,
+            0.96783,
+            0.952183
+          ],
+          "cv_mean": 0.957899,
+          "cv_std": 0.006554,
+          "delta_mean": 0.100891,
+          "delta_std": 0.033953,
+          "per_language_f1": {
+            "python": 0.972376,
+            "cpp": 0.918033,
+            "java": 0.967391,
+            "javascript": 0.923077,
+            "rust": 0.973822,
+            "go": 0.985075,
+            "sql": 0.938462,
+            "html": 0.980392
+          },
+          "fit_seconds": 0.040758
+        }
+      }
+    },
+    {
+      "id": 26,
+      "label": "M=500, n=2+3, delimiters on, words on",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "frequency",
+        "min_df": 1,
+        "word_tokens": true
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.143298,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.904219,
+            0.920167,
+            0.928028,
+            0.918034,
+            0.930863
+          ],
+          "cv_mean": 0.920262,
+          "cv_std": 0.009328,
+          "delta_mean": 0.003341,
+          "delta_std": 0.008484,
+          "per_language_f1": {
+            "python": 0.93617,
+            "cpp": 0.883721,
+            "java": 0.941176,
+            "javascript": 0.865497,
+            "rust": 0.953846,
+            "go": 0.99,
+            "sql": 0.868217,
+            "html": 0.933333
+          },
+          "fit_seconds": 0.818875
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.823468,
+            0.804082,
+            0.868382,
+            0.90404,
+            0.875898
+          ],
+          "cv_mean": 0.855174,
+          "cv_std": 0.036352,
+          "delta_mean": -0.001834,
+          "delta_std": 0.008767,
+          "per_language_f1": {
+            "python": 0.909091,
+            "cpp": 0.768362,
+            "java": 0.920455,
+            "javascript": 0.793296,
+            "rust": 0.887755,
+            "go": 0.984615,
+            "sql": 0.736842,
+            "html": 0.872483
+          },
+          "fit_seconds": 0.047052
+        }
+      }
+    },
+    {
+      "id": 27,
+      "label": "M=500, n=2+3, delimiters on, select chi2, words on",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "chi2",
+        "min_df": 1,
+        "word_tokens": true
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.140941,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.911124,
+            0.955724,
+            0.956622,
+            0.974916,
+            0.977659
+          ],
+          "cv_mean": 0.955209,
+          "cv_std": 0.023825,
+          "delta_mean": 0.038288,
+          "delta_std": 0.022144,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.917127,
+            "java": 0.946237,
+            "javascript": 0.903955,
+            "rust": 0.96875,
+            "go": 0.994975,
+            "sql": 0.96,
+            "html": 0.966443
+          },
+          "fit_seconds": 0.390726
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.95386,
+            0.946556,
+            0.956622,
+            0.968067,
+            0.931412
+          ],
+          "cv_mean": 0.951303,
+          "cv_std": 0.012116,
+          "delta_mean": 0.094295,
+          "delta_std": 0.032459,
+          "per_language_f1": {
+            "python": 0.972973,
+            "cpp": 0.918033,
+            "java": 0.945055,
+            "javascript": 0.903955,
+            "rust": 0.962963,
+            "go": 0.984925,
+            "sql": 0.944882,
+            "html": 0.973333
+          },
+          "fit_seconds": 0.037795
+        }
+      }
+    },
+    {
+      "id": 28,
+      "label": "M=500, n=2+3, delimiters on, select class_balanced, words on",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": true,
+        "selection": "class_balanced",
+        "min_df": 1,
+        "word_tokens": true
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.142625,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.930051,
+            0.978433,
+            0.963729,
+            0.961681,
+            0.978757
+          ],
+          "cv_mean": 0.96253,
+          "cv_std": 0.017739,
+          "delta_mean": 0.045609,
+          "delta_std": 0.019239,
+          "per_language_f1": {
+            "python": 0.978261,
+            "cpp": 0.926554,
+            "java": 0.941799,
+            "javascript": 0.925714,
+            "rust": 0.979381,
+            "go": 1.0,
+            "sql": 0.976,
+            "html": 0.96
+          },
+          "fit_seconds": 0.386563
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.950335,
+            0.949499,
+            0.956622,
+            0.96783,
+            0.960852
+          ],
+          "cv_mean": 0.957027,
+          "cv_std": 0.006826,
+          "delta_mean": 0.100019,
+          "delta_std": 0.030126,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.912088,
+            "java": 0.962162,
+            "javascript": 0.917647,
+            "rust": 0.968421,
+            "go": 0.985075,
+            "sql": 0.944882,
+            "html": 0.987013
+          },
+          "fit_seconds": 0.041103
+        }
+      }
+    },
+    {
+      "id": 29,
+      "label": "M=500, n=2+3, delimiters off, select class_balanced",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": false,
+        "selection": "class_balanced",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.025747,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.908718,
+            0.957606,
+            0.963141,
+            0.961681,
+            0.97329
+          ],
+          "cv_mean": 0.952887,
+          "cv_std": 0.02268,
+          "delta_mean": 0.035966,
+          "delta_std": 0.02091,
+          "per_language_f1": {
+            "python": 0.962162,
+            "cpp": 0.916201,
+            "java": 0.931937,
+            "javascript": 0.906977,
+            "rust": 0.963731,
+            "go": 0.994975,
+            "sql": 0.97561,
+            "html": 0.96
+          },
+          "fit_seconds": 0.324838
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.956928,
+            0.962656,
+            0.956622,
+            0.96783,
+            0.969019
+          ],
+          "cv_mean": 0.962611,
+          "cv_std": 0.005225,
+          "delta_mean": 0.105603,
+          "delta_std": 0.034613,
+          "per_language_f1": {
+            "python": 0.972678,
+            "cpp": 0.92973,
+            "java": 0.967391,
+            "javascript": 0.928571,
+            "rust": 0.973822,
+            "go": 0.985075,
+            "sql": 0.952381,
+            "html": 0.987013
+          },
+          "fit_seconds": 0.040712
+        }
+      }
+    },
+    {
+      "id": 30,
+      "label": "M=500, n=2+3, delimiters off, select chi2",
+      "is_base": false,
+      "features": {
+        "n_features": 500,
+        "ngram_sizes": [
+          2,
+          3
+        ],
+        "use_delimiters": false,
+        "selection": "chi2",
+        "min_df": 1,
+        "word_tokens": false
+      },
+      "vocab_size": 500,
+      "binarize_ms": 0.024824,
+      "models": {
+        "logistic_regression": {
+          "cv_f1": [
+            0.911985,
+            0.972031,
+            0.956231,
+            0.961546,
+            0.984523
+          ],
+          "cv_mean": 0.957263,
+          "cv_std": 0.02462,
+          "delta_mean": 0.040342,
+          "delta_std": 0.024669,
+          "per_language_f1": {
+            "python": 0.983784,
+            "cpp": 0.920455,
+            "java": 0.932642,
+            "javascript": 0.896552,
+            "rust": 0.974093,
+            "go": 1.0,
+            "sql": 0.97561,
+            "html": 0.96
+          },
+          "fit_seconds": 0.265799
+        },
+        "naive_bayes": {
+          "cv_f1": [
+            0.953551,
+            0.956917,
+            0.956622,
+            0.961962,
+            0.947218
+          ],
+          "cv_mean": 0.955254,
+          "cv_std": 0.00484,
+          "delta_mean": 0.098246,
+          "delta_std": 0.034903,
+          "per_language_f1": {
+            "python": 0.972973,
+            "cpp": 0.909091,
+            "java": 0.95082,
+            "javascript": 0.913295,
+            "rust": 0.962963,
+            "go": 0.98,
+            "sql": 0.967742,
+            "html": 0.980132
+          },
+          "fit_seconds": 0.037303
+        }
+      }
+    }
+  ],
+  "best_by_cv": {
+    "logistic_regression": 19,
+    "naive_bayes": 19
+  }
+}

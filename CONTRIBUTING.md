@@ -12,7 +12,7 @@ A plain `uv sync` removes the `tm` and `collect` extras again.
 - Before PR: `uv run ruff check . && uv run pytest`.
 - One roadmap item per PR; link the issue (`Closes #N`). Issues belong to a milestone (M1-M7, see [docs/roadmap.md](docs/roadmap.md)).
 - Feature branches only; no direct commits to `main`. See [docs/github-setup.md](docs/github-setup.md).
-- Experiments: define them in `configs/*.yaml` (fixed seeds) and commit the generated reports (`docs/results.md`, `docs/ablations.md`); never edit generated reports by hand.
+- Experiments: define them in `configs/*.yaml` (fixed seeds) and commit the generated reports (`docs/results.md`, `docs/ablations.md` and their `.json` sidecars); never edit generated reports by hand.
 - Log problems and their fixes in `docs/issues-and-fixes.md`, and session progress in `PROGRESS.md`.
 
 ## Data

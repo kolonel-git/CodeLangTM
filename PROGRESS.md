@@ -2,9 +2,9 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-09-24
-**Current milestone:** M2 — Features & baselines
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done except the PR: feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); next: PR, then M3 TM training
+**Last updated:** 2026-09-27
+**Current milestone:** M3 — TM training (branch A `feat/report`: figures and report)
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A (report, A0-A1 done), then branch B (TM training)
 
 ## Milestone overview
 
@@ -12,8 +12,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
-| M2 Features & baselines | Done, PR pending | Part 1 merged; part 2 (configs, ablations, frozen features, resource metrics, faster binarization) on `feat/ablations` |
-| M3 TM training | Planned | |
+| M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
+| M3 TM training | In progress | Branch A `feat/report` (A0-A1 done), then branch B `feat/tm-training` |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -56,13 +56,22 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 - [ ] Short-snippet evaluation (Future, skipped in M3 by decision; see roadmap Future)
-- [ ] M3 branch A `feat/report`: A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + `docs/report.md`
+- [x] M3 branch A, A1: JSON sidecars (`results.json`, `ablations.json`)
+- [ ] M3 branch A `feat/report`: A2 `figures.py`, A3 `codelangtm report` + `docs/report.md`
 - [ ] M3 branch B `feat/tm-training`: B1 spike, B2 `TMLanguageClassifier`, B3 config + protocol, B4 curves, B4b `tm-train`, B5 resources, B6 clause inspector, B6b error analysis, B7 report
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-27 — M3 branch A, A1: JSON sidecars
+- `codelangtm baselines` and `codelangtm ablate` now also write `docs/results.json` / `docs/ablations.json` next to the markdown (path = markdown path with `.json`). Same runs as the markdown, floats kept to 6 decimals, schema tags `codelangtm.results/1` and `codelangtm.ablations/1`. The figure code (A2) reads these instead of parsing markdown.
+- `results.json`: meta, language order, best by CV, and per model the CV folds, test, repeated-split scores, per-language F1, confusion matrix and resources.
+- `ablations.json`: each unique setting stored once (base = id 0) with its features, vocabulary used, binarize time and per model the fold scores, paired Δ vs base and per-language F1; studies list their settings by id; best setting per model.
+- Shared `dataset_meta` gained `composition` (snippets and distinct repos per language for train/test/wild), and `data_dir` is written with `/` on every OS.
+- Regenerated both reports on v5: all F1 scores and deltas identical to the digit; only timings changed. Ablation binarize times now reflect the faster binarizer (base 0.11-0.12 ms/snippet, was ~0.30 when the ablations were last run).
+- Tests: 230 passing (sidecar vs in-memory results, composition counts, stable JSON writing, CLI writes both files).
 
 ### 2026-09-25 — M3 branch A, A0 housekeeping (`feat/report`)
 - `feat/ablations` merged (PR #5); M3 plan approved, work split into branch A (report) and branch B (TM training).
