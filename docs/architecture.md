@@ -2,7 +2,7 @@
 
 ```
 Code snippet
-  -> Feature extraction & binarization   (char n-grams + structural delimiters, top M selected)
+  -> Feature extraction & binarization   (char n-grams, M selected per language; see Features)
   -> Literal expansion                   (x_k and NOT x_k -> 2M literals)
   -> Multi-class TM engine (TMU)         (bitwise clause evaluation)
   -> Vote summation                      (positive clauses - negative clauses)
@@ -23,9 +23,10 @@ Code snippet
 | Classical baselines | `baselines.py` | `codelangtm baselines` |
 | Feature ablations | `ablations.py` | `codelangtm ablate` |
 | Label-issue and shortcut checks | `diagnostics.py` | `codelangtm diagnose` |
+| Report figures (optional `viz` extra) | `figures.py` | `codelangtm report` |
 | TM model, rules, C export | `model.py`, `rules.py`, `export_c.py` | stubs (M3, M5, M6) |
 
-Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`).
+Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`), each with a JSON sidecar (`results.json`, `ablations.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes) → embedded in the hand-written [report.md](report.md).
 
 ## Features
 `Binarizer` (scikit-learn transformer; refit inside every CV fold):
@@ -51,7 +52,8 @@ Feedback: Type I (pattern discovery, erasure with prob 1/s), Type II (false-alar
 ## Install notes
 - TMU builds a C extension; Python 3.12 is pinned. It installs natively on Windows (checked with TMU 0.8.3); WSL2 or Docker is only a fallback.
 - TMU 0.8.x breaks on NumPy 2, so the `tm` extra pins `numpy<2` and `scipy<1.14`.
-- Always `uv sync --extra tm --extra collect`: a plain `uv sync` removes the extras.
+- Always `uv sync --extra tm --extra collect --extra viz`: a plain `uv sync` removes the extras.
+- `viz` (matplotlib) is only needed for figures; the package and CLI import without it.
 
 ## Targets
 Macro-F1 >= 96% over 8 languages; < 0.1 ms/snippet; < 500 KB model.

@@ -73,7 +73,7 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 ### M2. Latency is dominated by feature extraction
 - **Finding:** end-to-end baseline latency is ~0.31 ms/snippet, and binarization alone is ~0.31 ms. Model inference (even random forest) is negligible. Measured latency varies between runs (0.31 on v4, 0.43-0.48 on v5 for the same pipeline, on the same machine with other load); treat single-run latency as approximate until a dedicated benchmark (M6).
 - **Implication:** the < 0.1 ms target is a feature-extraction problem. Planned: faster Python binarization in M2, and C feature extraction in M6.
-- **Ablation finding:** delimiters cost ~40% of binarize time (0.315 vs 0.185 ms/snippet) for a gain within fold noise (+0.012 ± 0.014). The frozen feature config therefore drops them (delimiters add nothing once selection is label-aware).
+- **Ablation finding:** delimiters cost ~40% of binarize time (0.315 vs 0.185 ms/snippet) for a gain within fold noise (+0.012 ± 0.014). The frozen feature config therefore drops them (delimiters add nothing once selection is label-aware). After the faster binarizer (below) their share grew: rerun ablations show 0.114 ms/snippet with delimiters vs 0.029 without (~75% of binarize time).
 - **Profile (frozen config, 1,174 chars/snippet):** 92% of `transform` was building the set of all 2- and 3-character substrings of each snippet (0.20 of 0.22 ms); the 500 membership tests were the other 8%.
 - **Fix:** `Binarizer.transform` no longer builds substring sets. Each snippet becomes an array of code points; characters map to small ids, and 1-3 character terms are found by indexing a direct-address table (`table[id_a * base + id_b]`) with NumPy. Terms longer than 3 characters and word features keep the set method; if the alphabet were so large that a table would exceed 4M entries, the code falls back to a sorted-key binary search (5-6× slower than the table). Lookup tables are derived from the vocabulary, built once, and not pickled.
 - **Correctness:** output is identical to testing `term in snippet` for every term. Fuzz tests compare against that definition on random ASCII, control, BMP and non-BMP strings (empty, 1-character and unseen-character inputs included), with n-gram lengths 1-4, word tokens, the delimiter list and the forced binary-search fallback. A mutation check (breaking the unknown-character id) fails 5 tests. Baseline scores are bit-for-bit unchanged (0.963 / 0.959 / 0.968).
@@ -146,6 +146,11 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 ---
 
 ## Tooling & workflow
+
+### W5. Keeping figure files stable in git
+- **Goal:** redrawing a figure from the same sidecar must give the same bytes, on this machine and in CI, so regenerated PNGs only show up in git when the numbers change.
+- **Risks found while building `figures.py`:** default PNGs carry a `Software: matplotlib <version>` stamp (a different matplotlib version would change every file); system fonts differ between Windows and Linux; tick labels are created at save time, so a style applied only while building the figure would not reach them.
+- **Fix:** `figures.save_png` passes `metadata={"Software": None}` and saves inside the same style context used to build the figure; the font is DejaVu Sans (bundled with matplotlib); size and dpi are fixed. Tests: two renders are byte-identical, and PNGs contain no `matplotlib`/`Software` bytes (checked: a default save does contain them, so the test would catch a regression).
 
 ### W4. `±` printed as `�` in the console
 - **Root cause:** Windows console uses cp1252, which cannot encode `±`.

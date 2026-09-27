@@ -274,12 +274,13 @@ def dataset_meta(data_dir: Path, dataset: dict[str, list], folds: np.ndarray) ->
         files, split_params = manifest.get("files", {}), manifest.get("params", {})
     return {
         "generated": datetime.now().isoformat(sep=" ", timespec="seconds"),
-        "data_dir": str(data_dir),
+        "data_dir": data_dir.as_posix(),  # same text in reports on every OS
         "dataset_files": {k: v[:12] for k, v in files.items()},
         "n_train": len(dataset["train"]),
         "n_test": len(dataset["test"]),
         "n_wild": len(dataset.get("wild", [])),
         "n_folds": len(set(folds.tolist())),
+        "composition": composition(dataset),
         "split": split_params,
         "versions": {
             "python": platform.python_version(),
@@ -287,6 +288,90 @@ def dataset_meta(data_dir: Path, dataset: dict[str, list], folds: np.ndarray) ->
             "numpy": np.__version__,
         },
         "cpu": platform.processor() or platform.machine(),
+    }
+
+
+def composition(dataset: dict[str, list]) -> dict[str, dict[str, dict[str, int]]]:
+    """Snippets and distinct repos per language for each split, languages sorted by name."""
+    out = {}
+    for split, snippets in dataset.items():
+        per_lang: dict[str, dict[str, int]] = {}
+        repos: dict[str, set[str]] = {}
+        for s in snippets:
+            entry = per_lang.setdefault(s.language, {"snippets": 0, "repos": 0})
+            entry["snippets"] += 1
+            repos.setdefault(s.language, set()).add(s.repo)
+        for lang, entry in per_lang.items():
+            entry["repos"] = len(repos[lang])
+        out[split] = dict(sorted(per_lang.items()))
+    return out
+
+
+def _json_ready(value: object, digits: int = 6) -> object:
+    """Round floats (stable diffs; far below any reported precision) and make tuples lists."""
+    if isinstance(value, float):
+        return round(value, digits)
+    if isinstance(value, dict):
+        return {str(k): _json_ready(v, digits) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_ready(v, digits) for v in value]
+    return value
+
+
+def write_json(data: dict, path: str | Path) -> Path:
+    """Write a report sidecar: indented UTF-8 JSON, floats rounded, trailing newline."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(_json_ready(data), indent=2, ensure_ascii=False)
+    path.write_text(text + "\n", encoding="utf-8")
+    return path
+
+
+def sidecar_path(markdown_path: str | Path) -> Path:
+    """`docs/results.md` -> `docs/results.json`."""
+    return Path(markdown_path).with_suffix(".json")
+
+
+RESULTS_SCHEMA = "codelangtm.results/1"
+
+
+def result_dict(r: ModelResult) -> dict:
+    return {
+        "name": r.name,
+        "cv_f1": r.cv_f1,
+        "cv_mean": r.cv_mean,
+        "cv_std": r.cv_std,
+        "test_f1": r.test_f1,
+        "test_accuracy": r.test_accuracy,
+        "repeat_f1": r.repeat_f1,
+        "repeat_mean": r.repeat_mean,
+        "repeat_std": r.repeat_std,
+        "wild_f1": r.wild_f1,
+        "per_language_f1": r.per_language_f1,
+        "confusion": r.confusion,
+        "resources": {
+            "fit_seconds": r.fit_seconds,
+            "fit_cpu_seconds": r.fit_cpu_seconds,
+            "peak_binarize_mb": r.peak_binarize_mb,
+            "peak_model_mb": r.peak_model_mb,
+            "size_kb": r.size_kb,
+            "vocab_kb": r.vocab_kb,
+            "latency_ms": r.latency_ms,
+            "throughput": r.throughput,
+        },
+    }
+
+
+def results_json(
+    results: Sequence[ModelResult], meta: dict, languages: Sequence[str] = LANGUAGES
+) -> dict:
+    """Machine-readable twin of `render_results_md`: same runs, numbers kept to 6 decimals."""
+    return {
+        "schema": RESULTS_SCHEMA,
+        "meta": meta,
+        "languages": list(languages),  # order of per-language keys and confusion rows/columns
+        "best_by_cv": best_by_cv(results).name,
+        "models": [result_dict(r) for r in results],
     }
 
 

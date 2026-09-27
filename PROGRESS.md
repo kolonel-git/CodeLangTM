@@ -2,9 +2,9 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-09-24
-**Current milestone:** M2 — Features & baselines
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done except the PR: feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); next: PR, then M3 TM training
+**Last updated:** 2026-09-27
+**Current milestone:** M3 — TM training (branch A `feat/report` complete, ready for PR; branch B next)
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A done (results [report](docs/report.md) with figures), next branch B (TM training)
 
 ## Milestone overview
 
@@ -12,8 +12,8 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
-| M2 Features & baselines | Done, PR pending | Part 1 merged; part 2 (configs, ablations, frozen features, resource metrics, faster binarization) on `feat/ablations` |
-| M3 TM training | Planned | |
+| M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
+| M3 TM training | In progress | Branch A `feat/report` done (report + figures), PR pending; then branch B `feat/tm-training` |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -21,45 +21,50 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 ## Next steps (in order)
 
-- [x] Verify GitHub repo settings: description, topics, replace `OWNER` in README badges, CI green ([docs/github-setup.md](docs/github-setup.md))
-- [x] Check TMU installs: `uv sync --extra tm` (works natively on Windows, no WSL/Docker needed)
-- [x] Re-run `uv run ruff check .` and `uv run pytest` after the `features.py` lint fix
-- [x] M1: define snippet record schema in code (`Snippet` in `src/codelangtm/data.py`)
-- [x] M1: dataset loader + tests on tiny fixtures (JSONL in `data.py`)
-- [x] M1: window extractor (20-50 contiguous lines), dedup, label sanity check
-- [x] M1: group-by-repo split + k-fold
-- [x] M1: GitHub collector (permissive licenses only; token from env var)
-- [x] M1: smoke-test collector against real GitHub (4 Python snippets, 2 Apache-2.0 repos, 0 drops)
-- [x] M1: `codelangtm data build` command: merge sources → split → write train/test/wild
-- [x] M1: Stage A collection run + review drop counts per language
-- [x] M1: `data build` on Stage A data
-- [x] M1: template-heavy SQL/HTML filter
-- [x] M1: `data audit` command + manual sample review
-- [x] M1: fix windows cutting comments/strings; re-collect (dataset v3)
-- [x] M1: re-skim regenerated `audit.md` (no problems found)
-- [x] M1: dataset card (`docs/dataset-card.md`) + ledger rows in [docs/data-sources.md](docs/data-sources.md)
-- [x] M1: push `feat/data-build`, open PR, merge → M1 Stage A done (PR merged)
-- [x] M2: harden Binarizer (sklearn transformer, deterministic vocabulary, save/load, faster transform)
-- [x] M2: 5 baselines (NB, DT, LR, linear SVM, RF) with CV / test macro-F1 → `docs/results.md`
-- [x] M2: confident-learning check (out-of-fold predictions) + shortcut probe (top features per language)
-- [x] M2: embedded-language rule for HTML (drop windows with < 20% markup lines; stricter tag pattern)
-- [x] M2: re-collect HTML → dataset v4; rerun build, baselines, diagnose; update dataset card + results
-- [x] M2: stable split (hash-based per-language repo assignment) + repeated-split test reporting → dataset v5
-- [x] M2: push `feat/baselines`, open PR, merge (M2 part 1)
-- [x] M2 ablations step 1: YAML config system (`configs/baselines.yaml`, strict loader, settings hash in results)
-- [x] M2 ablations step 2: ablation runner (M, n-gram sizes, delimiters) → `docs/ablations.md`
-- [x] M2 ablations step 3: label-aware vocabulary selection (fixes M6 and M5), word tokens (no gain), larger M (no gain once selection is on)
-- [x] M2 ablations step 4: delimiters check, freeze the feature config for M3 (`configs/baselines.yaml`), rerun baselines; resource metrics added to the report
-- [ ] M2: push `feat/ablations`, open PR, merge (M2 part 2)
-- [x] M2: faster binarization: 5.4-6.0× faster transform, identical output (issues-and-fixes M2); < 0.1 ms end-to-end to be confirmed on a quiet machine in M6
+M0-M2 are finished; each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
+
+- [x] M3 branch A `feat/report`: A0 housekeeping, A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + [docs/report.md](docs/report.md)
+- [ ] Push `feat/report`, open PR, check the first CI run (TMU and matplotlib now installed in CI), merge
+- [ ] M3 branch B `feat/tm-training`: B1 spike → B2 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
-- [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
-- [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
+- [ ] Later: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-27 — M3 branch A, A3: `codelangtm report` and the written report
+- `codelangtm report [--results] [--ablations] [--out]` draws the 8 figures from the JSON sidecars into `docs/figures/` (committed). Missing sidecar, wrong schema or missing matplotlib: exit 1 with a clear message.
+- `docs/report.md`: hand-written narrative for readers new to the project: goal and how a TM classifies, data, evaluation protocol (repo split, CV, repeated test, macro-F1), baselines with figures, ablation findings (label-aware selection), resources, TM section (placeholder until B7), limitations, reproduction commands. Every number was checked against `results.json` / `ablations.json`; four draft claims were corrected in the process (vocabulary-size gain up to +0.011 not < 0.01; word tokens now 25% slower, not 10%; frequency ranking catches up only for logistic regression; unverified explanations of individual errors removed).
+- New `tests/test_docs.py`: every relative link, image and `#anchor` in all tracked markdown must resolve (checked to fail on a missing file, image and anchor), and `report.md` must embed every figure.
+- Docs audit: README (install line with `viz`, `report` command, pipeline line matches the frozen features, M3 status, link to the report), CONTRIBUTING (install, figures, report.md upkeep), CLAUDE.md (one install line, `report` command, correct raw-data path, docs test), architecture (pipeline, install), roadmap (M2 marked done; M3 lists steps B1-B7 and the clause inspector; M5 notes what moved to M3), PR template (regenerate figures, update report numbers), this file (finished M0-M2 checklist collapsed into the done log).
+- Observation: with the faster binarizer, delimiters are now ~75% of binarize time (0.114 vs 0.029 ms/snippet with them off), up from ~40% before; another reason they stay off (issues-and-fixes M2).
+- Tests: 259 passing (20 new: link checks for each markdown file, report figure check, slug check, `report` CLI).
+
+### 2026-09-27 — M3 branch A, A2: figures
+- `src/codelangtm/figures.py` draws 8 PNGs from the JSON sidecars: dataset composition, baseline comparison (CV, repeated test, single test, 0.96 target), per-language test F1 heatmap, confusion matrix of the best model (colour = share of the true language, text = counts), resources (fit time, latency, size as three separate panels, never a dual axis), and three ablation figures (F1 vs vocabulary size per selection method, F1 per n-gram set, paired Δ vs base for all 30 settings with within-noise results hollow).
+- Colours: three categorical slots from a palette checked with a colour-vision-deficiency validator (all pairs pass); each selection method keeps its colour in every figure; series also differ by marker shape and legend. Magnitudes use one blue ramp.
+- matplotlib is imported only when drawing; without the `viz` extra the package and CLI still import and drawing fails with "run `uv sync --extra viz`" (tested in a subprocess with matplotlib blocked).
+- Deterministic output: same sidecar, same bytes (no PNG metadata, fixed font/size/dpi, style applied at save time too); issues-and-fixes W5.
+- Checked every figure by eye on the v5 sidecars; fixed a legend covering a label, a clipped legend, `6.99e+03` size labels, and unreadable ablation labels (now only the options that differ from base).
+- Figures are not committed yet: A3's `codelangtm report` writes them to `docs/figures/`.
+- Tests: 239 passing (9 new).
+
+### 2026-09-27 — M3 branch A, A1: JSON sidecars
+- `codelangtm baselines` and `codelangtm ablate` now also write `docs/results.json` / `docs/ablations.json` next to the markdown (path = markdown path with `.json`). Same runs as the markdown, floats kept to 6 decimals, schema tags `codelangtm.results/1` and `codelangtm.ablations/1`. The figure code (A2) reads these instead of parsing markdown.
+- `results.json`: meta, language order, best by CV, and per model the CV folds, test, repeated-split scores, per-language F1, confusion matrix and resources.
+- `ablations.json`: each unique setting stored once (base = id 0) with its features, vocabulary used, binarize time and per model the fold scores, paired Δ vs base and per-language F1; studies list their settings by id; best setting per model.
+- Shared `dataset_meta` gained `composition` (snippets and distinct repos per language for train/test/wild), and `data_dir` is written with `/` on every OS.
+- Regenerated both reports on v5: all F1 scores and deltas identical to the digit; only timings changed. Ablation binarize times now reflect the faster binarizer (base 0.11-0.12 ms/snippet, was ~0.30 when the ablations were last run).
+- Tests: 230 passing (sidecar vs in-memory results, composition counts, stable JSON writing, CLI writes both files).
+
+### 2026-09-25 — M3 branch A, A0 housekeeping (`feat/report`)
+- `feat/ablations` merged (PR #5); M3 plan approved, work split into branch A (report) and branch B (TM training).
+- Short-snippet evaluation moved from the M3 roadmap to Future (roadmap, dataset card limitation, this file).
+- New optional extra `viz` (matplotlib) for figures; core code stays importable without it. CI now runs `uv sync --extra tm --extra viz` so TM and figure tests run there (TMU build on the runner is checked on the first PR).
+- `docs/figures/` created for generated figures.
+- Tests: 226 passing, ruff clean.
 
 ### 2026-09-25 — M2: faster binarization
 - Profile: 92% of `Binarizer.transform` was building substring sets; the vocabulary lookups were 8%.

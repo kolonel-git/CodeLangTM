@@ -35,10 +35,10 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 
 **Exit:** `codelangtm data build` reproduces the dataset from configs; no repo appears in both train and test; every row has a license.
 
-## M2 — Features & baselines
+## M2 — Features & baselines (done)
 **Goal:** justify feature design with ablations; establish the bar the TM must beat.
 
-**Status:** baselines, data checks, stable split, ablations and the frozen feature config done. Bar for the TM (dataset v5, frozen features, see [results.md](results.md)): Naive Bayes CV macro-F1 0.963, repeated test 0.968 ± 0.009; logistic regression 0.953 / 0.968. Label-aware vocabulary selection was the key (0.917 → ~0.96, [ablations.md](ablations.md)); binarization is 5-6× faster. Only the PR is left.
+**Status:** baselines, data checks, stable split, ablations and the frozen feature config done. Bar for the TM (dataset v5, frozen features, see [results.md](results.md)): Naive Bayes CV macro-F1 0.963, repeated test 0.968 ± 0.009; logistic regression 0.953 / 0.968. Label-aware vocabulary selection was the key (0.917 → ~0.96, [ablations.md](ablations.md)); binarization is 5-6× faster. Merged (PR #5). Narrative with figures: [report.md](report.md).
 
 - [x] Harden Binarizer (sklearn transformer refit per fold, deterministic vocabulary, save/load, fast transform)
 - [x] Token-level features: whole-word tokens (`word_tokens`) tested, no gain over label-aware n-gram selection
@@ -58,21 +58,26 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 **Exit:** ablation table and all five baselines reproducible from one command; best baseline macro-F1 recorded.
 
 ## M3 — Tsetlin Machine training
-**Goal:** working TMU classifier with fair comparison.
+**Goal:** working TMU classifier with fair comparison, and every learned clause inspectable.
 
+**Plan:** branch `feat/report` (report infrastructure, done), then branch `feat/tm-training` (steps B1-B7 below, in order).
+
+- [x] Results report: JSON sidecars for generated reports, deterministic figures (`figures.py`, `codelangtm report` → `docs/figures/`), hand-written [report.md](report.md) (branch `feat/report`)
 - [x] Verify TMU install: TMU 0.8.3 builds natively on Windows with `numpy<2` (see [architecture.md](architecture.md) install notes); CUDA optional
-- [ ] `TMLanguageClassifier` fit/predict/save/load with tests
-- [ ] Baseline run: N_c=100, T=30, s=3.5
-- [ ] Training curves (accuracy vs epoch); throughput
-- [ ] TM vs baselines table on CV / test / wild, using the repeated-split protocol
-- [ ] Resource comparison, same protocol for every model (baselines already report the first block in [results.md](results.md)):
+- [ ] B1 spike (not committed): seconds per epoch, accuracy per epoch, and whether a NumPy re-implementation of prediction matches TMU exactly (including clauses with no literals)
+- [ ] B2 `TMLanguageClassifier` (scikit-learn estimator: fit/partial_fit/predict/decision_function) + TMU-free NumPy `TMState` (predict, save/load) with tests
+- [ ] B3 `TMConfig` + `configs/tm.yaml`; baseline run N_c=100, T=30, s=3.5 through the same CV / test / repeated-split protocol → `docs/tm-results.md` + `.json`
+- [ ] B4 training curves (macro-F1 vs epoch, train and held-out folds; epoch chosen without test data); B4b `codelangtm tm-train` saves the final model (`models/`, gitignored)
+- [ ] B5 resource comparison, same protocol for every model (baselines already report the first block in [results.md](results.md)):
   - training: wall time, CPU time, peak memory (Python heap for baselines; process-level peak RSS, measured in a subprocess, for both baselines and the TM, since TMU allocates in C), epochs to converge;
   - model: size in KB (pickled, and for the TM also the bit-packed clause size that the C export will use), vocabulary size, number of clauses and average literals per clause (TM) or non-zero weights (linear models);
   - inference: latency (median, p95) and throughput, split into binarize vs predict;
   - reported as measured, including where the TM loses
-- [ ] Error analysis: confusable pairs, short snippets
+- [ ] B6 clause inspector (pulled forward from M5): every clause as a readable rule (`docs/clauses.md`, `clauses.json`), per-clause statistics on train, signature features per language, literal-usage heatmap, class-overlap matrix, clause formation over epochs, `codelangtm explain` traces one prediction to the clauses that fired
+- [ ] B6b error analysis: confusable pairs, disagreement with Naive Bayes (short snippets moved to Future)
+- [ ] B7 TM sections of [report.md](report.md) (results, curves, resources, "how the TM works inside")
 
-**Exit:** TM results in `docs/results.md`, comparable to baselines on the same splits.
+**Exit:** TM results in `docs/tm-results.md`, comparable to baselines on the same splits; reported as measured, including where the TM loses; every learned clause is inspectable and any prediction can be traced to the clauses that fired.
 
 ## M4 — Tuning & compression
 **Goal:** best accuracy per byte and per rule.
@@ -87,6 +92,8 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 
 ## M5 — Explainability
 **Goal:** make the interpretability claim demonstrable.
+
+Rule extraction, per-prediction explanation and the per-language gallery move into M3 (B6, clause inspector). M5 keeps what builds on them: rule quality on the test set, the HTML report and a polished `predict --explain`.
 
 - [ ] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`); name features via `Binarizer.get_feature_names_out()` so word features read `word("SELECT")`, not the internal marker
 - [ ] Per-prediction explanation: `codelangtm predict --explain` shows winning clauses and vote totals
@@ -114,6 +121,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] Tag `v0.1.0`, update CHANGELOG
 
 ## Future
+- Short-snippet evaluation: accuracy on 1-10 line snippets (collect or cut short windows from the same repos, report F1 by snippet length). Skipped in M3 by decision; the current dataset only has 20-50 line windows ([dataset card](dataset-card.md), Known limitations)
 - Relational TM over ASTs (Horn clauses)
 - Convolutional TM over 2D code layout
 - VS Code extension; WebAssembly browser demo
