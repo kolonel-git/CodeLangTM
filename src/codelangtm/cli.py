@@ -81,6 +81,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     abl.add_argument("--out", type=Path, help="default: the config's `out` (docs/ablations.md)")
 
+    rep = sub.add_parser(
+        "report", help="draw the report figures (docs/figures/) from the JSON sidecars"
+    )
+    rep.add_argument("--results", type=Path, default=Path("docs/results.json"))
+    rep.add_argument("--ablations", type=Path, default=Path("docs/ablations.json"))
+    rep.add_argument("--out", type=Path, default=Path("docs/figures"))
+
     diag = sub.add_parser(
         "diagnose", help="label-issue candidates and shortcut features (training data only)"
     )
@@ -102,6 +109,20 @@ def _diagnose(args: argparse.Namespace) -> int:
         return 1
     print(result.summary())
     print(f"\nreview file: {args.out}")
+    return 0
+
+
+def _report(args: argparse.Namespace) -> int:
+    from .figures import render_all
+
+    try:
+        written = render_all(args.results, args.ablations, args.out)
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"report failed: {e}", file=sys.stderr)
+        return 1
+    for path in written:
+        print(f"wrote {path.as_posix()}")
+    print("narrative: docs/report.md (hand-written; update its numbers if the results changed)")
     return 0
 
 
@@ -255,6 +276,8 @@ def main(argv: list[str] | None = None) -> int:
         return _baselines(args)
     if args.command == "ablate":
         return _ablate(args)
+    if args.command == "report":
+        return _report(args)
     if args.command == "diagnose":
         return _diagnose(args)
     parser.print_help()

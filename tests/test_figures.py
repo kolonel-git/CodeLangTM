@@ -155,3 +155,18 @@ def test_core_imports_without_matplotlib():
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert fg.INSTALL_HINT in out.stdout
+
+
+def test_cli_report(sidecars, tmp_path, capsys):
+    from codelangtm.cli import main
+
+    out = tmp_path / "figs"
+    args = ["report", "--results", str(sidecars[0]), "--ablations", str(sidecars[1]),
+            "--out", str(out)]  # fmt: skip
+    assert main(args) == 0
+    assert "wrote" in capsys.readouterr().out
+    assert {p.stem for p in out.glob("*.png")} == set(fg.RESULTS_FIGURES) | set(
+        fg.ABLATION_FIGURES
+    )
+    assert main(["report", "--results", str(tmp_path / "none.json"), "--out", str(out)]) == 1
+    assert "sidecar not found" in capsys.readouterr().err
