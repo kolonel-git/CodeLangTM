@@ -70,9 +70,9 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
   - model: size in KB (pickled, and for the TM also the bit-packed clause size that the C export will use), vocabulary size, number of clauses and average literals per clause (TM) or non-zero weights (linear models);
   - inference: latency (median, p95) and throughput, split into binarize vs predict;
   - reported as measured, including where the TM loses
-- [ ] Error analysis: confusable pairs, short snippets
+- [ ] Error analysis: confusable pairs, disagreement with Naive Bayes (short snippets moved to Future)
 
-**Exit:** TM results in `docs/results.md`, comparable to baselines on the same splits.
+**Exit:** TM results in `docs/tm-results.md`, comparable to baselines on the same splits.
 
 ## M4 — Tuning & compression
 **Goal:** best accuracy per byte and per rule.
@@ -114,6 +114,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] Tag `v0.1.0`, update CHANGELOG
 
 ## Future
+- Short-snippet evaluation: accuracy on 1-10 line snippets (collect or cut short windows from the same repos, report F1 by snippet length). Skipped in M3 by decision; the current dataset only has 20-50 line windows ([dataset card](dataset-card.md), Known limitations)
 - Relational TM over ASTs (Horn clauses)
 - Convolutional TM over 2D code layout
 - VS Code extension; WebAssembly browser demo

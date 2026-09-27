@@ -50,16 +50,26 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [x] M2 ablations step 2: ablation runner (M, n-gram sizes, delimiters) → `docs/ablations.md`
 - [x] M2 ablations step 3: label-aware vocabulary selection (fixes M6 and M5), word tokens (no gain), larger M (no gain once selection is on)
 - [x] M2 ablations step 4: delimiters check, freeze the feature config for M3 (`configs/baselines.yaml`), rerun baselines; resource metrics added to the report
-- [ ] M2: push `feat/ablations`, open PR, merge (M2 part 2)
+- [x] M2: push `feat/ablations`, open PR, merge (M2 part 2; PR #5 merged)
 - [x] M2: faster binarization: 5.4-6.0× faster transform, identical output (issues-and-fixes M2); < 0.1 ms end-to-end to be confirmed on a quiet machine in M6
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [ ] Stage B (later): The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
+- [ ] Short-snippet evaluation (Future, skipped in M3 by decision; see roadmap Future)
+- [ ] M3 branch A `feat/report`: A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + `docs/report.md`
+- [ ] M3 branch B `feat/tm-training`: B1 spike, B2 `TMLanguageClassifier`, B3 config + protocol, B4 curves, B4b `tm-train`, B5 resources, B6 clause inspector, B6b error analysis, B7 report
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-25 — M3 branch A, A0 housekeeping (`feat/report`)
+- `feat/ablations` merged (PR #5); M3 plan approved, work split into branch A (report) and branch B (TM training).
+- Short-snippet evaluation moved from the M3 roadmap to Future (roadmap, dataset card limitation, this file).
+- New optional extra `viz` (matplotlib) for figures; core code stays importable without it. CI now runs `uv sync --extra tm --extra viz` so TM and figure tests run there (TMU build on the runner is checked on the first PR).
+- `docs/figures/` created for generated figures.
+- Tests: 226 passing, ruff clean.
 
 ### 2026-09-25 — M2: faster binarization
 - Profile: 92% of `Binarizer.transform` was building substring sets; the vocabulary lookups were 8%.
