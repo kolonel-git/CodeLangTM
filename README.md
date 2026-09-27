@@ -19,7 +19,7 @@ python = has("def ") AND has(":") AND NOT has(";")
 ## Pipeline
 
 ```
-snippet -> n-gram/delimiter binarizer (top-M features) -> literals (x, NOT x) -> Tsetlin Machine (TMU) -> argmax vote -> language
+snippet -> binarizer (M label-selected character 2/3-grams) -> literals (x, NOT x) -> Tsetlin Machine (TMU) -> argmax vote -> language
 ```
 
 See [docs/architecture.md](docs/architecture.md). Data is real-world code only, from permissively licensed GitHub repositories ([dataset card](docs/dataset-card.md)).
@@ -37,7 +37,7 @@ Languages: Python, C++, Java, JavaScript, Rust, Go, SQL, HTML.
 ## Quickstart
 
 ```bash
-uv sync --extra tm --extra collect   # Python 3.12 env, dev tools, TMU, collector (plain `uv sync` drops extras)
+uv sync --extra tm --extra collect --extra viz   # Python 3.12 env, dev tools, TMU, collector, figures (plain `uv sync` drops extras)
 uv run codelangtm --version
 uv run pytest
 ```
@@ -49,18 +49,19 @@ uv run codelangtm collect github                                  # data/raw/
 uv run codelangtm data build                                      # data/processed/
 uv run codelangtm baselines --config configs/baselines.yaml       # docs/results.md + .json
 uv run codelangtm ablate                                          # docs/ablations.md + .json
+uv run codelangtm report                                          # docs/figures/*.png
 ```
 
 ## Status
 
-Pre-alpha. Full plan in [docs/roadmap.md](docs/roadmap.md).
+Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with figures. Full plan in [docs/roadmap.md](docs/roadmap.md).
 
 | Milestone | Status |
 | --- | --- |
 | M0 Foundations | done |
 | M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
 | M2 Features & baselines | done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
-| M3 TM training | planned |
+| M3 TM training | in progress: results report with figures done ([report](docs/report.md)); TM training next |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |
 | M6 Deployment & benchmarks | planned |
