@@ -117,7 +117,14 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 ## 7. Tsetlin Machine
 
-*Not trained yet: this section is filled in during M3.* Planned content:
+*Full results come later in M3.* First measurements from a throwaway experiment (5 CV folds of train, test not used; details in [issues-and-fixes M8](issues-and-fixes.md)):
+
+- **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.04 s.
+- **The planned starting setting falls short.** With 100 clauses per language it reaches about 0.93 macro-F1, 3 points below Naive Bayes on the same folds (0.963).
+- **More clauses close the gap.** With 400 clauses per language and a higher vote threshold T, the TM reaches about 0.96.
+- **Prediction can run without TMU.** A plain NumPy re-implementation gives exactly the same scores as TMU. That means a trained model can be saved and inspected without TMU installed.
+
+Planned content:
 
 - **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits.
 - **Training:** curves of macro-F1 per epoch, and how fast the model learns.

@@ -64,9 +64,9 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 
 - [x] Results report: JSON sidecars for generated reports, deterministic figures (`figures.py`, `codelangtm report` → `docs/figures/`), hand-written [report.md](report.md) (branch `feat/report`)
 - [x] Verify TMU install: TMU 0.8.3 builds natively on Windows with `numpy<2` (see [architecture.md](architecture.md) install notes); CUDA optional
-- [ ] B1 spike (not committed): seconds per epoch, accuracy per epoch, and whether a NumPy re-implementation of prediction matches TMU exactly (including clauses with no literals)
+- [x] B1 spike (not committed): 0.03-0.04 s/epoch; NumPy prediction matches TMU exactly (empty clauses output 0); planned N_c=100/T=30/s=3.5 reaches ~0.93 CV, N_c=400/T=100/s=5 ~0.96 ([issues-and-fixes](issues-and-fixes.md) M8)
 - [ ] B2 `TMLanguageClassifier` (scikit-learn estimator: fit/partial_fit/predict/decision_function) + TMU-free NumPy `TMState` (predict, save/load) with tests
-- [ ] B3 `TMConfig` + `configs/tm.yaml`; baseline run N_c=100, T=30, s=3.5 through the same CV / test / repeated-split protocol → `docs/tm-results.md` + `.json`
+- [ ] B3 `TMConfig` + `configs/tm.yaml`; main run N_c=400, T=100, s=5 (from B1, CV only) plus the planned N_c=100, T=30, s=3.5 as a reference row, through the same CV / test / repeated-split protocol → `docs/tm-results.md` + `.json`
 - [ ] B4 training curves (macro-F1 vs epoch, train and held-out folds; epoch chosen without test data); B4b `codelangtm tm-train` saves the final model (`models/`, gitignored)
 - [ ] B5 resource comparison, same protocol for every model (baselines already report the first block in [results.md](results.md)):
   - training: wall time, CPU time, peak memory (Python heap for baselines; process-level peak RSS, measured in a subprocess, for both baselines and the TM, since TMU allocates in C), epochs to converge;

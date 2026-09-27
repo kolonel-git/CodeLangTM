@@ -18,6 +18,25 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
+### M8. The planned TM setting trails the baselines (B1 spike, CV only)
+- **Setup:** throwaway spike, not committed. TMU 0.8.3 `TMClassifier` on the frozen features, 5 repo-grouped CV folds of train (the test set was not used), 150 epochs, macro-F1 on the held-out fold after every epoch. Naive Bayes on the same folds: 0.963 ± 0.005.
+- **Symptom:** the planned starting point (N_c=100 clauses per class, T=30, s=3.5, weighted clauses) ends at 0.925-0.940 (mean of the last 20 epochs, 3 seeds), about 3 points below Naive Bayes. Training F1 reaches 1.0 by epoch 15-60 while held-out F1 stays lower: the model fits the training set completely.
+- **Probe (6 settings, a sanity check rather than tuning; M4 tunes properly):**
+
+  | Setting | Last-20-epoch mean | Best epoch mean (optimistic) | s/epoch |
+  | --- | --- | --- | --- |
+  | N_c=100, T=30, s=3.5 (seeds 42 / 7 / 123) | 0.925 / 0.940 / 0.934 | 0.951 / 0.949 / 0.946 | 0.028 |
+  | same, unweighted clauses | 0.891 (falls after epoch ~30) | 0.944 | 0.046 |
+  | N_c=100, T=15, s=3.5 | 0.935 | 0.949 | 0.028 |
+  | N_c=100, T=30, s=6 | 0.916 | 0.946 | 0.028 |
+  | N_c=200, T=50, s=3.5 | 0.950 | 0.962 | 0.031 |
+  | **N_c=400, T=100, s=5** | **0.962** | 0.969 | 0.037 |
+
+- **Reading:** capacity (more clauses, with T scaled up so the votes do not saturate) closes the gap; changing s alone does not. "Best epoch" is the maximum of 150 noisy means, so it flatters every setting; the last-20 mean is the fairer number.
+- **Noise:** held-out F1 moves ±0.02 between consecutive epochs and the fold std is 0.02-0.03. A "smallest epoch within one std of the best" rule picks epochs 5-12 here, too early; B4 needs a smoothed curve or a window average.
+- **Cost of the larger setting:** 8 × 400 = 3,200 clauses over 1,000 literals, 35,960 included literals (11.2 per clause). Bit-packed include matrix: 400 KB, close to the 500 KB target; stored sparsely (2-byte literal ids + clause offsets + weights) about 80 KB.
+- **Proposal for B3:** N_c=400, T=100, s=5, weighted clauses as the main TM setting (chosen on CV only), with the planned N_c=100/T=30/s=3.5 kept as a reference row; full tuning stays in M4.
+
 ### M7. First resource numbers were misleading (fixed before commit)
 - **Symptom:** the first "Resources" table showed fit CPU 2.7 s against 0.45 s wall time, and an identical 71.7 MB peak memory for all five models.
 - **Root cause:** both came from one memory-traced fit. `tracemalloc` slows code down about 6×, which inflated CPU time; and the peak was the binarizer's candidate table (same for every model), which hid the differences between classifiers.
@@ -124,6 +143,11 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 ---
 
 ## Environment
+
+### E5. TMU prints a pycuda traceback on import
+- **Symptom:** importing `tmu.models.classification` logs a WARNING and an ERROR with a full `No module named 'pycuda'` traceback.
+- **Root cause:** TMU tries to load its CUDA backend at import and logs the failure with `_LOGGER.exception`. Harmless: the CPU backend works.
+- **Fix (planned for B2):** raise the level of the `tmu.clause_bank.clause_bank_cuda` and `tmu.util.cuda_profiler` loggers before importing TMU, so real errors still show.
 
 ### E4. `uv sync` removed TMU
 - **Symptom:** after a plain `uv sync`, TMU disappeared from the venv.

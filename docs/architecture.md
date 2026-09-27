@@ -49,6 +49,13 @@ Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test
 `V_m(X) = sum C+_{m,j}(X) - sum C-_{m,j}(X)`; highest wins.
 Feedback: Type I (pattern discovery, erasure with prob 1/s), Type II (false-alarm correction), gated by threshold T.
 
+TMU 0.8.3 facts checked in the B1 spike ([issues-and-fixes](issues-and-fixes.md) M8):
+- `number_of_clauses` is per class. The first half of the clauses start with weight +1 (vote for the class), the second half with -1 (vote against). With `weighted_clauses=True`, training moves the weights (seen range -20 to +29).
+- `fit(X, Y)` runs **one epoch**; state persists across calls. X must be `uint32` (the `Binarizer` output is). TMU adds the negated literals itself, so literal `j < M` is `x_j` and literal `M + j` is `NOT x_j`.
+- Prediction: class sum = `weights · clause_outputs` (not clipped); argmax, with ties going to the lower class id. A clause outputs 1 when none of its included literals is violated **and it includes at least one literal**, so empty clauses output 0 at prediction. A NumPy re-implementation from `clause_banks[c].get_literals()` and `weight_banks[c].get_weights()` matches TMU's class sums exactly (all 696 train snippets, two model sizes); counting empty clauses as firing does not.
+- TMU's default incremental clause evaluation gives the same sums as the plain path, and its cache is reset by every training update, so predicting between epochs is safe.
+- Training is deterministic for a given `seed` (identical per-epoch scores across separate runs).
+
 ## Install notes
 - TMU builds a C extension; Python 3.12 is pinned. It installs natively on Windows (checked with TMU 0.8.3); WSL2 or Docker is only a fallback.
 - TMU 0.8.x breaks on NumPy 2, so the `tm` extra pins `numpy<2` and `scipy<1.14`.

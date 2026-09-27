@@ -3,8 +3,8 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-27
-**Current milestone:** M3 — TM training (branch A `feat/report` complete, ready for PR; branch B next)
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A done (results [report](docs/report.md) with figures), next branch B (TM training)
+**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1 spike done, B2 next)
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B started (B1 spike: the TM reaches ~0.96 CV with 400 clauses per language)
 
 ## Milestone overview
 
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A `feat/report` done (report + figures), PR pending; then branch B `feat/tm-training` |
+| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1 done |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -24,8 +24,10 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 M0-M2 are finished; each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
 
 - [x] M3 branch A `feat/report`: A0 housekeeping, A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + [docs/report.md](docs/report.md)
-- [ ] Push `feat/report`, open PR, check the first CI run (TMU and matplotlib now installed in CI), merge
-- [ ] M3 branch B `feat/tm-training`: B1 spike → B2 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
+- [x] Push `feat/report`, PR #6 merged; CI green with TMU and matplotlib installed (TMU builds on the Ubuntu runner)
+- [x] B1 spike: timing, NumPy-vs-TMU equivalence, first CV numbers (issues-and-fixes M8)
+- [ ] Confirm the B3 main TM setting (proposed N_c=400, T=100, s=5; planned 100/30/3.5 kept as a reference row)
+- [ ] M3 branch B `feat/tm-training`: B2 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
 - [ ] Later: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
@@ -33,6 +35,14 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-27 — M3 branch B, B1: TMU spike (throwaway scripts, not committed)
+- `feat/report` merged (PR #6); CI green, so TMU compiles on the Ubuntu runner and the figure tests pass there.
+- Read TMU 0.8.3's classifier and clause bank source first: prediction is `weights · clause outputs` per class; the incremental prediction cache resets on every training update, so predicting between epochs is safe.
+- Speed: 0.03-0.04 s per epoch on ~550 snippets (first epoch 0.06-0.12 s); TMU predict 0.07-0.09 ms/snippet (a Python loop per sample). The whole CV + test + 10 repeated splits protocol at 100 epochs is about a minute, so B3 keeps the full protocol.
+- Equivalence: a NumPy re-implementation matches TMU's class sums exactly when empty clauses output 0 (off by up to 21 otherwise); incremental and plain TMU prediction agree; the same seed gives identical runs.
+- Accuracy (5 CV folds, test not used): planned N_c=100/T=30/s=3.5 ends at 0.925-0.940 (3 seeds), Naive Bayes 0.963 on the same folds; N_c=400/T=100/s=5 reaches 0.962. Held-out F1 is noisy (±0.02 epoch to epoch), so B4's epoch rule needs smoothing. Details: issues-and-fixes M8; TMU facts: architecture, Model.
+- Found TMU's harmless pycuda traceback at import (issues-and-fixes E5).
 
 ### 2026-09-27 — M3 branch A, A3: `codelangtm report` and the written report
 - `codelangtm report [--results] [--ablations] [--out]` draws the 8 figures from the JSON sidecars into `docs/figures/` (committed). Missing sidecar, wrong schema or missing matplotlib: exit 1 with a clear message.
@@ -236,6 +246,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 | 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
+| 2026-09-27 | B1 spike: TMU, frozen features, 150 epochs (CV only) | v5 | N_c=100/T=30/s=3.5: 0.925-0.940 / -; N_c=400/T=100/s=5: 0.962 / - | last-20-epoch mean over 5 folds; NB same folds 0.963; 0.03-0.04 s/epoch; TMU predict 0.07-0.09 ms/snippet; N_c=400 clauses 400 KB dense / ~80 KB sparse |
 | 2026-09-25 | Same, after faster binarization | v5 | identical scores | 0.08-0.13 ms/snippet end-to-end (linear models / NB) on a loaded machine; binarize alone 5.4-6.0× faster than before (interleaved A/B); RF 0.75 |
 
 ## Targets
