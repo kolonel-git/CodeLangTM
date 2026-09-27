@@ -147,6 +147,11 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Tooling & workflow
 
+### W5. Keeping figure files stable in git
+- **Goal:** redrawing a figure from the same sidecar must give the same bytes, on this machine and in CI, so regenerated PNGs only show up in git when the numbers change.
+- **Risks found while building `figures.py`:** default PNGs carry a `Software: matplotlib <version>` stamp (a different matplotlib version would change every file); system fonts differ between Windows and Linux; tick labels are created at save time, so a style applied only while building the figure would not reach them.
+- **Fix:** `figures.save_png` passes `metadata={"Software": None}` and saves inside the same style context used to build the figure; the font is DejaVu Sans (bundled with matplotlib); size and dpi are fixed. Tests: two renders are byte-identical, and PNGs contain no `matplotlib`/`Software` bytes (checked: a default save does contain them, so the test would catch a regression).
+
 ### W4. `±` printed as `�` in the console
 - **Root cause:** Windows console uses cp1252, which cannot encode `±`.
 - **Fix:** console tables use ASCII `+/-`; generated Markdown files (UTF-8) keep `±`.

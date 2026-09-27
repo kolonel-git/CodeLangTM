@@ -23,9 +23,10 @@ Code snippet
 | Classical baselines | `baselines.py` | `codelangtm baselines` |
 | Feature ablations | `ablations.py` | `codelangtm ablate` |
 | Label-issue and shortcut checks | `diagnostics.py` | `codelangtm diagnose` |
+| Report figures (optional `viz` extra) | `figures.py` | `codelangtm report` (A3) |
 | TM model, rules, C export | `model.py`, `rules.py`, `export_c.py` | stubs (M3, M5, M6) |
 
-Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`), each with a JSON sidecar (`results.json`, `ablations.json`: same runs, machine-readable, read by the figure code).
+Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`), each with a JSON sidecar (`results.json`, `ablations.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes).
 
 ## Features
 `Binarizer` (scikit-learn transformer; refit inside every CV fold):

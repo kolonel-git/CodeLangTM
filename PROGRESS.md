@@ -4,7 +4,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 **Last updated:** 2026-09-27
 **Current milestone:** M3 — TM training (branch A `feat/report`: figures and report)
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A (report, A0-A1 done), then branch B (TM training)
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A (report, A0-A2 done), then branch B (TM training)
 
 ## Milestone overview
 
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A `feat/report` (A0-A1 done), then branch B `feat/tm-training` |
+| M3 TM training | In progress | Branch A `feat/report` (A0-A2 done), then branch B `feat/tm-training` |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -57,13 +57,23 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 - [ ] Wild set (later, collected by hand): StackOverflow / blogs / docs
 - [ ] Short-snippet evaluation (Future, skipped in M3 by decision; see roadmap Future)
 - [x] M3 branch A, A1: JSON sidecars (`results.json`, `ablations.json`)
-- [ ] M3 branch A `feat/report`: A2 `figures.py`, A3 `codelangtm report` + `docs/report.md`
+- [x] M3 branch A, A2: `figures.py` (8 figures from the sidecars)
+- [ ] M3 branch A `feat/report`: A3 `codelangtm report` + `docs/report.md`
 - [ ] M3 branch B `feat/tm-training`: B1 spike, B2 `TMLanguageClassifier`, B3 config + protocol, B4 curves, B4b `tm-train`, B5 resources, B6 clause inspector, B6b error analysis, B7 report
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-27 — M3 branch A, A2: figures
+- `src/codelangtm/figures.py` draws 8 PNGs from the JSON sidecars: dataset composition, baseline comparison (CV, repeated test, single test, 0.96 target), per-language test F1 heatmap, confusion matrix of the best model (colour = share of the true language, text = counts), resources (fit time, latency, size as three separate panels, never a dual axis), and three ablation figures (F1 vs vocabulary size per selection method, F1 per n-gram set, paired Δ vs base for all 30 settings with within-noise results hollow).
+- Colours: three categorical slots from a palette checked with a colour-vision-deficiency validator (all pairs pass); each selection method keeps its colour in every figure; series also differ by marker shape and legend. Magnitudes use one blue ramp.
+- matplotlib is imported only when drawing; without the `viz` extra the package and CLI still import and drawing fails with "run `uv sync --extra viz`" (tested in a subprocess with matplotlib blocked).
+- Deterministic output: same sidecar, same bytes (no PNG metadata, fixed font/size/dpi, style applied at save time too); issues-and-fixes W5.
+- Checked every figure by eye on the v5 sidecars; fixed a legend covering a label, a clipped legend, `6.99e+03` size labels, and unreadable ablation labels (now only the options that differ from base).
+- Figures are not committed yet: A3's `codelangtm report` writes them to `docs/figures/`.
+- Tests: 239 passing (9 new).
 
 ### 2026-09-27 — M3 branch A, A1: JSON sidecars
 - `codelangtm baselines` and `codelangtm ablate` now also write `docs/results.json` / `docs/ablations.json` next to the markdown (path = markdown path with `.json`). Same runs as the markdown, floats kept to 6 decimals, schema tags `codelangtm.results/1` and `codelangtm.ablations/1`. The figure code (A2) reads these instead of parsing markdown.
