@@ -86,7 +86,20 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     rep.add_argument("--results", type=Path, default=Path("docs/results.json"))
     rep.add_argument("--ablations", type=Path, default=Path("docs/ablations.json"))
+    rep.add_argument(
+        "--curves", type=Path, default=Path("docs/tm-curves.json"),
+        help="TM training curves sidecar (skipped if the file does not exist)",
+    )  # fmt: skip
     rep.add_argument("--out", type=Path, default=Path("docs/figures"))
+
+    curve = sub.add_parser(
+        "tm-curve", help="TM training curves on CV folds (train only); recommends the epoch count"
+    )
+    curve.add_argument("--config", type=Path, default=Path("configs/tm.yaml"))
+    curve.add_argument(
+        "--setting", action="append", help="TM setting from the config (repeatable; default: all)"
+    )
+    curve.add_argument("--out", type=Path, help="default: the config's `curves_out`")
 
     diag = sub.add_parser(
         "diagnose", help="label-issue candidates and shortcut features (training data only)"
@@ -115,14 +128,42 @@ def _diagnose(args: argparse.Namespace) -> int:
 def _report(args: argparse.Namespace) -> int:
     from .figures import render_all
 
+    curves = args.curves if args.curves and args.curves.exists() else None
+    if args.curves and curves is None:
+        print(f"note: {args.curves.as_posix()} not found, skipping TM curve figures")
     try:
-        written = render_all(args.results, args.ablations, args.out)
+        written = render_all(args.results, args.ablations, args.out, curves)
     except (FileNotFoundError, ValueError, ImportError) as e:
         print(f"report failed: {e}", file=sys.stderr)
         return 1
     for path in written:
         print(f"wrote {path.as_posix()}")
     print("narrative: docs/report.md (hand-written; update its numbers if the results changed)")
+    return 0
+
+
+def _tm_curve(args: argparse.Namespace) -> int:
+    from .baselines import sidecar_path, write_json
+    from .config import load_tm_config
+    from .curves import curves_json, render_curves_md, run_curves, summary_table
+
+    try:
+        cfg = load_tm_config(args.config)
+        runs, meta = run_curves(cfg, args.setting, progress=lambda m: print(m, flush=True))
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"tm-curve failed: {e}", file=sys.stderr)
+        return 1
+    meta["config_path"] = args.config.as_posix()
+    data = curves_json(cfg, runs, meta)
+    out = args.out or cfg.curves_out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_curves_md(data), encoding="utf-8")
+    sidecar = write_json(data, sidecar_path(out))
+    print()
+    print(summary_table(data))
+    print(f"\nwrote {out} and {sidecar}")
+    print(f"set `epochs` per setting in {args.config.as_posix()} to the chosen epoch, then "
+          "run `codelangtm report` for the figures")  # fmt: skip
     return 0
 
 
@@ -278,6 +319,8 @@ def main(argv: list[str] | None = None) -> int:
         return _ablate(args)
     if args.command == "report":
         return _report(args)
+    if args.command == "tm-curve":
+        return _tm_curve(args)
     if args.command == "diagnose":
         return _diagnose(args)
     parser.print_help()
