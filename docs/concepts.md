@@ -71,8 +71,12 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 - **Ablation:** change one design option, keep everything else fixed, and measure the effect.
 - **Paired difference (Δ):** compare two settings on the *same* folds and look at the per-fold differences. Some folds are harder than others; pairing cancels that out.
 - **Noise band:** differences smaller than their own spread (|mean Δ| ≤ std) are treated as noise, not as real effects.
+- **Training curve:** a score measured after every epoch, plotted against the epoch number. The held-out curve shows when the model stops improving; the gap to the training curve shows overfitting.
+- **Moving average (smoothing):** replace each point by the average of its neighbours (here 11 epochs centred on it), so single lucky or unlucky epochs stop dominating.
+- **Plateau rule:** after smoothing, choose the first epoch whose score is within a small tolerance (0.005) of the best smoothed score: the point where the curve has levelled off. Training longer costs time and gains almost nothing.
 - **Selection bias ("best epoch"):** picking the best of many noisy numbers gives an optimistic result, because the maximum is partly luck. That is why the project reports averages (for example over the last 20 epochs) and chooses settings on CV only.
 - **Significance test:** a statistical check of whether a difference (for example TM vs Naive Bayes) is larger than chance variation would produce. Used for the headline comparisons, over several seeds and the same folds.
+- **Corrected resampled t-test (Nadeau & Bengio):** the test used here. A normal paired t-test assumes the repeated splits are independent, but they share most of their training data, which makes it too confident. The correction widens the uncertainty to account for that overlap.
 
 ## Speed and size
 

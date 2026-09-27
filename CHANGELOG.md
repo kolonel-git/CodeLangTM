@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- TM experiment config (`TMConfig`, `configs/tm.yaml`: seeds, TM settings, curve rule; features must equal the frozen baseline features).
+- `codelangtm tm-curve` (`curves.py`): TM training curves on CV folds of train (every fold x seed, one epoch at a time), clause-formation statistics per epoch, smoothed plateau rule for the epoch count; writes `docs/tm-curves.md` + `.json`. `codelangtm report --curves` draws `tm_curves.png` and `tm_clause_formation.png`.
 - `TMLanguageClassifier` (`model.py`): Tsetlin Machine as a scikit-learn estimator (`fit`, `partial_fit`, `predict`, `decision_function`, `predict_tmu`), TMU imported lazily and without its pycuda noise.
 - `TMState`: trained TM as NumPy arrays, predictions identical to TMU's; one-file JSON model format `codelangtm.tm/1` with `save_model`, `save_pipeline`, `load_model` (documented in `docs/architecture.md`).
 - `Binarizer.to_dict` / `Binarizer.from_dict` (used by the model file; `save`/`load` unchanged).

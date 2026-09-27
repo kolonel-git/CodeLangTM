@@ -63,7 +63,7 @@ Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with fi
 | M0 Foundations | done |
 | M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
 | M2 Features & baselines | done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
-| M3 TM training | in progress: results report with figures done ([report](docs/report.md)); TM training next |
+| M3 TM training | in progress: TM classifier and training curves done; on CV the TM reaches 0.95 vs Naive Bayes 0.963 ([report](docs/report.md), section 7); full comparison next |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |
 | M6 Deployment & benchmarks | planned |
