@@ -1,0 +1,39 @@
+# M3 Tsetlin Machine experiments.
+#   uv run codelangtm tm-curve --config configs/tm.yaml    # B4: training curves -> docs/tm-curves.md
+# Every TM number is a mean over `seeds` (seed 0 is not allowed: TMU hangs, issues-and-fixes E6).
+# All choices are made on CV folds of train; the test set is only scored in the final protocol run.
+
+data: data/processed
+out: docs/tm-results.md          # B3: full protocol (CV, test, repeated splits, significance test)
+curves_out: docs/tm-curves.md    # B4: training curves and the epoch recommendation
+seeds: [1, 2, 3, 4, 5]
+repeats: 10                      # extra repo-level splits for the repeated test score
+baselines: [naive_bayes, logistic_regression]   # re-run beside the TM on identical splits
+
+# Must equal the frozen features in configs/baselines.yaml (a test checks this).
+features:
+  n_features: 500
+  ngram_sizes: [2, 3]
+  use_delimiters: false
+  selection: class_balanced
+  min_df: 1
+  word_tokens: false
+
+curves:
+  max_epochs: 150         # scan length
+  smooth_window: 11       # centred moving average over epochs (per-epoch F1 is noisy, +/-0.02)
+  plateau_tolerance: 0.005   # chosen epoch = first where smoothed held-out F1 >= smoothed max - this
+
+tm:
+  tm_400:                 # main setting (B1 spike, CV only; option A)
+    n_clauses: 400        # per language: half vote for, half against
+    T: 100
+    s: 5.0
+    weighted_clauses: true
+    epochs: 19            # tm-curve 2026-09-27: plateau (smoothed 0.946; max 0.951 at 120)
+  tm_100:                 # reference: the originally planned starting point
+    n_clauses: 100
+    T: 30
+    s: 3.5
+    weighted_clauses: true
+    epochs: 44            # tm-curve 2026-09-27: plateau (smoothed 0.928; max 0.933 at 142)

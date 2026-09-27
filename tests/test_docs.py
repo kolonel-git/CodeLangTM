@@ -46,7 +46,7 @@ def test_relative_links_resolve(doc):
 
 def test_report_embeds_every_figure():
     embedded = {Path(t).stem for t in links(ROOT / "docs" / "report.md") if t.endswith(".png")}
-    assert embedded == set(fg.RESULTS_FIGURES) | set(fg.ABLATION_FIGURES)
+    assert embedded == set(fg.RESULTS_FIGURES) | set(fg.ABLATION_FIGURES) | set(fg.CURVE_FIGURES)
     for name in embedded:
         assert (ROOT / "docs" / "figures" / f"{name}.png").exists()
 

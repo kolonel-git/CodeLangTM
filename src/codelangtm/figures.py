@@ -450,6 +450,75 @@ def ablation_deltas(ablations: dict) -> object:
     return _draw(draw)
 
 
+# ---------------------------------------------------------- tm-curves.json figures
+
+
+def tm_curves(curves: dict) -> object:
+    """Held-out and training macro-F1 per epoch, one panel per TM setting, chosen epoch marked."""
+
+    def draw():
+        settings = list(curves["settings"].items())
+        fig, axes = _new_figure(3.8 * len(settings), 3.3, ncols=len(settings), sharey=True)
+        for ax, (name, s) in zip(axes, settings, strict=True):
+            sm = s["summary"]
+            epochs = list(range(1, len(sm["val_mean"]) + 1))
+            lo = [m - d for m, d in zip(sm["val_mean"], sm["val_std_folds"], strict=True)]
+            hi = [m + d for m, d in zip(sm["val_mean"], sm["val_std_folds"], strict=True)]
+            ax.fill_between(epochs, lo, hi, color=SERIES[0], alpha=0.12, lw=0)
+            ax.plot(epochs, sm["val_mean"], color=SERIES[0], lw=1, alpha=0.45)
+            ax.plot(epochs, sm["val_smoothed"], color=SERIES[0], lw=2,
+                    label="held-out (smoothed; band ± std over folds)")  # fmt: skip
+            ax.plot(epochs, sm["train_mean"], color=SERIES[1], lw=1.5, ls="-", label="train")
+            e = sm["chosen_epoch"]
+            ax.axvline(e, color=INK_2, lw=1)
+            ax.text(e, 0.0, f" epoch {e}", transform=ax.get_xaxis_transform(), color=INK_2,
+                    fontsize=8, va="bottom")  # fmt: skip
+            ax.axhline(TARGET_F1, color=MUTED, lw=1, label=f"target {TARGET_F1}")
+            params = s["params"]
+            title = (f"{name}: {params.get('n_clauses')} clauses/language, "
+                     f"T={params.get('T')}, s={params.get('s')}")  # fmt: skip
+            ax.set_title(title, fontsize=9)
+            ax.set_xlabel("epoch")
+        axes[0].set_ylabel("macro-F1")
+        axes[0].set_ylim(bottom=max(0.0, min(min(s["summary"]["val_mean"]) for _, s in settings)
+                                    - 0.05), top=1.01)  # fmt: skip
+        axes[0].legend(loc="lower right")
+        fig.suptitle("TM training curves (CV folds of train, mean over folds x seeds)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
+def tm_clause_formation(curves: dict) -> object:
+    """Clause growth and stability per epoch: included literals per clause, decisions changed."""
+
+    def draw():
+        settings = list(curves["settings"].items())
+        fig, axes = _new_figure(7.6, 3.1, ncols=2)
+        for slot, (name, s) in enumerate(settings[: len(SERIES)]):
+            sm = s["summary"]
+            epochs = list(range(1, len(sm["val_mean"]) + 1))
+            per_clause = [i / n if n else 0.0 for i, n in
+                          zip(sm["included_mean"], sm["nonempty_mean"], strict=True)]  # fmt: skip
+            every = max(1, len(epochs) // 10)
+            style = dict(color=SERIES[slot], marker=MARKERS[slot], ms=4, markevery=every,
+                         label=name)  # fmt: skip
+            axes[0].plot(epochs, per_clause, **style)
+            axes[1].plot(epochs, sm["changed_mean"], **style)
+        axes[0].set_title("literals per non-empty clause", fontsize=9)
+        axes[1].set_title("include decisions changed per epoch (log scale)", fontsize=9)
+        axes[1].set_yscale("log")
+        for ax in axes:
+            ax.set_xlabel("epoch")
+        axes[0].legend(loc="lower right")
+        fig.suptitle("How clauses form during training (mean over folds x seeds)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
 # ------------------------------------------------------------------------ all figures
 
 RESULTS_FIGURES: dict[str, Callable[[dict], object]] = {
@@ -464,6 +533,10 @@ ABLATION_FIGURES: dict[str, Callable[[dict], object]] = {
     "ablation_ngrams": ablation_ngrams,
     "ablation_deltas": ablation_deltas,
 }
+CURVE_FIGURES: dict[str, Callable[[dict], object]] = {
+    "tm_curves": tm_curves,
+    "tm_clause_formation": tm_clause_formation,
+}
 
 
 def load_sidecar(path: str | Path, schema_prefix: str) -> dict:
@@ -477,7 +550,10 @@ def load_sidecar(path: str | Path, schema_prefix: str) -> dict:
 
 
 def render_all(
-    results_path: str | Path | None, ablations_path: str | Path | None, out_dir: str | Path
+    results_path: str | Path | None,
+    ablations_path: str | Path | None,
+    out_dir: str | Path,
+    curves_path: str | Path | None = None,
 ) -> list[Path]:
     """Draw every figure whose sidecar is given; returns the written PNG paths."""
     _mpl()  # fail early with the install hint
@@ -487,6 +563,8 @@ def render_all(
         jobs.append((load_sidecar(results_path, "codelangtm.results/"), RESULTS_FIGURES))
     if ablations_path:
         jobs.append((load_sidecar(ablations_path, "codelangtm.ablations/"), ABLATION_FIGURES))
+    if curves_path:
+        jobs.append((load_sidecar(curves_path, "codelangtm.tm-curves/"), CURVE_FIGURES))
     for data, figures in jobs:
         for name, fn in figures.items():
             written.append(save_png(fn(data), Path(out_dir) / f"{name}.png"))
