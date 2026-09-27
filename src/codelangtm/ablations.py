@@ -20,7 +20,7 @@ from sklearn.metrics import f1_score
 from . import LANGUAGES
 from .audit import load_dataset
 from .baselines import _macro_f1, dataset_meta, load_folds, make_models
-from .config import AblationConfig, FeatureConfig, Study, config_hash
+from .config import AblationConfig, FeatureConfig, Study, config_dict, config_hash
 
 
 @dataclass
@@ -276,6 +276,59 @@ def render_ablations_md(
             f"Δ vs base {mean:+.3f} ± {std:.3f})"
         )
     return "\n".join(md) + "\n"
+
+
+ABLATIONS_SCHEMA = "codelangtm.ablations/1"
+
+
+def ablations_json(
+    cfg: AblationConfig, runs: Runs, meta: dict, languages: Sequence[str] = LANGUAGES
+) -> dict:
+    """Machine-readable twin of `render_ablations_md`.
+
+    Each unique setting appears once (`settings`, base first, id = position); studies refer to
+    settings by id. Vocabulary size and binarize time are per setting (shared by all models).
+    """
+    settings = cfg.feature_settings()
+    ids = {features: i for i, features in enumerate(settings)}
+    out_settings = []
+    for i, features in enumerate(settings):
+        first = runs[features, cfg.models[0]]
+        models = {}
+        for m in cfg.models:
+            run = runs[features, m]
+            delta_mean, delta_std = paired_delta(run, runs[cfg.base, m])
+            models[m] = {
+                "cv_f1": run.cv_f1,
+                "cv_mean": run.cv_mean,
+                "cv_std": run.cv_std,
+                "delta_mean": delta_mean,
+                "delta_std": delta_std,
+                "per_language_f1": run.per_language_f1,
+                "fit_seconds": run.fit_seconds,
+            }
+        out_settings.append({
+            "id": i,
+            "label": describe(features),
+            "is_base": features == cfg.base,
+            "features": config_dict(features),
+            "vocab_size": first.vocab_size,
+            "binarize_ms": first.binarize_ms,
+            "models": models,
+        })  # fmt: skip
+    return {
+        "schema": ABLATIONS_SCHEMA,
+        "meta": meta,
+        "languages": list(languages),
+        "models": list(cfg.models),
+        "base": ids[cfg.base],
+        "studies": [
+            {"name": s.name, "varied": list(s.varied), "settings": [ids[f] for f in s.settings]}
+            for s in cfg.studies
+        ],
+        "settings": out_settings,
+        "best_by_cv": {m: ids[best_setting(runs, m).features] for m in cfg.models},
+    }
 
 
 def summary_table(cfg: AblationConfig, runs: Runs) -> str:

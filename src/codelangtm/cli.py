@@ -81,6 +81,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     abl.add_argument("--out", type=Path, help="default: the config's `out` (docs/ablations.md)")
 
+    rep = sub.add_parser(
+        "report", help="draw the report figures (docs/figures/) from the JSON sidecars"
+    )
+    rep.add_argument("--results", type=Path, default=Path("docs/results.json"))
+    rep.add_argument("--ablations", type=Path, default=Path("docs/ablations.json"))
+    rep.add_argument("--out", type=Path, default=Path("docs/figures"))
+
     diag = sub.add_parser(
         "diagnose", help="label-issue candidates and shortcut features (training data only)"
     )
@@ -105,8 +112,23 @@ def _diagnose(args: argparse.Namespace) -> int:
     return 0
 
 
+def _report(args: argparse.Namespace) -> int:
+    from .figures import render_all
+
+    try:
+        written = render_all(args.results, args.ablations, args.out)
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"report failed: {e}", file=sys.stderr)
+        return 1
+    for path in written:
+        print(f"wrote {path.as_posix()}")
+    print("narrative: docs/report.md (hand-written; update its numbers if the results changed)")
+    return 0
+
+
 def _ablate(args: argparse.Namespace) -> int:
     from . import ablations as ab
+    from .baselines import sidecar_path, write_json
     from .config import load_ablation_config
 
     def progress(i: int, n: int, features: object) -> None:
@@ -122,14 +144,23 @@ def _ablate(args: argparse.Namespace) -> int:
     out = args.out or cfg.out
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(ab.render_ablations_md(cfg, runs, meta), encoding="utf-8")
+    sidecar = write_json(ab.ablations_json(cfg, runs, meta), sidecar_path(out))
     print()
     print(ab.summary_table(cfg, runs))
-    print(f"\nwrote {out}")
+    print(f"\nwrote {out} and {sidecar}")
     return 0
 
 
 def _baselines(args: argparse.Namespace) -> int:
-    from .baselines import best_by_cv, render_results_md, run_baselines, summary_table
+    from .baselines import (
+        best_by_cv,
+        render_results_md,
+        results_json,
+        run_baselines,
+        sidecar_path,
+        summary_table,
+        write_json,
+    )
     from .config import BaselinesConfig, config_hash, load_baselines_config
 
     overrides = {
@@ -153,8 +184,9 @@ def _baselines(args: argparse.Namespace) -> int:
     }
     cfg.out.parent.mkdir(parents=True, exist_ok=True)
     cfg.out.write_text(render_results_md(results, meta), encoding="utf-8")
+    sidecar = write_json(results_json(results, meta), sidecar_path(cfg.out))
     print(summary_table(results))
-    print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {cfg.out}")
+    print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {cfg.out} and {sidecar}")
     return 0
 
 
@@ -244,6 +276,8 @@ def main(argv: list[str] | None = None) -> int:
         return _baselines(args)
     if args.command == "ablate":
         return _ablate(args)
+    if args.command == "report":
+        return _report(args)
     if args.command == "diagnose":
         return _diagnose(args)
     parser.print_help()

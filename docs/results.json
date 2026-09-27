@@ -1,0 +1,787 @@
+{
+  "schema": "codelangtm.results/1",
+  "meta": {
+    "generated": "2026-09-27 15:43:05",
+    "data_dir": "data/processed",
+    "dataset_files": {
+      "train.jsonl": "8cdc4c91ebe6",
+      "test.jsonl": "54649be8e4e0",
+      "wild.jsonl": "e3b0c44298fc",
+      "folds.json": "77229e0f7668"
+    },
+    "n_train": 696,
+    "n_test": 173,
+    "n_wild": 0,
+    "n_folds": 5,
+    "composition": {
+      "train": {
+        "cpp": {
+          "snippets": 90,
+          "repos": 20
+        },
+        "go": {
+          "snippets": 99,
+          "repos": 20
+        },
+        "html": {
+          "snippets": 76,
+          "repos": 20
+        },
+        "java": {
+          "snippets": 94,
+          "repos": 20
+        },
+        "javascript": {
+          "snippets": 85,
+          "repos": 20
+        },
+        "python": {
+          "snippets": 93,
+          "repos": 20
+        },
+        "rust": {
+          "snippets": 98,
+          "repos": 20
+        },
+        "sql": {
+          "snippets": 61,
+          "repos": 17
+        }
+      },
+      "test": {
+        "cpp": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "go": {
+          "snippets": 25,
+          "repos": 5
+        },
+        "html": {
+          "snippets": 24,
+          "repos": 5
+        },
+        "java": {
+          "snippets": 20,
+          "repos": 5
+        },
+        "javascript": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "python": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "rust": {
+          "snippets": 25,
+          "repos": 5
+        },
+        "sql": {
+          "snippets": 16,
+          "repos": 4
+        }
+      },
+      "wild": {}
+    },
+    "split": {
+      "split": "stable-hash",
+      "test_size": 0.2,
+      "n_folds": 5,
+      "salt": "codelangtm-v1"
+    },
+    "versions": {
+      "python": "3.12.12",
+      "scikit-learn": "1.9.1",
+      "numpy": "1.26.4"
+    },
+    "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "n_features": 500,
+    "features": {
+      "min_df": 1,
+      "n_features": 500,
+      "ngram_sizes": [
+        2,
+        3
+      ],
+      "selection": "class_balanced",
+      "use_delimiters": false,
+      "word_tokens": false
+    },
+    "seed": 0,
+    "repeats": 10,
+    "config": {
+      "path": "configs/baselines.yaml",
+      "overrides": [],
+      "hash": "8375c85f8398"
+    }
+  },
+  "languages": [
+    "python",
+    "cpp",
+    "java",
+    "javascript",
+    "rust",
+    "go",
+    "sql",
+    "html"
+  ],
+  "best_by_cv": "naive_bayes",
+  "models": [
+    {
+      "name": "naive_bayes",
+      "cv_f1": [
+        0.956928,
+        0.962656,
+        0.956622,
+        0.96783,
+        0.969019
+      ],
+      "cv_mean": 0.962611,
+      "cv_std": 0.005225,
+      "test_f1": 0.958845,
+      "test_accuracy": 0.959538,
+      "repeat_f1": [
+        0.97774,
+        0.964569,
+        0.960223,
+        0.961458,
+        0.975331,
+        0.97469,
+        0.966744,
+        0.975279,
+        0.945879,
+        0.973988
+      ],
+      "repeat_mean": 0.96759,
+      "repeat_std": 0.009415,
+      "wild_f1": null,
+      "per_language_f1": {
+        "python": 0.976744,
+        "cpp": 0.933333,
+        "java": 0.947368,
+        "javascript": 0.976744,
+        "rust": 0.958333,
+        "go": 0.958333,
+        "sql": 0.941176,
+        "html": 0.978723
+      },
+      "confusion": [
+        [
+          21,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          21,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          18,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          21,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          23,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0,
+          0,
+          23,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          16,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          23
+        ]
+      ],
+      "resources": {
+        "fit_seconds": 0.337288,
+        "fit_cpu_seconds": 0.34375,
+        "peak_binarize_mb": 71.729777,
+        "peak_model_mb": 4.31744,
+        "size_kb": 66.545898,
+        "vocab_kb": 3.355469,
+        "latency_ms": 0.036265,
+        "throughput": 27574.994495
+      }
+    },
+    {
+      "name": "decision_tree",
+      "cv_f1": [
+        0.786159,
+        0.864398,
+        0.831273,
+        0.844202,
+        0.886672
+      ],
+      "cv_mean": 0.842541,
+      "cv_std": 0.033864,
+      "test_f1": 0.831651,
+      "test_accuracy": 0.843931,
+      "repeat_f1": [
+        0.795738,
+        0.852215,
+        0.840092,
+        0.797815,
+        0.826377,
+        0.827701,
+        0.831156,
+        0.765564,
+        0.817477,
+        0.865467
+      ],
+      "repeat_mean": 0.82196,
+      "repeat_std": 0.02783,
+      "wild_f1": null,
+      "per_language_f1": {
+        "python": 0.75,
+        "cpp": 0.818182,
+        "java": 0.85,
+        "javascript": 0.809524,
+        "rust": 0.863636,
+        "go": 0.941176,
+        "sql": 0.62069,
+        "html": 1.0
+      },
+      "confusion": [
+        [
+          18,
+          0,
+          1,
+          0,
+          0,
+          1,
+          1,
+          0
+        ],
+        [
+          1,
+          18,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          17,
+          2,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          2,
+          0,
+          1,
+          17,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          5,
+          1,
+          0,
+          19,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          24,
+          1,
+          0
+        ],
+        [
+          6,
+          0,
+          0,
+          0,
+          0,
+          1,
+          9,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          24
+        ]
+      ],
+      "resources": {
+        "fit_seconds": 0.338224,
+        "fit_cpu_seconds": 0.34375,
+        "peak_binarize_mb": 71.72964,
+        "peak_model_mb": 1.43821,
+        "size_kb": 20.394531,
+        "vocab_kb": 3.355469,
+        "latency_ms": 0.027971,
+        "throughput": 35751.927088
+      }
+    },
+    {
+      "name": "logistic_regression",
+      "cv_f1": [
+        0.908718,
+        0.957606,
+        0.963141,
+        0.961681,
+        0.97329
+      ],
+      "cv_mean": 0.952887,
+      "cv_std": 0.02268,
+      "test_f1": 0.971385,
+      "test_accuracy": 0.971098,
+      "repeat_f1": [
+        0.97774,
+        0.953352,
+        0.966358,
+        0.974326,
+        0.993243,
+        0.955465,
+        0.983213,
+        0.982101,
+        0.958703,
+        0.933393
+      ],
+      "repeat_mean": 0.96779,
+      "repeat_std": 0.016913,
+      "wild_f1": null,
+      "per_language_f1": {
+        "python": 0.913043,
+        "cpp": 0.97561,
+        "java": 0.947368,
+        "javascript": 0.976744,
+        "rust": 0.979592,
+        "go": 1.0,
+        "sql": 1.0,
+        "html": 0.978723
+      },
+      "confusion": [
+        [
+          21,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          20,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          0,
+          18,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          21,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          24,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          25,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          16,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          23
+        ]
+      ],
+      "resources": {
+        "fit_seconds": 0.400699,
+        "fit_cpu_seconds": 0.375,
+        "peak_binarize_mb": 71.72964,
+        "peak_model_mb": 4.053275,
+        "size_kb": 35.333984,
+        "vocab_kb": 3.355469,
+        "latency_ms": 0.032071,
+        "throughput": 31180.722086
+      }
+    },
+    {
+      "name": "linear_svm",
+      "cv_f1": [
+        0.91161,
+        0.957785,
+        0.949841,
+        0.949637,
+        0.962147
+      ],
+      "cv_mean": 0.946204,
+      "cv_std": 0.017945,
+      "test_f1": 0.964328,
+      "test_accuracy": 0.965318,
+      "repeat_f1": [
+        0.962193,
+        0.959409,
+        0.96583,
+        0.974326,
+        0.987205,
+        0.93937,
+        0.974193,
+        0.982078,
+        0.961816,
+        0.92307
+      ],
+      "repeat_mean": 0.962949,
+      "repeat_std": 0.018382,
+      "wild_f1": null,
+      "per_language_f1": {
+        "python": 0.909091,
+        "cpp": 0.97561,
+        "java": 0.947368,
+        "javascript": 0.954545,
+        "rust": 0.979592,
+        "go": 1.0,
+        "sql": 0.969697,
+        "html": 0.978723
+      },
+      "confusion": [
+        [
+          20,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          20,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          18,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          21,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          24,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          25,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          16,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          23
+        ]
+      ],
+      "resources": {
+        "fit_seconds": 0.372643,
+        "fit_cpu_seconds": 0.375,
+        "peak_binarize_mb": 71.72964,
+        "peak_model_mb": 2.734094,
+        "size_kb": 35.217773,
+        "vocab_kb": 3.355469,
+        "latency_ms": 0.031961,
+        "throughput": 31288.432222
+      }
+    },
+    {
+      "name": "random_forest",
+      "cv_f1": [
+        0.936264,
+        0.956292,
+        0.955847,
+        0.939978,
+        0.963486
+      ],
+      "cv_mean": 0.950374,
+      "cv_std": 0.010431,
+      "test_f1": 0.944474,
+      "test_accuracy": 0.947977,
+      "repeat_f1": [
+        0.977882,
+        0.960758,
+        0.966534,
+        0.961712,
+        0.975934,
+        0.974298,
+        0.961109,
+        0.961368,
+        0.954614,
+        0.965546
+      ],
+      "repeat_mean": 0.965976,
+      "repeat_std": 0.007281,
+      "wild_f1": null,
+      "per_language_f1": {
+        "python": 1.0,
+        "cpp": 0.952381,
+        "java": 0.842105,
+        "javascript": 0.909091,
+        "rust": 0.958333,
+        "go": 0.979592,
+        "sql": 0.914286,
+        "html": 1.0
+      },
+      "confusion": [
+        [
+          21,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          20,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          16,
+          2,
+          0,
+          0,
+          2,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          20,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          23,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          24,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          16,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          24
+        ]
+      ],
+      "resources": {
+        "fit_seconds": 0.625794,
+        "fit_cpu_seconds": 0.8125,
+        "peak_binarize_mb": 71.72964,
+        "peak_model_mb": 2.83874,
+        "size_kb": 6994.527344,
+        "vocab_kb": 3.355469,
+        "latency_ms": 0.245526,
+        "throughput": 4072.888216
+      }
+    }
+  ]
+}
