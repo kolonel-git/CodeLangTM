@@ -2,9 +2,9 @@
 
 ## Setup
 ```bash
-uv sync --extra tm --extra collect   # Python 3.12 venv, dev tools, TMU, collector
+uv sync --extra tm --extra collect --extra viz   # Python 3.12 venv, dev tools, TMU, collector, figures
 ```
-A plain `uv sync` removes the `tm` and `collect` extras again.
+A plain `uv sync` removes the `tm`, `collect` and `viz` extras again.
 
 ## Workflow
 - Branch from `main`: `feat/<topic>`, `fix/<topic>`.
@@ -12,7 +12,7 @@ A plain `uv sync` removes the `tm` and `collect` extras again.
 - Before PR: `uv run ruff check . && uv run pytest`.
 - One roadmap item per PR; link the issue (`Closes #N`). Issues belong to a milestone (M1-M7, see [docs/roadmap.md](docs/roadmap.md)).
 - Feature branches only; no direct commits to `main`. See [docs/github-setup.md](docs/github-setup.md).
-- Experiments: define them in `configs/*.yaml` (fixed seeds) and commit the generated reports (`docs/results.md`, `docs/ablations.md` and their `.json` sidecars); never edit generated reports by hand.
+- Experiments: define them in `configs/*.yaml` (fixed seeds) and commit the generated reports (`docs/results.md`, `docs/ablations.md` and their `.json` sidecars), then `uv run codelangtm report` for `docs/figures/`; never edit generated reports by hand. `docs/report.md` is hand-written: update its numbers when results change.
 - Log problems and their fixes in `docs/issues-and-fixes.md`, and session progress in `PROGRESS.md`.
 
 ## Data
