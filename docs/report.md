@@ -125,12 +125,13 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 ![TM training curves](figures/tm_curves.png)
 
-| TM setting | Epochs chosen | Held-out macro-F1 there | Best smoothed (epoch) | Naive Bayes, same folds |
+| TM setting | Epochs used (smoothed peak) | Held-out macro-F1 there | Where the curve levels off | Naive Bayes, same folds |
 | --- | --- | --- | --- | --- |
-| 400 clauses per language, T=100, s=5 | 19 | 0.946 | 0.951 (120) | 0.963 |
-| 100 clauses per language, T=30, s=3.5 | 44 | 0.928 | 0.933 (142) | 0.963 |
+| 400 clauses per language, T=100, s=5 | 120 | 0.951 | epoch 19 (0.946) | 0.963 |
+| 100 clauses per language, T=30, s=3.5 | 142 | 0.933 | epoch 44 (0.928) | 0.963 |
 
-- **Learning is fast, then flat.** The TM gets 99% of the training set right within 5 epochs, and the held-out score stops improving after about 20 epochs (400 clauses). Training longer adds at most 0.005, so the chosen epoch is the first point where the smoothed curve levels off, not the best single epoch, which would be partly luck.
+- **Learning is fast, then flat.** The TM gets 99% of the training set right within 5 epochs, and the held-out score levels off after about 20 epochs (400 clauses). Training on to the peak of the smoothed curve (epoch 120) adds about 0.005.
+- **Which epoch, and why it changed.** The rule fixed before the run was "first epoch where the smoothed curve levels off" (epochs 19 and 44). After seeing the curves, and before any test-set evaluation, we switched to the peak of the smoothed curve (epochs 120 and 142): about 6× the training time for about 0.005 more F1 on CV. Smoothing keeps a single lucky epoch from deciding. Because the rule was changed after seeing the CV curves, the CV scores at the chosen epoch are slightly optimistic; the test set and the repeated splits in the next step are the independent check.
 - **The TM trails Naive Bayes by about 1.5 points** (0.946-0.951 vs 0.963), and the training score of 1.000 against about 0.95 held out shows it fits the training data completely. This is the honest starting point for tuning in M4.
 - **One lucky seed misled the first experiment.** The throwaway spike (B1) measured 0.962 with seed 42, and chose the 400-clause setting on that basis. Averaged over seeds 1-5 the same setting gives 0.945-0.950 per seed; rerunning seed 42 with the final code reproduces 0.962, so the code is consistent and seed 42 was simply lucky (one fold scored 0.991). This is why every TM number is now a mean over 5 seeds ([issues-and-fixes M8](issues-and-fixes.md)).
 - **Clauses grow, then settle.** During training, clauses get longer (about 9 → 12.7 literals per clause with 400 clauses) and change less and less: from about 29,000 include decisions changing in the first epoch to under 100 per epoch near epoch 150.
@@ -142,7 +143,7 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 Planned content:
 
-- **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits, each TM number a mean over 5 seeds, with a corrected resampled t-test against Naive Bayes. Two TM sizes: 400 clauses per language (19 epochs) and the planned 100 (44 epochs, reference).
+- **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits, each TM number a mean over 5 seeds, with a corrected resampled t-test against Naive Bayes. Two TM sizes: 400 clauses per language (120 epochs) and the planned 100 (142 epochs, reference).
 - **Resources:** size (including the bit-packed clause size used by the C export), latency and memory.
 - **How the TM works inside:**
   - every learned clause, readable as a rule;
