@@ -22,7 +22,11 @@ features:
 curves:
   max_epochs: 150         # scan length
   smooth_window: 11       # centred moving average over epochs (per-epoch F1 is noisy, +/-0.02)
-  plateau_tolerance: 0.005   # chosen epoch = first where smoothed held-out F1 >= smoothed max - this
+  plateau_tolerance: 0.005   # plateau epoch = first where smoothed held-out F1 >= smoothed max - this
+  # Rule for `epochs`: "plateau" (first levelled-off epoch) or "max" (smoothed peak).
+  # Changed plateau -> max on 2026-09-28, after seeing the CV curves and before any test-set
+  # look (plateau gave 19 / 44 epochs; max trades ~6x training time for ~0.005 CV F1).
+  epoch_rule: max
 
 tm:
   tm_400:                 # main setting (B1 spike, CV only; option A)
@@ -30,10 +34,10 @@ tm:
     T: 100
     s: 5.0
     weighted_clauses: true
-    epochs: 19            # tm-curve 2026-09-27: plateau (smoothed 0.946; max 0.951 at 120)
+    epochs: 120           # tm-curve: smoothed peak 0.951 (levels off at 19 with 0.946)
   tm_100:                 # reference: the originally planned starting point
     n_clauses: 100
     T: 30
     s: 3.5
     weighted_clauses: true
-    epochs: 44            # tm-curve 2026-09-27: plateau (smoothed 0.928; max 0.933 at 142)
+    epochs: 142           # tm-curve: smoothed peak 0.933 (levels off at 44 with 0.928)

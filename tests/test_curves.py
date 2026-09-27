@@ -33,6 +33,14 @@ def test_choose_epoch_takes_start_of_plateau():
     assert epoch == 9  # zero tolerance = the maximum itself
 
 
+def test_choose_epoch_max_rule():
+    curve = [0.5, 0.9, 0.95, 0.94, 0.95]
+    assert cv.choose_epoch(curve, window=1, tolerance=0.1, rule="max")[0] == 3  # first peak
+    assert cv.choose_epoch(curve, window=1, tolerance=0.1, rule="plateau")[0] == 2
+    with pytest.raises(ValueError, match="unknown epoch rule"):
+        cv.choose_epoch(curve, 1, 0.0, rule="best")
+
+
 def test_choose_epoch_ignores_a_single_spike():
     curve = [0.80] * 10 + [0.99] + [0.80] * 10  # one lucky epoch
     epoch_raw, _ = cv.choose_epoch(curve, window=1, tolerance=0.005)
@@ -71,6 +79,7 @@ def test_parse_tm_valid():
         ({"tm": {}}, "config.tm"),
         ({"curves": {"smooth_window": 4}}, "must be odd"),
         ({"curves": {"plateau_tolerance": -1}}, ">= 0"),
+        ({"curves": {"epoch_rule": "best"}}, "epoch_rule"),
         ({"epochz": 3}, "unknown key"),
     ],
 )
@@ -175,6 +184,7 @@ def test_json_and_markdown(processed, curve_runs):
     assert len(s["runs"]) == 10 and s["n_clauses_total"] == 10 * 2
     sm = s["summary"]
     assert 1 <= sm["chosen_epoch"] <= 3 and len(sm["val_mean"]) == 3
+    assert sm["epoch_rule"] == "plateau" and sm["plateau_epoch"] == sm["chosen_epoch"]
     mean = np.mean([r["val_f1"] for r in s["runs"]], axis=0)
     assert np.allclose(sm["val_mean"], mean)
     md = cv.render_curves_md(json.loads(json.dumps(data)))

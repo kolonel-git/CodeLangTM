@@ -54,11 +54,16 @@ def moving_average(values: Sequence[float], window: int) -> np.ndarray:
 
 
 def choose_epoch(
-    mean_curve: Sequence[float], window: int, tolerance: float
+    mean_curve: Sequence[float], window: int, tolerance: float, rule: str = "plateau"
 ) -> tuple[int, np.ndarray]:
-    """(epoch, smoothed curve): the first epoch (1-based) whose smoothed F1 is within
-    `tolerance` of the smoothed maximum, i.e. where the curve has levelled off."""
+    """(epoch, smoothed curve), 1-based. Rule "plateau": the first epoch whose smoothed F1 is
+    within `tolerance` of the smoothed maximum (where the curve levels off). Rule "max": the
+    epoch of the smoothed maximum itself (first one on ties)."""
     smooth = moving_average(mean_curve, window)
+    if rule == "max":
+        return int(np.argmax(smooth)) + 1, smooth
+    if rule != "plateau":
+        raise ValueError(f"unknown epoch rule {rule!r}")
     target = smooth.max() - tolerance
     return int(np.argmax(smooth >= target)) + 1, smooth
 
@@ -140,7 +145,10 @@ def summarise(runs: list[CurveRun], curves: CurveConfig) -> dict:
     """Mean curves over all fold x seed runs, the chosen epoch and clause statistics."""
     val = np.asarray([r.val_f1 for r in runs])
     train = np.asarray([r.train_f1 for r in runs])
-    epoch, smooth = choose_epoch(val.mean(axis=0), curves.smooth_window, curves.plateau_tolerance)
+    mean = val.mean(axis=0)
+    epoch, smooth = choose_epoch(mean, curves.smooth_window, curves.plateau_tolerance,
+                                 curves.epoch_rule)  # fmt: skip
+    plateau, _ = choose_epoch(mean, curves.smooth_window, curves.plateau_tolerance, "plateau")
     peak = int(smooth.argmax()) + 1
     tail = min(TAIL, val.shape[1])
     # Spread across folds: average each fold's seeds first, then take the std over folds.
@@ -149,7 +157,10 @@ def summarise(runs: list[CurveRun], curves: CurveConfig) -> dict:
         by_fold.setdefault(r.fold, []).append(np.asarray(r.val_f1))
     fold_means = np.asarray([np.mean(v, axis=0) for _, v in sorted(by_fold.items())])
     return {
+        "epoch_rule": curves.epoch_rule,
         "chosen_epoch": epoch,
+        "plateau_epoch": plateau,
+        "smoothed_at_plateau": float(smooth[plateau - 1]),
         "smoothed_at_chosen": float(smooth[epoch - 1]),
         "smoothed_max": float(smooth.max()),
         "smoothed_max_epoch": peak,
@@ -214,16 +225,15 @@ def render_curves_md(data: dict) -> str:
         f"used); binarizer refit per fold; seeds {', '.join(map(str, meta['seeds']))}; "
         f"up to {curves['max_epochs']} epochs, macro-F1 on the held-out fold after every epoch",
         f"- Epoch rule: mean held-out F1 over all folds x seeds, centred moving average of "
-        f"{curves['smooth_window']} epochs, first epoch within "
-        f"{curves['plateau_tolerance']} of the smoothed maximum (where the curve levels off)",
+        f"{curves['smooth_window']} epochs; " + _rule_text(curves),
         "- Versions: " + ", ".join(f"{k} {v}" for k, v in meta["versions"].items())
         + f"; CPU: {meta['cpu']}",
         "",
         "## Recommendation",
         "",
-        "| Setting | Parameters | Chosen epoch | Smoothed F1 there | Smoothed max (epoch) "
-        f"| Mean of last {TAIL} epochs | Epoch time (s, median) |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Setting | Parameters | Chosen epoch | Smoothed F1 there | Plateau epoch (F1) "
+        f"| Smoothed max (epoch) | Mean of last {TAIL} epochs | Epoch time (s, median) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for name, s in data["settings"].items():
         sm = s["summary"]
@@ -231,6 +241,7 @@ def render_curves_md(data: dict) -> str:
         md.append(
             f"| **{name}** | {_fmt_params(s['params'])} | **{e}** | "
             f"{sm['smoothed_at_chosen']:.3f} | "
+            f"{sm['plateau_epoch']} ({sm['smoothed_at_plateau']:.3f}) | "
             f"{sm['smoothed_max']:.3f} ({sm['smoothed_max_epoch']}) | {sm['tail_mean']:.3f} | "
             f"{statistics.median(sm['epoch_seconds_median']):.3f} |"
         )
@@ -260,6 +271,14 @@ def render_curves_md(data: dict) -> str:
                 f"{sm['changed_mean'][i]:,.0f} |"
             )
     return "\n".join(md) + "\n"
+
+
+def _rule_text(curves: dict) -> str:
+    plateau = (f"plateau epoch = first within {curves['plateau_tolerance']} of the smoothed "
+               "maximum")  # fmt: skip
+    if curves.get("epoch_rule", "plateau") == "max":
+        return f"chosen epoch = the smoothed maximum (rule `max`); {plateau}, shown for reference"
+    return f"chosen epoch = {plateau} (rule `plateau`, where the curve levels off)"
 
 
 def summary_table(data: dict) -> str:
