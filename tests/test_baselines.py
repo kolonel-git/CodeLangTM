@@ -148,6 +148,47 @@ def test_render_results_md():
     assert "| c | 0.10 | 0.25 | 12.3 | 0.6 | 1 | 3.2 | 0.010 | 100,000 |" in md
 
 
+def test_composition_counts_snippets_and_repos(processed):
+    _, meta = run(processed, models=["naive_bayes"], repeats=0)
+    comp = meta["composition"]
+    assert set(comp) == {"train", "test", "wild"} and comp["wild"] == {}
+    for lang in LANGS:
+        # 10 repos x 3 snippets per language, split by repo
+        assert comp["train"][lang]["snippets"] + comp["test"][lang]["snippets"] == 30
+        assert comp["train"][lang]["repos"] + comp["test"][lang]["repos"] == 10
+        assert comp["test"][lang]["snippets"] == 3 * comp["test"][lang]["repos"]
+    assert sum(v["snippets"] for v in comp["train"].values()) == meta["n_train"]
+
+
+def test_json_sidecar_matches_results(processed, tmp_path):
+    results, meta = run(processed)
+    path = bl.write_json(bl.results_json(results, meta, LANGS), tmp_path / "results.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["schema"] == bl.RESULTS_SCHEMA and data["languages"] == list(LANGS)
+    assert data["best_by_cv"] == bl.best_by_cv(results).name
+    assert [m["name"] for m in data["models"]] == FAST
+    for got, r in zip(data["models"], results, strict=True):
+        assert got["cv_f1"] == pytest.approx(r.cv_f1, abs=1e-6)
+        assert got["cv_mean"] == pytest.approx(r.cv_mean, abs=1e-6)
+        assert got["test_f1"] == pytest.approx(r.test_f1, abs=1e-6)
+        assert got["repeat_f1"] == pytest.approx(r.repeat_f1, abs=1e-6)
+        assert got["confusion"] == r.confusion and got["wild_f1"] is None
+        assert got["per_language_f1"] == pytest.approx(r.per_language_f1, abs=1e-6)
+        assert got["resources"]["latency_ms"] == pytest.approx(r.latency_ms, abs=1e-6)
+        assert got["resources"]["size_kb"] == pytest.approx(r.size_kb, abs=1e-6)
+    assert data["meta"]["n_train"] == meta["n_train"]
+
+
+def test_write_json_rounds_and_is_stable(tmp_path):
+    data = {"a": 1 / 3, "b": (1, 2.0), "c": None, "d": {"x": [0.1234567891]}, "e": "±"}
+    path = bl.write_json(data, tmp_path / "sub" / "x.json")
+    text = path.read_text(encoding="utf-8")
+    assert json.loads(text) == {"a": 0.333333, "b": [1, 2.0], "c": None,
+                                "d": {"x": [0.123457]}, "e": "±"}  # fmt: skip
+    assert text.endswith("}\n") and bl.write_json(data, path).read_text(encoding="utf-8") == text
+    assert bl.sidecar_path("docs/results.md").as_posix() == "docs/results.json"
+
+
 def test_unknown_model_rejected(processed):
     with pytest.raises(ValueError, match="unknown model"):
         bl.run_baselines(processed, ["gpt"], languages=LANGS)
@@ -170,6 +211,8 @@ def test_cli(processed, tmp_path, capsys):
     assert main(args) == 0
     assert "best by CV: naive_bayes" in capsys.readouterr().out
     assert out.read_text(encoding="utf-8").startswith("# Results")
+    data = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    assert data["best_by_cv"] == "naive_bayes" and data["meta"]["config"]["hash"]
     assert main(["baselines", "--data", str(tmp_path / "none")]) == 1
 
 

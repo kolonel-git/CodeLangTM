@@ -107,6 +107,7 @@ def _diagnose(args: argparse.Namespace) -> int:
 
 def _ablate(args: argparse.Namespace) -> int:
     from . import ablations as ab
+    from .baselines import sidecar_path, write_json
     from .config import load_ablation_config
 
     def progress(i: int, n: int, features: object) -> None:
@@ -122,14 +123,23 @@ def _ablate(args: argparse.Namespace) -> int:
     out = args.out or cfg.out
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(ab.render_ablations_md(cfg, runs, meta), encoding="utf-8")
+    sidecar = write_json(ab.ablations_json(cfg, runs, meta), sidecar_path(out))
     print()
     print(ab.summary_table(cfg, runs))
-    print(f"\nwrote {out}")
+    print(f"\nwrote {out} and {sidecar}")
     return 0
 
 
 def _baselines(args: argparse.Namespace) -> int:
-    from .baselines import best_by_cv, render_results_md, run_baselines, summary_table
+    from .baselines import (
+        best_by_cv,
+        render_results_md,
+        results_json,
+        run_baselines,
+        sidecar_path,
+        summary_table,
+        write_json,
+    )
     from .config import BaselinesConfig, config_hash, load_baselines_config
 
     overrides = {
@@ -153,8 +163,9 @@ def _baselines(args: argparse.Namespace) -> int:
     }
     cfg.out.parent.mkdir(parents=True, exist_ok=True)
     cfg.out.write_text(render_results_md(results, meta), encoding="utf-8")
+    sidecar = write_json(results_json(results, meta), sidecar_path(cfg.out))
     print(summary_table(results))
-    print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {cfg.out}")
+    print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {cfg.out} and {sidecar}")
     return 0
 
 
