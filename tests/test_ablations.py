@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 
 import pytest
@@ -145,6 +146,39 @@ def test_render_markdown(processed):
     assert "setting" in ab.summary_table(cfg, runs)
 
 
+def test_json_sidecar_matches_runs(processed, tmp_path):
+    cfg = make_cfg(processed)
+    runs, meta = ab.run_ablations(cfg, LANGS)
+    data = json.loads(
+        bl.write_json(ab.ablations_json(cfg, runs, meta, LANGS), tmp_path / "a.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    settings = cfg.feature_settings()
+    assert [s["id"] for s in data["settings"]] == list(range(len(settings)))
+    assert data["base"] == 0 and data["settings"][0]["is_base"]
+    assert sum(s["is_base"] for s in data["settings"]) == 1
+    # base is shared by both studies but stored once; studies point at it by id
+    assert data["studies"] == [
+        {"name": "vocab", "varied": ["n_features"], "settings": [1, 0]},
+        {"name": "delims", "varied": ["use_delimiters"], "settings": [0, 2]},
+    ]
+    for entry, features in zip(data["settings"], settings, strict=True):
+        assert entry["label"] == ab.describe(features)
+        assert entry["features"]["n_features"] == features.n_features
+        for m in cfg.models:
+            run, got = runs[features, m], entry["models"][m]
+            assert got["cv_f1"] == pytest.approx(run.cv_f1, abs=1e-6)
+            assert got["cv_mean"] == pytest.approx(run.cv_mean, abs=1e-6)
+            assert got["delta_mean"] == pytest.approx(
+                ab.paired_delta(run, runs[cfg.base, m])[0], abs=1e-6
+            )
+            assert set(got["per_language_f1"]) == set(LANGS)
+    for m in cfg.models:
+        assert settings[data["best_by_cv"][m]] == ab.best_setting(runs, m).features
+    assert set(data["meta"]["composition"]["train"]) == set(LANGS)
+
+
 def test_cli(processed, tmp_path, capsys):
     out = tmp_path / "ablations.md"
     cfg = tmp_path / "abl.yaml"
@@ -159,6 +193,10 @@ def test_cli(processed, tmp_path, capsys):
     assert "[1/2]" in printed and f"wrote {out}" in printed
     md = out.read_text(encoding="utf-8")
     assert "## vocab" in md and "## delims" not in md
+    data = json.loads((tmp_path / "ablations.json").read_text(encoding="utf-8"))
+    assert data["schema"] == ab.ABLATIONS_SCHEMA and [s["name"] for s in data["studies"]] == [
+        "vocab"
+    ]
 
     assert main(["ablate", "--config", str(cfg), "--study", "nope"]) == 1
     assert "unknown study" in capsys.readouterr().err
