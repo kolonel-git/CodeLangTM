@@ -119,17 +119,30 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 ## 7. Tsetlin Machine
 
-*Full results come later in M3.* First measurements from a throwaway experiment (5 CV folds of train, test not used; details in [issues-and-fixes M8](issues-and-fixes.md)):
+*The full comparison with the baselines (test set, repeated splits, significance test) comes next in M3.* So far, all on CV folds of train (the test set has not been used for the TM):
 
-- **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.04 s.
-- **The planned starting setting falls short.** With 100 clauses per language it reaches about 0.93 macro-F1, 3 points below Naive Bayes on the same folds (0.963).
-- **More clauses close the gap.** With 400 clauses per language and a higher vote threshold T, the TM reaches about 0.96.
+**Training curves.** Each TM setting was trained on the 5 folds with 5 seeds each (25 runs), for up to 150 epochs, scoring the held-out fold after every epoch ([tm-curves.md](tm-curves.md)).
+
+![TM training curves](figures/tm_curves.png)
+
+| TM setting | Epochs chosen | Held-out macro-F1 there | Best smoothed (epoch) | Naive Bayes, same folds |
+| --- | --- | --- | --- | --- |
+| 400 clauses per language, T=100, s=5 | 19 | 0.946 | 0.951 (120) | 0.963 |
+| 100 clauses per language, T=30, s=3.5 | 44 | 0.928 | 0.933 (142) | 0.963 |
+
+- **Learning is fast, then flat.** The TM gets 99% of the training set right within 5 epochs, and the held-out score stops improving after about 20 epochs (400 clauses). Training longer adds at most 0.005, so the chosen epoch is the first point where the smoothed curve levels off, not the best single epoch, which would be partly luck.
+- **The TM trails Naive Bayes by about 1.5 points** (0.946-0.951 vs 0.963), and the training score of 1.000 against about 0.95 held out shows it fits the training data completely. This is the honest starting point for tuning in M4.
+- **One lucky seed misled the first experiment.** The throwaway spike (B1) measured 0.962 with seed 42, and chose the 400-clause setting on that basis. Averaged over seeds 1-5 the same setting gives 0.945-0.950 per seed; rerunning seed 42 with the final code reproduces 0.962, so the code is consistent and seed 42 was simply lucky (one fold scored 0.991). This is why every TM number is now a mean over 5 seeds ([issues-and-fixes M8](issues-and-fixes.md)).
+- **Clauses grow, then settle.** During training, clauses get longer (about 9 → 12.7 literals per clause with 400 clauses) and change less and less: from about 29,000 include decisions changing in the first epoch to under 100 per epoch near epoch 150.
+
+![How clauses form during training](figures/tm_clause_formation.png)
+
+- **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.05 s.
 - **Prediction can run without TMU.** A plain NumPy re-implementation gives exactly the same scores as TMU, and ran about twice as fast in a first measurement (0.03 vs 0.07 ms per snippet, one fold). A trained model is saved as one JSON file of about 160 KB and can be used and inspected without TMU installed.
 
 Planned content:
 
-- **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits, each TM number a mean over 5 seeds, with a paired significance test against Naive Bayes. Two TM sizes: 400 clauses per language (the accurate one) and the planned 100 (for reference).
-- **Training:** curves of macro-F1 per epoch, and how fast the model learns.
+- **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits, each TM number a mean over 5 seeds, with a corrected resampled t-test against Naive Bayes. Two TM sizes: 400 clauses per language (19 epochs) and the planned 100 (44 epochs, reference).
 - **Resources:** size (including the bit-packed clause size used by the C export), latency and memory.
 - **How the TM works inside:**
   - every learned clause, readable as a rule;

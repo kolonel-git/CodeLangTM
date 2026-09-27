@@ -63,14 +63,15 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 ## M3 — Tsetlin Machine training
 **Goal:** working TMU classifier with fair comparison, and every learned clause inspectable.
 
-**Plan:** branch `feat/report` (report infrastructure, done), then branch `feat/tm-training` (steps B1-B7 below, in order).
+**Plan:** branch `feat/report` (report infrastructure, done), then branch `feat/tm-training` (steps B1-B7 below). Order changed on 2026-09-27: B4 (training curves) runs before B3, so the full protocol run uses an epoch count chosen on CV.
 
 - [x] Results report: JSON sidecars for generated reports, deterministic figures (`figures.py`, `codelangtm report` → `docs/figures/`), hand-written [report.md](report.md) (branch `feat/report`)
 - [x] Verify TMU install: TMU 0.8.3 builds natively on Windows with `numpy<2` (see [architecture.md](architecture.md) install notes); CUDA optional
-- [x] B1 spike (not committed): 0.03-0.04 s/epoch; NumPy prediction matches TMU exactly (empty clauses output 0); planned N_c=100/T=30/s=3.5 reaches ~0.93 CV, N_c=400/T=100/s=5 ~0.96 ([issues-and-fixes](issues-and-fixes.md) M8)
+- [x] B1 spike (not committed): 0.03-0.04 s/epoch; NumPy prediction matches TMU exactly (empty clauses output 0); planned N_c=100/T=30/s=3.5 reaches ~0.93 CV, N_c=400/T=100/s=5 0.962 with seed 42, which B4 showed to be a lucky seed (0.948 over seeds 1-5; [issues-and-fixes](issues-and-fixes.md) M8)
 - [x] B2 `TMLanguageClassifier` (scikit-learn estimator: fit/partial_fit/predict/decision_function) + TMU-free NumPy `TMState` (predict, save/load in a documented, portable format that the C export and the web demo can read) with tests
-- [ ] B3 `TMConfig` + `configs/tm.yaml`; main run N_c=400, T=100, s=5 (from B1, CV only) plus the planned N_c=100, T=30, s=3.5 as a reference row, through the same CV / test / repeated-split protocol, each over 5 seeds (mean ± std), with a paired significance test against Naive Bayes on the same folds → `docs/tm-results.md` + `.json` (raw per-seed runs included)
-- [ ] B4 training curves (macro-F1 vs epoch, train and held-out folds; epoch chosen without test data); B4b `codelangtm tm-train` saves the final model (`models/`, gitignored)
+- [ ] B3 (after B4) main run N_c=400, T=100, s=5 (from B1, CV only) plus the planned N_c=100, T=30, s=3.5 as a reference row, through the same CV / test / repeated-split protocol, each over 5 seeds (mean ± std), with a paired significance test against Naive Bayes on the same folds (Nadeau-Bengio corrected resampled t-test) → `docs/tm-results.md` + `.json` (raw per-seed runs included)
+- [x] B4 `TMConfig` + `configs/tm.yaml`; `codelangtm tm-curve`: training curves (macro-F1 vs epoch on held-out folds and train, 5 folds x 5 seeds, up to 150 epochs, clause formation per epoch); epoch = first where the 11-epoch smoothed held-out curve is within 0.005 of its maximum (no test data) → `docs/tm-curves.md` + `.json` + figures. Result: 400 clauses → 19 epochs (held-out 0.946, best smoothed 0.951), 100 clauses → 44 epochs (0.928); Naive Bayes 0.963 on the same folds
+- [ ] B4b `codelangtm tm-train` saves the final model (`models/`, gitignored)
 - [ ] B5 resource comparison, same protocol for every model (baselines already report the first block in [results.md](results.md)):
   - training: wall time, CPU time, peak memory (Python heap for baselines; process-level peak RSS, measured in a subprocess, for both baselines and the TM, since TMU allocates in C), epochs to converge;
   - model: size in KB (pickled, and for the TM also the bit-packed clause size that the C export will use), vocabulary size, number of clauses and average literals per clause (TM) or non-zero weights (linear models);
