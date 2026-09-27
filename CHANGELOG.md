@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- `TMLanguageClassifier` (`model.py`): Tsetlin Machine as a scikit-learn estimator (`fit`, `partial_fit`, `predict`, `decision_function`, `predict_tmu`), TMU imported lazily and without its pycuda noise.
+- `TMState`: trained TM as NumPy arrays, predictions identical to TMU's; one-file JSON model format `codelangtm.tm/1` with `save_model`, `save_pipeline`, `load_model` (documented in `docs/architecture.md`).
+- `Binarizer.to_dict` / `Binarizer.from_dict` (used by the model file; `save`/`load` unchanged).
 - Project scaffold: package layout, binarizer, CLI stub, CI, docs.
 - `Snippet` schema with JSONL I/O (`data.py`).
 - Line-window extractor with low-signal filter (`windows.py`).
@@ -27,6 +30,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Documentation link check (`tests/test_docs.py`): relative links, images and anchors in all markdown must resolve.
 - Report figures (`figures.py`): 8 deterministic PNGs drawn from the JSON sidecars (dataset, baselines, per-language F1, confusion, resources, ablations).
 - Optional `viz` extra (matplotlib) for figures and the report; `docs/figures/` for generated plots.
+
+### Fixed
+- Pickling a `Binarizer` or `TMLanguageClassifier` no longer modifies the original object (Python 3.11+ `__getstate__` returns the live dict).
 
 ### Changed
 - CI installs the `tm` and `viz` extras so TM and figure tests run in CI.

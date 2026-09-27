@@ -3,7 +3,7 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-27
-**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1 spike done, B2 next)
+**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B2 done, B3 next)
 **Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B started (B1 spike: the TM reaches ~0.96 CV with 400 clauses per language)
 
 ## Milestone overview
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1 done |
+| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B2 done |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -28,7 +28,8 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - [x] B1 spike: timing, NumPy-vs-TMU equivalence, first CV numbers (issues-and-fixes M8)
 - [x] B3 main TM setting chosen: N_c=400, T=100, s=5 (planned 100/30/3.5 kept as a reference row)
 - [x] Direction agreed (see done log 2026-09-27): portfolio + later research write-up, research-ready rigor, Stage B after M3, CLI + C runtime + web demo, concepts guide
-- [ ] M3 branch B `feat/tm-training`: B2 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
+- [x] B2 `TMLanguageClassifier`, `TMState`, JSON model file
+- [ ] M3 branch B `feat/tm-training`: B3 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison (5 seeds, paired significance test)
 - [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
@@ -36,6 +37,25 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-27 — M3 branch B, B2: TM classifier and TMU-free model
+- Choices (asked at the start of the step): sparse JSON model file; one bundled file (vocabulary + clauses + metadata); simple NumPy matrix inference, with speed left to the C runtime (M6).
+- `TMLanguageClassifier` (`model.py`): scikit-learn estimator over the binary features.
+  - `fit` trains `epochs` epochs from scratch; `partial_fit` adds one epoch (for the B4 curves); `decision_function` returns TMU's class sums; `predict_tmu` calls TMU for comparison.
+  - Labels are encoded and checked (unknown labels rejected); TMU is imported only on training, without its pycuda traceback (E5).
+  - Defaults: N_c=400, T=100, s=5, weighted clauses, 50 epochs (B4 sets epochs), seed 1.
+- `TMState`: the trained model as arrays (clause → class, weight, included literal ids in CSR layout, empty clauses kept). One matrix product decides which clauses fire. `save_model` / `save_pipeline` / `load_model` write and read the one-file JSON format `codelangtm.tm/1` (documented in architecture); `TrainedModel.predict(texts)` goes from raw code to language without TMU.
+- Real-data check (fold 0, 20 epochs): predictions and class sums identical to TMU; pickle and JSON round trips identical; JSON model 159 KB (3,200 clauses, 36,474 included literals, 52 empty); NumPy predict 0.031 vs TMU 0.070 ms/snippet (single run).
+- Problems found and fixed:
+  - **Pickling stripped the live model** (Python 3.11+ `__getstate__` returns the live dict; W6). `Binarizer` had the same pattern.
+  - **TMU hangs forever with `seed=0`** (all-zero xorshift128+ state; E6). Seeds must now be >= 1.
+  - TMU's own NumPy deprecation warnings are filtered in pytest (for `tmu.*` modules only).
+- Tests: 279 passing (19 new in `tests/test_model.py`). They cover:
+  - hand-built clauses with known answers (empty clauses, negated literals, ties);
+  - NumPy vs TMU equality on a trained model (a mutation that lets empty clauses fire breaks it);
+  - same seed → same model; `partial_fit` × 2 equals `fit` with 2 epochs;
+  - pickling; JSON round trip and validation; pipeline + clone;
+  - quiet TMU import; install hint without TMU.
 
 ### 2026-09-27 — Direction agreed, B3 setting chosen, concepts guide
 - Branch `feat/tm-training` created from the updated `main`; B1 findings committed.

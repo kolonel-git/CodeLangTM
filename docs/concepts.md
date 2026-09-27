@@ -42,7 +42,8 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 - **T (threshold):** roughly the number of votes after which a language counts as "confident enough". Once its class sum reaches T, feedback for that example fades. More clauses need a larger T.
 - **s (specificity):** controls how easily literals are dropped. A larger s gives longer, more specific clauses.
 - **Epoch:** one pass over all training snippets. The TM trains for many epochs.
-- **Seed:** the starting value of the random number generator. Training uses randomness, so the same seed reproduces the same model, and different seeds show how much results depend on luck.
+- **Model file:** the trained TM saved as one JSON file: the feature vocabulary, every clause (its included literals and weight) and metadata. Anything that can read JSON can use it to classify code, with no machine-learning library.
+- **Seed:** the starting value of the random number generator. Training uses randomness, so the same seed reproduces the same model, and different seeds show how much results depend on luck. (TMU needs a seed of at least 1: with 0 its random number generator gets stuck.)
 
 ## Measuring quality
 
@@ -65,6 +66,7 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 
 ## Experiments and noise
 
+- **Estimator / pipeline:** scikit-learn's common interface: every model has `fit` (learn) and `predict`. A *pipeline* chains steps, here binarizer → classifier, so the whole chain is trained and evaluated as one model. Because the TM follows the same interface, the same evaluation code runs for every model.
 - **Baseline:** a standard model used as a yardstick. Here: Naive Bayes, logistic regression, linear SVM, decision tree and random forest, all on exactly the TM's features.
 - **Ablation:** change one design option, keep everything else fixed, and measure the effect.
 - **Paired difference (Δ):** compare two settings on the *same* folds and look at the per-fold differences. Some folds are harder than others; pairing cancels that out.
