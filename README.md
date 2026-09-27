@@ -16,6 +16,8 @@ python = has("def ") AND has(":") AND NOT has(";")
 - **Explainable** — every prediction traces to human-readable clauses.
 - **Tiny** — no weight matrices; target < 500 KB.
 
+Planned deliverables: a `codelangtm predict` CLI, a zero-dependency C runtime and a web demo that shows the clauses behind each prediction. The project is a portfolio piece, written so it can later become a research write-up (multi-seed results, significance tests, saved raw runs).
+
 ## Pipeline
 
 ```
@@ -54,7 +56,7 @@ uv run codelangtm report                                          # docs/figures
 
 ## Status
 
-Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with figures. Full plan in [docs/roadmap.md](docs/roadmap.md).
+Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with figures; new to Tsetlin Machines or the evaluation terms? Start with the [concepts guide](docs/concepts.md). Full plan in [docs/roadmap.md](docs/roadmap.md).
 
 | Milestone | Status |
 | --- | --- |

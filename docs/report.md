@@ -2,6 +2,8 @@
 
 A readable account of the project so far: what we are building, the data, how models are evaluated, what the classical baselines achieve, which feature choices mattered, and what the Tsetlin Machine (TM) has to match.
 
+New to the terms used here (clauses, T and s, macro-F1, CV, ablation)? See the [concepts guide](concepts.md).
+
 *Hand-written narrative.* The exact numbers live in generated files ([results.md](results.md), [ablations.md](ablations.md) and their `.json` twins). The figures are regenerated with `uv run codelangtm report`. Last updated 2026-09-27 (dataset v5, frozen features, before any TM training).
 
 **Contents:** [1 Goal](#1-goal-and-approach) · [2 Data](#2-data) · [3 Evaluation](#3-how-models-are-evaluated) · [4 Baselines](#4-baselines-the-bar-for-the-tm) · [5 Feature ablations](#5-feature-ablations-what-mattered) · [6 Resources](#6-resources) · [7 Tsetlin Machine](#7-tsetlin-machine) · [8 Limitations](#8-limitations) · [9 Reproduce](#9-reproduce)
@@ -126,7 +128,7 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 Planned content:
 
-- **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits.
+- **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits, each TM number a mean over 5 seeds, with a paired significance test against Naive Bayes. Two TM sizes: 400 clauses per language (the accurate one) and the planned 100 (for reference).
 - **Training:** curves of macro-F1 per epoch, and how fast the model learns.
 - **Resources:** size (including the bit-packed clause size used by the C export), latency and memory.
 - **How the TM works inside:**
