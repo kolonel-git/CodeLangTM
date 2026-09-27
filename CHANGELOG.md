@@ -23,6 +23,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - `Binarizer` options `selection` (`frequency`, `chi2`, `class_balanced`), `min_df` and `word_tokens` (whole identifier/keyword features, shown as `word:NAME`); configurable in YAML. Defaults keep the previous behaviour.
 - Resource metrics in `docs/results.md` for every model: fit CPU time, peak memory (binarizer and classifier separately), size split into vocabulary and classifier, throughput.
 
+- JSON sidecars for generated reports: `codelangtm baselines` writes `results.json` and `codelangtm ablate` writes `ablations.json` next to the markdown (same runs, machine-readable). Report metadata now includes per-language dataset composition (snippets and repos per split).
 - Optional `viz` extra (matplotlib) for figures and the report; `docs/figures/` for generated plots.
 
 ### Changed
