@@ -144,10 +144,16 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Environment
 
+### E6. TMU training hangs forever with `seed=0`
+- **Symptom:** while writing B2's tests, a tiny TM (4 clauses, 3 classes) never finished its first epoch. Any clause count or T hung the same way, yet the same model trained in 0.05 s in other tests.
+- **Cause found by elimination:** the difference was the seed. `seed=0` hangs; 1 and 42 do not. TMU passes the seed to `lib.pcg32_seed` and `lib.xorshift128p_seed` in its C code. A xorshift128+ generator whose state is all zeros returns 0 forever, and a TMU loop that draws random numbers until a condition holds then never ends. That mechanism is inferred from the source and the behaviour (the compiled C was not stepped through); the trigger, seed 0, is confirmed.
+- **Fix:** `TMLanguageClassifier` rejects seeds below 1 (and non-integers) with a clear message; the default seed is 1. Seeds for multi-seed runs start at 1. Test: seeds 0, -1, 1.5 and `True` are rejected before TMU is touched.
+- **Lesson:** the B1 spike used seed 42 and never met this; a test suite with small, fast models surfaced it.
+
 ### E5. TMU prints a pycuda traceback on import
 - **Symptom:** importing `tmu.models.classification` logs a WARNING and an ERROR with a full `No module named 'pycuda'` traceback.
 - **Root cause:** TMU tries to load its CUDA backend at import and logs the failure with `_LOGGER.exception`. Harmless: the CPU backend works.
-- **Fix (planned for B2):** raise the level of the `tmu.clause_bank.clause_bank_cuda` and `tmu.util.cuda_profiler` loggers before importing TMU, so real errors still show.
+- **Fix (B2):** raise the level of the `tmu.clause_bank.clause_bank_cuda` and `tmu.util.cuda_profiler` loggers before importing TMU, so real errors still show.
 
 ### E4. `uv sync` removed TMU
 - **Symptom:** after a plain `uv sync`, TMU disappeared from the venv.
@@ -170,6 +176,11 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 ---
 
 ## Tooling & workflow
+
+### W6. Pickling a model silently stripped it (fixed before commit)
+- **Symptom:** B2 smoke test: after `pickle.dumps(pipeline)`, calling `predict_tmu` on the *original* model failed with "not fitted".
+- **Root cause:** `__getstate__` removed the TMU object from the state dict. Since Python 3.11, `object.__getstate__()` (which scikit-learn's `BaseEstimator.__getstate__` calls) can return the object's **live** `__dict__`, not a copy, so the removal hit the model itself. `Binarizer.__getstate__` had the same pattern (harmless there: it only drops a cache that is rebuilt on demand).
+- **Fix:** both copy the dict first (`dict(super().__getstate__())`). Regression test: after pickling, the original still has its TMU object and keeps training; the unpickled copy predicts identically and refuses to train with a clear message.
 
 ### W5. Keeping figure files stable in git
 - **Goal:** redrawing a figure from the same sidecar must give the same bytes, on this machine and in CI, so regenerated PNGs only show up in git when the numbers change.
