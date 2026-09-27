@@ -275,7 +275,7 @@ class Binarizer(BaseEstimator, TransformerMixin):
         return cached
 
     def __getstate__(self) -> dict:
-        state = super().__getstate__()
+        state = dict(super().__getstate__())  # may be the live __dict__ (Python 3.11+): copy
         state.pop("_lookup_cache", None)  # derived from vocabulary_; keeps pickles small
         return state
 
@@ -297,20 +297,29 @@ class Binarizer(BaseEstimator, TransformerMixin):
         check_is_fitted(self, "vocabulary_")
         return np.asarray([feature_name(t) for t in self.vocabulary_], dtype=object)
 
-    def save(self, path: str | Path) -> None:
+    def to_dict(self) -> dict:
+        """JSON-safe options + fitted vocabulary (also embedded in saved TM models)."""
         check_is_fitted(self, "vocabulary_")
         data = {**self.get_params(), "vocabulary": self.vocabulary_}
         data["ngram_sizes"] = list(self.ngram_sizes)
-        Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        return data
 
     @classmethod
-    def load(cls, path: str | Path) -> Binarizer:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    def from_dict(cls, data: dict) -> Binarizer:
+        data = dict(data)
         vocabulary = data.pop("vocabulary")
         data["ngram_sizes"] = tuple(data["ngram_sizes"])
         b = cls(**data)
-        b.vocabulary_ = vocabulary
+        b.vocabulary_ = list(vocabulary)
         return b
+
+    def save(self, path: str | Path) -> None:
+        text = json.dumps(self.to_dict(), ensure_ascii=False, indent=1)
+        Path(path).write_text(text, encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: str | Path) -> Binarizer:
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
 
 def expand_literals(x: np.ndarray) -> np.ndarray:

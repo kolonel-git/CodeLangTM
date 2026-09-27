@@ -50,6 +50,8 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# TMU 0.8 converts -1 to uint32 internally (NumPy deprecation, issues-and-fixes E3); not our code.
+filterwarnings = ["ignore::DeprecationWarning:tmu.*"]
 
 [tool.mypy]
 python_version = "3.12"
