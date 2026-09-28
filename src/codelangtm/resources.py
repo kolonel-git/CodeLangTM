@@ -68,10 +68,14 @@ def memory_mb() -> tuple[float, float]:
     current_mb = peak_mb
     status = Path("/proc/self/status")
     if status.exists():
+        # Linux: read current (VmRSS) and peak (VmHWM) from the same snapshot. ru_maxrss is
+        # updated lazily by the kernel and can lag behind VmRSS (issues-and-fixes W7).
         for line in status.read_text().splitlines():
             if line.startswith("VmRSS:"):
                 current_mb = int(line.split()[1]) / 1024
-    return current_mb, peak_mb
+            elif line.startswith("VmHWM:"):
+                peak_mb = int(line.split()[1]) / 1024
+    return current_mb, max(peak_mb, current_mb)
 
 
 # ------------------------------------------------------------------ worker jobs (child process)

@@ -23,6 +23,26 @@ def test_memory_is_measured_and_grows():
     del blob
 
 
+def test_linux_peak_comes_from_the_same_snapshot(monkeypatch, tmp_path):
+    # Simulates CI: getrusage lags behind; the peak must come from VmHWM, never below current.
+    # A fake `resource` module, so this also runs on Windows (which has no such module).
+    import sys
+    import types
+
+    fake = types.ModuleType("resource")
+    fake.RUSAGE_SELF = 0
+    fake.getrusage = lambda _who: types.SimpleNamespace(ru_maxrss=300000)  # lagging, in KB
+    monkeypatch.setitem(sys.modules, "resource", fake)
+    status = tmp_path / "status"
+    status.write_text("Name:\tpython\nVmHWM:\t  330000 kB\nVmRSS:\t  326000 kB\n")
+    monkeypatch.setattr(rs.sys, "platform", "linux")
+    monkeypatch.setattr(rs, "Path", lambda p: status if p == "/proc/self/status" else p)
+    current, peak = rs.memory_mb()
+    assert current == 326000 / 1024 and peak == 330000 / 1024
+    status.write_text("VmRSS:\t  326000 kB\n")  # no VmHWM line: fall back, but never below current
+    assert rs.memory_mb() == (326000 / 1024, 326000 / 1024)
+
+
 def py_text(tag):
     return "".join(f"def f_{tag}_{j}(x):\n    return x + len('{tag}') * {j}\n" for j in range(12))
 

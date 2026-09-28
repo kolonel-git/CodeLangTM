@@ -41,6 +41,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Optional `viz` extra (matplotlib) for figures and the report; `docs/figures/` for generated plots.
 
 ### Fixed
+- `resources.memory_mb` on Linux: the peak now comes from the same `/proc/self/status` snapshot as the current value (`VmHWM`), since `getrusage`'s lazily updated peak could be below the current value and failed CI after PR #7; the peak is never reported below the current value.
 - Pickling a `Binarizer` or `TMLanguageClassifier` no longer modifies the original object (Python 3.11+ `__getstate__` returns the live dict).
 
 ### Changed
