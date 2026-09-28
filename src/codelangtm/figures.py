@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -519,6 +520,85 @@ def tm_clause_formation(curves: dict) -> object:
     return _draw(draw)
 
 
+# --------------------------------------------------------- tm-results.json figures
+
+
+def _tm_rows(tm_results: dict) -> list[dict]:
+    """Baselines then TM settings as dicts: CV, repeated test and test scores with spreads."""
+    rows = []
+    for b in tm_results["baselines"]:
+        rows.append(dict(name=_label(b["name"]), cv=b["cv_mean"], cv_err=b["cv_std"],
+                         rep=b["repeat_mean"], rep_err=b["repeat_std"], test=b["test_f1"],
+                         test_lo=b["test_f1"], test_hi=b["test_f1"]))  # fmt: skip
+    for name, t in tm_results["tm"].items():
+        a = t["aggregate"]
+        rows.append(dict(name=f"{name} (TM)", cv=a["cv_mean"], cv_err=a["cv_std_folds"],
+                         rep=a.get("repeat_mean"), rep_err=a.get("repeat_std_splits"),
+                         test=a["test_mean"], test_lo=a["test_min"],
+                         test_hi=a["test_max"]))  # fmt: skip
+    return rows
+
+
+def tm_comparison(tm_results: dict) -> object:
+    """TM settings beside the baselines: CV, repeated test, single test (TM: range over seeds)."""
+
+    def draw():
+        rows = _tm_rows(tm_results)[::-1]
+        fig, (ax,) = _new_figure(6.4, 0.55 * len(rows) + 1.5)
+        y = list(range(len(rows)))
+        ax.errorbar([r["cv"] for r in rows], [i + 0.15 for i in y],
+                    xerr=[r["cv_err"] for r in rows], fmt=MARKERS[0], color=SERIES[0], ms=6,
+                    capsize=3, lw=1.5, label="CV, mean ± std over folds")  # fmt: skip
+        rep = [(i, r) for i, r in zip(y, rows, strict=True) if r["rep"] is not None]
+        if rep:
+            ax.errorbar([r["rep"] for _, r in rep], [i - 0.15 for i, _ in rep],
+                        xerr=[r["rep_err"] for _, r in rep], fmt=MARKERS[1], color=SERIES[1],
+                        ms=6, capsize=3, lw=1.5, label="repeated test, mean ± std")  # fmt: skip
+        for i, r in zip(y, rows, strict=True):
+            if r["test_hi"] > r["test_lo"]:
+                ax.plot([r["test_lo"], r["test_hi"]], [i, i], color=INK_2, lw=1, alpha=0.6)
+        ax.scatter([r["test"] for r in rows], y, marker="|", s=120, color=INK_2, zorder=3,
+                   label="single test (TM: mean, line = range over seeds)")  # fmt: skip
+        ax.axvline(TARGET_F1, color=MUTED, lw=1)
+        ax.text(TARGET_F1, len(rows) - 0.45, f" target {TARGET_F1}", color=MUTED, fontsize=8,
+                va="bottom")  # fmt: skip
+        ax.set_yticks(y, [r["name"] for r in rows])
+        ax.set_ylim(-0.6, len(rows) - 0.1)
+        ax.grid(axis="y", visible=False)
+        ax.set_xlabel("macro-F1")
+        seeds = len(next(iter(tm_results["tm"].values()))["seeds"]) if tm_results["tm"] else 0
+        ax.set_title(f"TM vs baselines, same splits (TM: mean over {seeds} seeds)")
+        ax.legend(loc="upper left", bbox_to_anchor=(0, -0.2), ncols=1)
+        return fig
+
+    return _draw(draw)
+
+
+def tm_per_language(tm_results: dict) -> object:
+    """Test F1 per language: baselines and TM settings (TM averaged over seeds)."""
+
+    def draw():
+        langs = tm_results["languages"]
+        names, values = [], []
+        for b in tm_results["baselines"]:
+            names.append(_label(b["name"]))
+            values.append([b["per_language_f1"][g] for g in langs])
+        for name, t in tm_results["tm"].items():
+            names.append(f"{name} (TM)")
+            values.append([t["aggregate"]["per_language_f1"][g] for g in langs])
+        # All scores here are high: start the scale just below the lowest one so differences
+        # between strong models stay visible (the printed values are exact either way).
+        low = min(min(row) for row in values)
+        vmin = math.floor((low - 0.05) * 10) / 10
+        fig, (ax,) = _new_figure(6.4, 0.42 * len(names) + 1.5)
+        image = _heatmap(ax, values, names, langs, vmin, 1.0, ".2f")
+        fig.colorbar(image, ax=ax, shrink=0.8, label="test F1").outline.set_visible(False)
+        ax.set_title("Test F1 per language: TM vs baselines")
+        return fig
+
+    return _draw(draw)
+
+
 # ------------------------------------------------------------------------ all figures
 
 RESULTS_FIGURES: dict[str, Callable[[dict], object]] = {
@@ -532,6 +612,10 @@ ABLATION_FIGURES: dict[str, Callable[[dict], object]] = {
     "ablation_vocabulary": ablation_vocabulary,
     "ablation_ngrams": ablation_ngrams,
     "ablation_deltas": ablation_deltas,
+}
+TM_RESULT_FIGURES: dict[str, Callable[[dict], object]] = {
+    "tm_comparison": tm_comparison,
+    "tm_per_language": tm_per_language,
 }
 CURVE_FIGURES: dict[str, Callable[[dict], object]] = {
     "tm_curves": tm_curves,
@@ -554,6 +638,7 @@ def render_all(
     ablations_path: str | Path | None,
     out_dir: str | Path,
     curves_path: str | Path | None = None,
+    tm_results_path: str | Path | None = None,
 ) -> list[Path]:
     """Draw every figure whose sidecar is given; returns the written PNG paths."""
     _mpl()  # fail early with the install hint
@@ -565,6 +650,8 @@ def render_all(
         jobs.append((load_sidecar(ablations_path, "codelangtm.ablations/"), ABLATION_FIGURES))
     if curves_path:
         jobs.append((load_sidecar(curves_path, "codelangtm.tm-curves/"), CURVE_FIGURES))
+    if tm_results_path:
+        jobs.append((load_sidecar(tm_results_path, "codelangtm.tm-results/"), TM_RESULT_FIGURES))
     for data, figures in jobs:
         for name, fn in figures.items():
             written.append(save_png(fn(data), Path(out_dir) / f"{name}.png"))

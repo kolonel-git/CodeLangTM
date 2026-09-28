@@ -90,7 +90,25 @@ def _build_parser() -> argparse.ArgumentParser:
         "--curves", type=Path, default=Path("docs/tm-curves.json"),
         help="TM training curves sidecar (skipped if the file does not exist)",
     )  # fmt: skip
+    rep.add_argument(
+        "--tm-results", type=Path, default=Path("docs/tm-results.json"),
+        help="TM results sidecar (skipped if the file does not exist)",
+    )  # fmt: skip
     rep.add_argument("--out", type=Path, default=Path("docs/figures"))
+
+    tmr = sub.add_parser(
+        "tm-results", help="TM vs baselines: full protocol per seed + significance tests"
+    )
+    tmr.add_argument("--config", type=Path, default=Path("configs/tm.yaml"))
+    tmr.add_argument(
+        "--setting", action="append", help="TM setting from the config (repeatable; default: all)"
+    )
+    tmr.add_argument("--out", type=Path, help="default: the config's `out`")
+    tmr.add_argument(
+        "--models-dir", type=Path, default=Path("models"),
+        help="where the final models (one JSON per setting x seed) are saved (gitignored)",
+    )  # fmt: skip
+    tmr.add_argument("--no-save-models", action="store_true")
 
     curve = sub.add_parser(
         "tm-curve", help="TM training curves on CV folds (train only); recommends the epoch count"
@@ -128,17 +146,47 @@ def _diagnose(args: argparse.Namespace) -> int:
 def _report(args: argparse.Namespace) -> int:
     from .figures import render_all
 
-    curves = args.curves if args.curves and args.curves.exists() else None
-    if args.curves and curves is None:
-        print(f"note: {args.curves.as_posix()} not found, skipping TM curve figures")
+    optional = {}
+    for key, label in (("curves", "TM curve"), ("tm_results", "TM result")):
+        path = getattr(args, key)
+        optional[key] = path if path and path.exists() else None
+        if path and optional[key] is None:
+            print(f"note: {path.as_posix()} not found, skipping {label} figures")
     try:
-        written = render_all(args.results, args.ablations, args.out, curves)
+        written = render_all(args.results, args.ablations, args.out, optional["curves"],
+                             optional["tm_results"])  # fmt: skip
     except (FileNotFoundError, ValueError, ImportError) as e:
         print(f"report failed: {e}", file=sys.stderr)
         return 1
     for path in written:
         print(f"wrote {path.as_posix()}")
     print("narrative: docs/report.md (hand-written; update its numbers if the results changed)")
+    return 0
+
+
+def _tm_results(args: argparse.Namespace) -> int:
+    from .baselines import sidecar_path, write_json
+    from .config import load_tm_config
+    from .tm_results import render_tm_results_md, run_tm_results, summary_table, tm_results_json
+
+    try:
+        cfg = load_tm_config(args.config)
+        models_dir = None if args.no_save_models else args.models_dir
+        baselines, entries, meta = run_tm_results(
+            cfg, args.setting, models_dir=models_dir, progress=lambda m: print(m, flush=True)
+        )
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"tm-results failed: {e}", file=sys.stderr)
+        return 1
+    meta["config_path"] = args.config.as_posix()
+    data = tm_results_json(cfg, baselines, entries, meta)
+    out = args.out or cfg.out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_tm_results_md(data), encoding="utf-8")
+    sidecar = write_json(data, sidecar_path(out))
+    print()
+    print(summary_table(data))
+    print(f"\nwrote {out} and {sidecar}")
     return 0
 
 
@@ -321,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
         return _report(args)
     if args.command == "tm-curve":
         return _tm_curve(args)
+    if args.command == "tm-results":
+        return _tm_results(args)
     if args.command == "diagnose":
         return _diagnose(args)
     parser.print_help()
