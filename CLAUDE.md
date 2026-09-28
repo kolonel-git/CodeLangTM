@@ -12,12 +12,13 @@ Tsetlin Machine (TMU) classifier that identifies a snippet's programming languag
 - `uv run codelangtm diagnose` — confident-learning label issues + shortcut probe → data/processed/diagnostics.md
 - `uv run codelangtm ablate [--study NAME]` — feature ablations from configs/ablations.yaml → docs/ablations.md + ablations.json (CV only)
 - `uv run codelangtm tm-curve [--setting NAME]` — TM training curves on CV folds from configs/tm.yaml → docs/tm-curves.md + tm-curves.json (recommends `epochs`)
+- `uv run codelangtm tm-results [--setting NAME]` — TM vs baselines: full protocol per seed + corrected t-tests → docs/tm-results.md + .json, final models → models/ (gitignored; ~25 min)
 - `uv run codelangtm report` — figures from the JSON sidecars → docs/figures/*.png (narrative in docs/report.md is hand-written)
 
 ## Layout
 `src/codelangtm/` (full table in docs/architecture.md):
 - Data: `data.py` (schema), `github.py` + `windows.py` + `syntax.py` (collection), `labels.py` + `dedup.py` (cleaning), `build.py` + `splits.py` (stable repo split), `audit.py`
-- Features and evaluation: `features.py` (binarizer + literals), `config.py` (YAML configs), `baselines.py`, `ablations.py`, `diagnostics.py`, `curves.py` (TM training curves), `figures.py` (report PNGs from the JSON sidecars; needs `--extra viz`)
+- Features and evaluation: `features.py` (binarizer + literals), `config.py` (YAML configs), `baselines.py`, `ablations.py`, `diagnostics.py`, `curves.py` (TM training curves), `tm_results.py` (TM vs baselines, significance), `figures.py` (report PNGs from the JSON sidecars; needs `--extra viz`)
 - TM: `model.py` (`TMLanguageClassifier` estimator over TMU, TMU-free `TMState`, JSON model files `codelangtm.tm/1`); stubs until B6/M6: `rules.py` (rule extraction), `export_c.py` (C export)
 - TMU seeds must be >= 1 (seed 0 hangs TMU); tests with TMU use `pytest.importorskip("tmu")`
 - `cli.py`; experiment configs in `configs/`; generated reports `docs/results.md`, `docs/ablations.md`, their `.json` sidecars and `docs/figures/` (never edit by hand); `docs/report.md` is the hand-written narrative (update its numbers when results change)

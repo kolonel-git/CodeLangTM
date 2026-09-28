@@ -119,7 +119,41 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 ## 7. Tsetlin Machine
 
-*The full comparison with the baselines (test set, repeated splits, significance test) comes next in M3.* So far, all on CV folds of train (the test set has not been used for the TM):
+### 7.1 Head-to-head with the baselines
+
+**Result: the 400-clause TM is statistically indistinguishable from Naive Bayes and logistic regression**, while the rules it uses stay readable (section 7.3 onwards, in progress). Both TMs went through exactly the protocol of the baselines: the same code, 5 CV folds, one fit on all of train scored once on test, and the same 10 repeated splits, with every TM number averaged over 5 seeds ([tm-results.md](tm-results.md)).
+
+![TM vs baselines](figures/tm_comparison.png)
+
+| Model | CV macro-F1 | Test macro-F1 | Repeated test macro-F1 |
+| --- | --- | --- | --- |
+| Naive Bayes | 0.963 ± 0.005 | 0.959 | 0.968 ± 0.009 |
+| Logistic regression | 0.953 ± 0.023 | 0.971 | 0.968 ± 0.017 |
+| **TM, 400 clauses** (5 seeds) | 0.949 ± 0.023 | 0.958 (seeds 0.947-0.966) | 0.966 ± 0.009 |
+| TM, 100 clauses (5 seeds) | 0.933 ± 0.023 | 0.946 (seeds 0.934-0.964) | 0.949 ± 0.015 |
+
+**Is the difference real?** For each fold and each repeated split, the TM's score (averaged over seeds) is compared with the baseline's score on exactly the same data. The *corrected resampled t-test* then asks whether those paired differences are larger than chance would produce. The correction matters because the splits share most of their training data ([concepts](concepts.md#experiments-and-noise)).
+
+| Comparison | Evaluation | Mean difference | 95% interval | p |
+| --- | --- | --- | --- | --- |
+| TM 400 − Naive Bayes | repeated test splits (10) | −0.001 | −0.012 to +0.010 | 0.82 |
+| TM 400 − Naive Bayes | CV folds (5) | −0.013 | −0.056 to +0.030 | 0.44 |
+| TM 400 − logistic regression | repeated test splits (10) | −0.001 | −0.021 to +0.019 | 0.88 |
+| TM 100 − logistic regression | repeated test splits (10) | −0.019 | −0.034 to −0.004 | 0.016 |
+
+- **TM 400 vs the baselines:** every interval contains 0 and every p is far above 0.05. On the repeated splits, the most reliable estimate, the TM is within about 0.01 of Naive Bayes in either direction. The 1.5-point gap seen on CV is inside the noise: CV has only 5 folds, and its spread (± 0.023) is large.
+- **TM 100 is worse:** the smaller TM is significantly behind logistic regression on the repeated splits (about 2 points; the interval excludes 0). Capacity matters.
+- **Caveat on the epoch choice:** the epoch counts were picked after looking at the CV curves (section 7.2), which can flatter the CV score slightly. The test set and the repeated splits were not used for any choice, so they are the independent check, and they agree with the conclusion.
+
+![Test F1 per language](figures/tm_per_language.png)
+
+- **Per language:** the TM is best on Go (1.00) and SQL (0.98), and weakest on Java (0.93), JavaScript and Python (0.94). Summed over the 5 seeds, its most frequent test mistakes are Java → Python (8), Rust → C++ (5), HTML → JavaScript (5), and C++ / Rust → Python (3 each). Python acts as a "sink" that attracts snippets from other languages, which the error analysis (next steps) will investigate by looking at the clauses that fired.
+- **Size and speed** (this run; timings on this machine vary with load, so B5 re-measures them properly):
+  - the 400-clause model file is **166 KB** (the 500 KB target is met): 3,200 clauses with 12 literals each on average;
+  - prediction takes **0.08 ms per snippet** end to end (Naive Bayes 0.04 ms). Our NumPy prediction is about 1.6× faster than TMU's own;
+  - training takes about 8 s (Naive Bayes 0.3 s).
+
+### 7.2 Training curves
 
 **Training curves.** Each TM setting was trained on the 5 folds with 5 seeds each (25 runs), for up to 150 epochs, scoring the held-out fold after every epoch ([tm-curves.md](tm-curves.md)).
 
@@ -132,7 +166,7 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 - **Learning is fast, then flat.** The TM gets 99% of the training set right within 5 epochs, and the held-out score levels off after about 20 epochs (400 clauses). Training on to the peak of the smoothed curve (epoch 120) adds about 0.005.
 - **Which epoch, and why it changed.** The rule fixed before the run was "first epoch where the smoothed curve levels off" (epochs 19 and 44). After seeing the curves, and before any test-set evaluation, we switched to the peak of the smoothed curve (epochs 120 and 142): about 6× the training time for about 0.005 more F1 on CV. Smoothing keeps a single lucky epoch from deciding. Because the rule was changed after seeing the CV curves, the CV scores at the chosen epoch are slightly optimistic; the test set and the repeated splits in the next step are the independent check.
-- **The TM trails Naive Bayes by about 1.5 points** (0.946-0.951 vs 0.963), and the training score of 1.000 against about 0.95 held out shows it fits the training data completely. This is the honest starting point for tuning in M4.
+- **On CV, the TM trails Naive Bayes by about 1.5 points** (0.946-0.951 vs 0.963), and the training score of 1.000 against about 0.95 held out shows it fits the training data completely. The head-to-head test (7.1) shows this CV gap is within the noise.
 - **One lucky seed misled the first experiment.** The throwaway spike (B1) measured 0.962 with seed 42, and chose the 400-clause setting on that basis. Averaged over seeds 1-5 the same setting gives 0.945-0.950 per seed; rerunning seed 42 with the final code reproduces 0.962, so the code is consistent and seed 42 was simply lucky (one fold scored 0.991). This is why every TM number is now a mean over 5 seeds ([issues-and-fixes M8](issues-and-fixes.md)).
 - **Clauses grow, then settle.** During training, clauses get longer (about 9 → 12.7 literals per clause with 400 clauses) and change less and less: from about 29,000 include decisions changing in the first epoch to under 100 per epoch near epoch 150.
 
@@ -141,16 +175,16 @@ Every model is measured the same way, so the TM will simply be one more row.
 - **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.05 s.
 - **Prediction can run without TMU.** A plain NumPy re-implementation gives exactly the same scores as TMU, and ran about twice as fast in a first measurement (0.03 vs 0.07 ms per snippet, one fold). A trained model is saved as one JSON file of about 160 KB and can be used and inspected without TMU installed.
 
-Planned content:
+### 7.3 Still to come in M3
 
-- **Comparison:** TM vs the baselines on the same folds, the same test set and the same 10 repeated splits, each TM number a mean over 5 seeds, with a corrected resampled t-test against Naive Bayes. Two TM sizes: 400 clauses per language (120 epochs) and the planned 100 (142 epochs, reference).
-- **Resources:** size (including the bit-packed clause size used by the C export), latency and memory.
+- **Resources, properly measured:** process-level memory and latency in isolated processes, for the TM and the baselines alike.
 - **How the TM works inside:**
   - every learned clause, readable as a rule;
   - the signature features of each language;
   - which languages share literals, to explain confusable pairs;
   - how clauses form over epochs;
-  - one prediction traced to the exact clauses that fired.
+  - one prediction traced to the exact clauses that fired;
+  - an error analysis of the confusable pairs, including why Python attracts other languages.
 
 ## 8. Limitations
 
