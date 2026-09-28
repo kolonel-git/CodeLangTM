@@ -158,9 +158,24 @@ def clauses_sidecar(formation=True):
     return data
 
 
+def errors_sidecar():
+    def flows(counts):
+        total = sum(counts)
+        return {g: {"count": c, "share": c / total} for g, c in zip(LANGS, counts, strict=True)}
+
+    return {
+        "schema": "codelangtm.errors/1", "setting": "tm_400", "seeds": [1, 2, 3],
+        "baselines": ["naive_bayes"], "languages": list(LANGS),
+        "models": {"tm": {"confusion": [[90, 3, 0], [2, 95, 1], [0, 6, 80]]}},
+        "inflow": {"tm": flows([2, 9, 1]), "naive_bayes": flows([1, 2, 1])},
+        "embedded": {"host": "html", "guest": "javascript",
+                     "points": [[0.0, 0], [0.7, 3], [0.9, 0], [0.2, 0]]},
+    }  # fmt: skip
+
+
 ALL_FIGURES = (set(fg.RESULTS_FIGURES) | set(fg.ABLATION_FIGURES) | set(fg.CURVE_FIGURES)
                | set(fg.TM_RESULT_FIGURES) | set(fg.RESOURCE_FIGURES)
-               | set(fg.CLAUSE_FIGURES))  # fmt: skip
+               | set(fg.CLAUSE_FIGURES) | set(fg.ERROR_FIGURES))  # fmt: skip
 
 
 @pytest.fixture
@@ -173,7 +188,8 @@ def sidecars(tmp_path):
     tm_results = bl.write_json(tm_results_sidecar(), tmp_path / "tm-results.json")
     res = bl.write_json(resources_sidecar(), tmp_path / "resources.json")
     clauses = bl.write_json(clauses_sidecar(), tmp_path / "clauses.json")
-    return results, ablations, curves, tm_results, res, clauses
+    errors = bl.write_json(errors_sidecar(), tmp_path / "errors.json")
+    return results, ablations, curves, tm_results, res, clauses, errors
 
 
 def test_render_all_writes_every_figure(sidecars, tmp_path):
@@ -209,6 +225,21 @@ def test_clause_figures_without_formation(sidecars, tmp_path):
     path = bl.write_json(clauses_sidecar(formation=False), tmp_path / "c.json")
     written = fg.render_all(None, None, tmp_path / "c", clauses_path=path)
     assert {p.stem for p in written} == set(fg.CLAUSE_FIGURES) - {"clause_formation_replay"}
+
+
+def test_error_figures_skip_embedded_without_points(sidecars, tmp_path):
+    data = {**errors_sidecar(), "embedded": None}
+    path = bl.write_json(data, tmp_path / "e.json")
+    written = fg.render_all(None, None, tmp_path / "e", errors_path=path)
+    assert {p.stem for p in written} == set(fg.ERROR_FIGURES) - {"errors_embedded"}
+
+
+def test_errors_confusion_greys_the_diagonal(sidecars):
+    ax = fg.errors_confusion(errors_sidecar()).axes[0]
+    assert ax.images[0].get_array()[0][0] == 0  # diagonal carries no colour
+    assert ax.images[0].get_array()[2][1] == pytest.approx(6 / 86)
+    colours = {t.get_text(): t.get_color() for t in ax.texts}
+    assert colours["90"] == fg.MUTED
 
 
 def test_clause_signature_cells_show_small_shares(sidecars):
@@ -270,7 +301,8 @@ def test_cli_report(sidecars, tmp_path, capsys):
     args = ["report", "--results", str(sidecars[0]), "--ablations", str(sidecars[1]),
             "--out", str(out)]  # fmt: skip
     missing = ["--curves", str(tmp_path / "no.json"), "--tm-results", str(tmp_path / "no2.json"),
-               "--resources", str(tmp_path / "no3.json"), "--clauses", str(tmp_path / "no4.json")]
+               "--resources", str(tmp_path / "no3.json"), "--clauses", str(tmp_path / "no4.json"),
+               "--errors", str(tmp_path / "no5.json")]
     assert main([*args, *missing]) == 0
     printed = capsys.readouterr().out
     assert "wrote" in printed and "skipping TM curve figures" in printed
@@ -279,7 +311,8 @@ def test_cli_report(sidecars, tmp_path, capsys):
         fg.ABLATION_FIGURES
     )
     assert main([*args, "--curves", str(sidecars[2]), "--tm-results", str(sidecars[3]),
-                 "--resources", str(sidecars[4]), "--clauses", str(sidecars[5])]) == 0
+                 "--resources", str(sidecars[4]), "--clauses", str(sidecars[5]),
+                 "--errors", str(sidecars[6])]) == 0
     assert {p.stem for p in out.glob("*.png")} == ALL_FIGURES
     assert main(["report", "--results", str(tmp_path / "none.json"), "--out", str(out)]) == 1
     assert "sidecar not found" in capsys.readouterr().err

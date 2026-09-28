@@ -48,7 +48,8 @@ def test_report_embeds_every_figure():
     embedded = {Path(t).stem for t in links(ROOT / "docs" / "report.md") if t.endswith(".png")}
     assert embedded == (set(fg.RESULTS_FIGURES) | set(fg.ABLATION_FIGURES)
                         | set(fg.CURVE_FIGURES) | set(fg.TM_RESULT_FIGURES)
-                        | set(fg.RESOURCE_FIGURES) | set(fg.CLAUSE_FIGURES))
+                        | set(fg.RESOURCE_FIGURES) | set(fg.CLAUSE_FIGURES)
+                        | set(fg.ERROR_FIGURES))
     for name in embedded:
         assert (ROOT / "docs" / "figures" / f"{name}.png").exists()
 

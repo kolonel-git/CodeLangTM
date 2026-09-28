@@ -103,6 +103,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--clauses", type=Path, default=Path("docs/clauses.json"),
         help="clause inspector sidecar (skipped if the file does not exist)",
     )  # fmt: skip
+    rep.add_argument(
+        "--errors", type=Path, default=Path("docs/errors.json"),
+        help="error analysis sidecar (skipped if the file does not exist)",
+    )  # fmt: skip
     rep.add_argument("--out", type=Path, default=Path("docs/figures"))
 
     res = sub.add_parser(
@@ -161,6 +165,29 @@ def _build_parser() -> argparse.ArgumentParser:
     cl.add_argument("--no-formation", action="store_true", help="skip the formation replay")
     cl.add_argument("--out", type=Path, default=Path("docs/clauses.md"))
 
+    er = sub.add_parser(
+        "errors", help="error analysis on out-of-fold CV predictions (train only; TM vs baselines)"
+    )
+    er.add_argument("--config", type=Path, default=Path("configs/tm.yaml"))
+    er.add_argument("--setting", default="tm_400")
+    er.add_argument(
+        "--tm-results", type=Path, default=Path("docs/tm-results.json"),
+        help="consistency check: per-fold scores must equal this run's (skipped if missing)",
+    )  # fmt: skip
+    er.add_argument(
+        "--clauses", type=Path, default=Path("docs/clauses.json"),
+        help="language overlap from the clause inspector (skipped if missing)",
+    )  # fmt: skip
+    er.add_argument(
+        "--model", type=Path, default=Path("models/tm.json"),
+        help="official model, for its signature n-grams (skipped if missing)",
+    )  # fmt: skip
+    er.add_argument("--out", type=Path, default=Path("docs/errors.md"))
+    er.add_argument(
+        "--review", type=Path, default=Path("data/processed/errors-review.md"),
+        help="local review file with the snippets' code (keep it out of git)",
+    )  # fmt: skip
+
     ex = sub.add_parser("explain", help="predict one snippet and show the clauses that fired")
     ex.add_argument("--model", type=Path, default=Path("models/tm.json"))
     ex.add_argument("--file", required=True, help="snippet file, or - for standard input")
@@ -204,7 +231,8 @@ def _report(args: argparse.Namespace) -> int:
 
     optional = {}
     for key, label in (("curves", "TM curve"), ("tm_results", "TM result"),
-                       ("resources", "resource"), ("clauses", "clause")):  # fmt: skip
+                       ("resources", "resource"), ("clauses", "clause"),
+                       ("errors", "error analysis")):  # fmt: skip
         path = getattr(args, key)
         optional[key] = path if path and path.exists() else None
         if path and optional[key] is None:
@@ -212,7 +240,7 @@ def _report(args: argparse.Namespace) -> int:
     try:
         written = render_all(args.results, args.ablations, args.out, optional["curves"],
                              optional["tm_results"], optional["resources"],
-                             optional["clauses"])  # fmt: skip
+                             optional["clauses"], optional["errors"])  # fmt: skip
     except (FileNotFoundError, ValueError, ImportError) as e:
         print(f"report failed: {e}", file=sys.stderr)
         return 1
@@ -354,6 +382,67 @@ def _clauses(args: argparse.Namespace) -> int:
     if not data["checks"]["rules_match_model"]:
         print("WARNING: rules do not reproduce the model's clause outputs", file=sys.stderr)
     print(f"\nwrote {args.out} and {sidecar}")
+    return 0
+
+
+def _errors(args: argparse.Namespace) -> int:
+    from .audit import load_dataset
+    from .baselines import sidecar_path
+    from .config import load_tm_config
+    from .errors import (
+        analyse,
+        render_errors_md,
+        render_review_md,
+        run_out_of_fold,
+        signature_document_frequency,
+        summary_table,
+    )
+    from .figures import load_sidecar
+    from .rules import extract_rules, rows_json_text, signature_features
+
+    try:
+        cfg = load_tm_config(args.config)
+        cfg.setting(args.setting)  # fail early on an unknown setting
+        train = load_dataset(cfg.data)["train"]
+        tm_results = overlap = signature_df = None
+        if args.tm_results.exists():
+            tm_results = load_sidecar(args.tm_results, "codelangtm.tm-results/")
+        if args.clauses.exists():
+            clauses = load_sidecar(args.clauses, "codelangtm.clauses/")
+            langs = clauses["languages"]
+            overlap = {a: dict(zip(langs, row, strict=True))
+                       for a, row in zip(langs, clauses["overlap"], strict=True)}  # fmt: skip
+        if args.model.exists():
+            from .model import load_model
+
+            model = load_model(args.model)
+            vocabulary = model.binarizer.vocabulary_
+            rules = extract_rules(model.state, vocabulary)
+            sigs = signature_features(rules, list(model.classes), vocabulary)
+            signature_df = signature_document_frequency(sigs, vocabulary, train)
+        for path, what in ((args.tm_results, "consistency check"), (args.clauses, "overlap"),
+                           (args.model, "signature n-grams (H6)")):  # fmt: skip
+            if not path.exists():
+                print(f"note: {path.as_posix()} not found, skipping the {what}")
+        oof = run_out_of_fold(cfg, args.setting, progress=lambda m: print(m, flush=True))
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"errors failed: {e}", file=sys.stderr)
+        return 1
+    texts = {i: s.text for i, s in enumerate(train)}
+    data = analyse(oof, tm_results, overlap, signature_df, texts)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(render_errors_md(data), encoding="utf-8")
+    sidecar = sidecar_path(args.out)
+    sidecar.write_text(rows_json_text(data, "snippets"), encoding="utf-8")
+    args.review.parent.mkdir(parents=True, exist_ok=True)
+    args.review.write_text(render_review_md(data, texts), encoding="utf-8")
+    print()
+    print(summary_table(data))
+    c = data["consistency"]
+    if c.get("checked") and not c.get("matches"):
+        print(f"WARNING: per-fold scores differ from {args.tm_results} "
+              f"(max {c['max_abs_diff']:.2g})", file=sys.stderr)  # fmt: skip
+    print(f"\nwrote {args.out} and {sidecar}; review file (local only): {args.review}")
     return 0
 
 
@@ -563,6 +652,8 @@ def main(argv: list[str] | None = None) -> int:
         return _tm_select(args)
     if args.command == "clauses":
         return _clauses(args)
+    if args.command == "errors":
+        return _errors(args)
     if args.command == "explain":
         return _explain(args)
     if args.command == "diagnose":

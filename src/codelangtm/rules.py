@@ -513,18 +513,23 @@ def inspect_model(
 def clauses_json_text(data: dict) -> str:
     """The sidecar as text: indented like the other sidecars, but one clause per line and every
     list of numbers on one line, so 3,200 clauses stay a readable, diff-friendly file."""
+    return rows_json_text(data, "clauses")
+
+
+def rows_json_text(data: dict, rows_key: str) -> str:
+    """Indented JSON with each item of `data[rows_key]` on one line and number lists inline."""
     from .baselines import _json_ready
 
     ready = _json_ready(data)
-    clauses = ready.pop("clauses")
-    text = json.dumps({**ready, "clauses": "__CLAUSES__"}, indent=2, ensure_ascii=False)
+    clauses = ready.pop(rows_key)
+    text = json.dumps({**ready, rows_key: "__ROWS__"}, indent=2, ensure_ascii=False)
     # JSON strings never hold a raw newline, so this only matches lists json.dumps broke up.
     number = r"(?:-?[\d.eE+-]+|null)"
     text = re.sub(rf"\[\n\s*({number}(?:,\n\s*{number})*)\n\s*\]",
                   lambda m: "[" + re.sub(r",\n\s*", ", ", m.group(1)) + "]", text)  # fmt: skip
     lines = ",\n    ".join(json.dumps(c, ensure_ascii=False) for c in clauses)
     body = f"[\n    {lines}\n  ]" if clauses else "[]"
-    return text.replace('"__CLAUSES__"', body) + "\n"
+    return text.replace('"__ROWS__"', body) + "\n"
 
 
 def _code(text: str) -> str:
