@@ -100,7 +100,31 @@ def curves_sidecar(epochs=12):
     }
 
 
-ALL_FIGURES = set(fg.RESULTS_FIGURES) | set(fg.ABLATION_FIGURES) | set(fg.CURVE_FIGURES)
+def tm_results_sidecar():
+    def base(name, cv, test):
+        return {"name": name, "cv_mean": cv, "cv_std": 0.01, "repeat_mean": cv + 0.005,
+                "repeat_std": 0.01, "test_f1": test,
+                "per_language_f1": {"python": test, "go": 1.0, "sql": test - 0.05}}  # fmt: skip
+
+    def tm(cv, test):
+        return {"params": {"n_clauses": 400, "epochs": 120}, "seeds": [{}, {}, {}],
+                "aggregate": {"cv_mean": cv, "cv_std_folds": 0.02, "repeat_mean": cv + 0.01,
+                              "repeat_std_splits": 0.015, "test_mean": test,
+                              "test_min": test - 0.01, "test_max": test + 0.01,
+                              "per_language_f1": {"python": test, "go": 0.98,
+                                                  "sql": 0.9}}}  # fmt: skip
+
+    return {
+        "schema": "codelangtm.tm-results/1",
+        "languages": list(LANGS),
+        "baselines": [base("naive_bayes", 0.963, 0.959),
+                      base("logistic_regression", 0.953, 0.971)],
+        "tm": {"tm_400": tm(0.95, 0.94), "tm_100": tm(0.93, 0.92)},
+    }
+
+
+ALL_FIGURES = (set(fg.RESULTS_FIGURES) | set(fg.ABLATION_FIGURES) | set(fg.CURVE_FIGURES)
+               | set(fg.TM_RESULT_FIGURES))  # fmt: skip
 
 
 @pytest.fixture
@@ -110,11 +134,13 @@ def sidecars(tmp_path):
     bl.write_json(results_sidecar(), results)
     bl.write_json(ablations_sidecar(), ablations)
     curves = bl.write_json(curves_sidecar(), tmp_path / "tm-curves.json")
-    return results, ablations, curves
+    tm_results = bl.write_json(tm_results_sidecar(), tmp_path / "tm-results.json")
+    return results, ablations, curves, tm_results
 
 
 def test_render_all_writes_every_figure(sidecars, tmp_path):
-    written = fg.render_all(sidecars[0], sidecars[1], tmp_path / "figs", sidecars[2])
+    written = fg.render_all(sidecars[0], sidecars[1], tmp_path / "figs", sidecars[2],
+                            sidecars[3])  # fmt: skip
     names = {p.stem for p in written}
     assert names == ALL_FIGURES
     for path in written:
@@ -124,8 +150,8 @@ def test_render_all_writes_every_figure(sidecars, tmp_path):
 
 
 def test_figures_are_byte_identical_across_runs(sidecars, tmp_path):
-    a = fg.render_all(sidecars[0], sidecars[1], tmp_path / "a", sidecars[2])
-    b = fg.render_all(sidecars[0], sidecars[1], tmp_path / "b", sidecars[2])
+    a = fg.render_all(sidecars[0], sidecars[1], tmp_path / "a", sidecars[2], sidecars[3])
+    b = fg.render_all(sidecars[0], sidecars[1], tmp_path / "b", sidecars[2], sidecars[3])
     for x, y in zip(a, b, strict=True):
         assert x.read_bytes() == y.read_bytes(), x.name
 
@@ -194,13 +220,15 @@ def test_cli_report(sidecars, tmp_path, capsys):
     out = tmp_path / "figs"
     args = ["report", "--results", str(sidecars[0]), "--ablations", str(sidecars[1]),
             "--out", str(out)]  # fmt: skip
-    assert main([*args, "--curves", str(tmp_path / "no-curves.json")]) == 0
+    missing = ["--curves", str(tmp_path / "no.json"), "--tm-results", str(tmp_path / "no2.json")]
+    assert main([*args, *missing]) == 0
     printed = capsys.readouterr().out
     assert "wrote" in printed and "skipping TM curve figures" in printed
+    assert "skipping TM result figures" in printed
     assert {p.stem for p in out.glob("*.png")} == set(fg.RESULTS_FIGURES) | set(
         fg.ABLATION_FIGURES
     )
-    assert main([*args, "--curves", str(sidecars[2])]) == 0
+    assert main([*args, "--curves", str(sidecars[2]), "--tm-results", str(sidecars[3])]) == 0
     assert {p.stem for p in out.glob("*.png")} == ALL_FIGURES
     assert main(["report", "--results", str(tmp_path / "none.json"), "--out", str(out)]) == 1
     assert "sidecar not found" in capsys.readouterr().err
