@@ -1,0 +1,484 @@
+{
+  "schema": "codelangtm.resources/1",
+  "meta": {
+    "generated": "2026-09-28 12:51:21",
+    "data_dir": "data/processed",
+    "dataset_files": {
+      "train.jsonl": "8cdc4c91ebe6",
+      "test.jsonl": "54649be8e4e0",
+      "wild.jsonl": "e3b0c44298fc",
+      "folds.json": "77229e0f7668"
+    },
+    "n_train": 696,
+    "n_test": 173,
+    "n_wild": 0,
+    "n_folds": 5,
+    "composition": {
+      "train": {
+        "cpp": {
+          "snippets": 90,
+          "repos": 20
+        },
+        "go": {
+          "snippets": 99,
+          "repos": 20
+        },
+        "html": {
+          "snippets": 76,
+          "repos": 20
+        },
+        "java": {
+          "snippets": 94,
+          "repos": 20
+        },
+        "javascript": {
+          "snippets": 85,
+          "repos": 20
+        },
+        "python": {
+          "snippets": 93,
+          "repos": 20
+        },
+        "rust": {
+          "snippets": 98,
+          "repos": 20
+        },
+        "sql": {
+          "snippets": 61,
+          "repos": 17
+        }
+      },
+      "test": {
+        "cpp": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "go": {
+          "snippets": 25,
+          "repos": 5
+        },
+        "html": {
+          "snippets": 24,
+          "repos": 5
+        },
+        "java": {
+          "snippets": 20,
+          "repos": 5
+        },
+        "javascript": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "python": {
+          "snippets": 21,
+          "repos": 5
+        },
+        "rust": {
+          "snippets": 25,
+          "repos": 5
+        },
+        "sql": {
+          "snippets": 16,
+          "repos": 4
+        }
+      },
+      "wild": {}
+    },
+    "split": {
+      "split": "stable-hash",
+      "test_size": 0.2,
+      "n_folds": 5,
+      "salt": "codelangtm-v1"
+    },
+    "versions": {
+      "python": "3.12.12",
+      "scikit-learn": "1.9.1",
+      "numpy": "1.26.4"
+    },
+    "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "config_hash": "79462a690bf6",
+    "repeats": 3,
+    "passes": 3,
+    "platform": "win32",
+    "memory_source": "peak working set (Windows)",
+    "config_path": "configs/tm.yaml"
+  },
+  "models": [
+    {
+      "name": "naive_bayes",
+      "spec": "baseline:naive_bayes",
+      "model_kind": "pickled pipeline",
+      "model_kb": 66.545898,
+      "fit": {
+        "wall_s": 0.347016,
+        "cpu_s": 0.34375,
+        "rss_before_mb": 136.984375,
+        "peak_rss_mb": 213.8125,
+        "added_mb": 76.691406
+      },
+      "predict": {
+        "load_s": 0.736532,
+        "rss_before_mb": 132.855469,
+        "peak_rss_mb": 136.984375,
+        "binarize_ms_median": 0.0386,
+        "binarize_ms_p95": 0.05393,
+        "predict_ms_median": 0.175,
+        "predict_ms_p95": 0.20561,
+        "total_ms_median": 0.2146,
+        "total_ms_p95": 0.2512,
+        "batch_ms_per_snippet": 0.039301,
+        "batch_snippets_per_s": 25444.918497,
+        "n_snippets": 173
+      },
+      "fit_runs": [
+        {
+          "wall_s": 0.347016,
+          "cpu_s": 0.359375,
+          "rss_before_mb": 136.890625,
+          "peak_rss_mb": 213.0,
+          "added_mb": 76.109375
+        },
+        {
+          "wall_s": 0.347371,
+          "cpu_s": 0.34375,
+          "rss_before_mb": 136.984375,
+          "peak_rss_mb": 213.8125,
+          "added_mb": 76.828125
+        },
+        {
+          "wall_s": 0.343887,
+          "cpu_s": 0.34375,
+          "rss_before_mb": 137.285156,
+          "peak_rss_mb": 213.976562,
+          "added_mb": 76.691406
+        }
+      ],
+      "predict_runs": [
+        {
+          "load_s": 0.785995,
+          "rss_before_mb": 132.855469,
+          "peak_rss_mb": 137.269531,
+          "binarize_ms_median": 0.04,
+          "binarize_ms_p95": 0.05823,
+          "predict_ms_median": 0.183,
+          "predict_ms_p95": 0.21678,
+          "total_ms_median": 0.2235,
+          "total_ms_p95": 0.27101,
+          "batch_ms_per_snippet": 0.042257,
+          "batch_snippets_per_s": 23664.915677,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.73242,
+          "rss_before_mb": 132.757812,
+          "peak_rss_mb": 136.824219,
+          "binarize_ms_median": 0.0386,
+          "binarize_ms_p95": 0.05301,
+          "predict_ms_median": 0.1741,
+          "predict_ms_p95": 0.19835,
+          "total_ms_median": 0.2135,
+          "total_ms_p95": 0.24554,
+          "batch_ms_per_snippet": 0.039301,
+          "batch_snippets_per_s": 25444.918497,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.736532,
+          "rss_before_mb": 133.15625,
+          "peak_rss_mb": 136.984375,
+          "binarize_ms_median": 0.0384,
+          "binarize_ms_p95": 0.05393,
+          "predict_ms_median": 0.175,
+          "predict_ms_p95": 0.20561,
+          "total_ms_median": 0.2146,
+          "total_ms_p95": 0.2512,
+          "batch_ms_per_snippet": 0.037003,
+          "batch_snippets_per_s": 27024.494016,
+          "n_snippets": 173
+        }
+      ]
+    },
+    {
+      "name": "logistic_regression",
+      "spec": "baseline:logistic_regression",
+      "model_kind": "pickled pipeline",
+      "model_kb": 35.333984,
+      "fit": {
+        "wall_s": 0.406812,
+        "cpu_s": 0.578125,
+        "rss_before_mb": 137.152344,
+        "peak_rss_mb": 213.128906,
+        "added_mb": 75.976562
+      },
+      "predict": {
+        "load_s": 0.735404,
+        "rss_before_mb": 132.746094,
+        "peak_rss_mb": 136.382812,
+        "binarize_ms_median": 0.033,
+        "binarize_ms_p95": 0.0477,
+        "predict_ms_median": 0.055,
+        "predict_ms_p95": 0.0656,
+        "total_ms_median": 0.0887,
+        "total_ms_p95": 0.10932,
+        "batch_ms_per_snippet": 0.030763,
+        "batch_snippets_per_s": 32506.576403,
+        "n_snippets": 173
+      },
+      "fit_runs": [
+        {
+          "wall_s": 0.406812,
+          "cpu_s": 0.5625,
+          "rss_before_mb": 137.050781,
+          "peak_rss_mb": 212.757812,
+          "added_mb": 75.707031
+        },
+        {
+          "wall_s": 0.406434,
+          "cpu_s": 0.578125,
+          "rss_before_mb": 137.386719,
+          "peak_rss_mb": 213.800781,
+          "added_mb": 76.414062
+        },
+        {
+          "wall_s": 0.421281,
+          "cpu_s": 0.65625,
+          "rss_before_mb": 137.152344,
+          "peak_rss_mb": 213.128906,
+          "added_mb": 75.976562
+        }
+      ],
+      "predict_runs": [
+        {
+          "load_s": 0.766372,
+          "rss_before_mb": 132.746094,
+          "peak_rss_mb": 136.382812,
+          "binarize_ms_median": 0.0327,
+          "binarize_ms_p95": 0.04655,
+          "predict_ms_median": 0.0544,
+          "predict_ms_p95": 0.0656,
+          "total_ms_median": 0.0879,
+          "total_ms_p95": 0.10884,
+          "batch_ms_per_snippet": 0.030763,
+          "batch_snippets_per_s": 32506.576403,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.735404,
+          "rss_before_mb": 132.925781,
+          "peak_rss_mb": 136.53125,
+          "binarize_ms_median": 0.033,
+          "binarize_ms_p95": 0.0477,
+          "predict_ms_median": 0.055,
+          "predict_ms_p95": 0.0655,
+          "total_ms_median": 0.0887,
+          "total_ms_p95": 0.10932,
+          "batch_ms_per_snippet": 0.03086,
+          "batch_snippets_per_s": 32404.285466,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.729506,
+          "rss_before_mb": 132.613281,
+          "peak_rss_mb": 136.09375,
+          "binarize_ms_median": 0.0336,
+          "binarize_ms_p95": 0.0503,
+          "predict_ms_median": 0.0552,
+          "predict_ms_p95": 0.06933,
+          "total_ms_median": 0.0903,
+          "total_ms_p95": 0.11313,
+          "batch_ms_per_snippet": 0.029646,
+          "batch_snippets_per_s": 33731.744919,
+          "n_snippets": 173
+        }
+      ]
+    },
+    {
+      "name": "tm_400 (seed 4)",
+      "spec": "tm:tm_400:4",
+      "model_kind": "TM model file (JSON)",
+      "model_kb": 164.150391,
+      "fit": {
+        "wall_s": 7.722833,
+        "cpu_s": 7.625,
+        "rss_before_mb": 137.992188,
+        "peak_rss_mb": 214.359375,
+        "added_mb": 75.972656
+      },
+      "predict": {
+        "load_s": 0.794324,
+        "rss_before_mb": 134.527344,
+        "peak_rss_mb": 154.390625,
+        "binarize_ms_median": 0.0562,
+        "binarize_ms_p95": 0.08153,
+        "predict_ms_median": 0.2826,
+        "predict_ms_p95": 0.40015,
+        "total_ms_median": 0.3426,
+        "total_ms_p95": 0.47082,
+        "batch_ms_per_snippet": 0.056549,
+        "batch_snippets_per_s": 17683.917777,
+        "n_snippets": 173
+      },
+      "fit_runs": [
+        {
+          "wall_s": 7.609705,
+          "cpu_s": 7.453125,
+          "rss_before_mb": 137.890625,
+          "peak_rss_mb": 214.792969,
+          "added_mb": 76.902344
+        },
+        {
+          "wall_s": 7.722833,
+          "cpu_s": 7.625,
+          "rss_before_mb": 137.992188,
+          "peak_rss_mb": 213.941406,
+          "added_mb": 75.949219
+        },
+        {
+          "wall_s": 7.934479,
+          "cpu_s": 7.84375,
+          "rss_before_mb": 138.386719,
+          "peak_rss_mb": 214.359375,
+          "added_mb": 75.972656
+        }
+      ],
+      "predict_runs": [
+        {
+          "load_s": 0.833494,
+          "rss_before_mb": 134.527344,
+          "peak_rss_mb": 154.390625,
+          "binarize_ms_median": 0.0623,
+          "binarize_ms_p95": 0.08621,
+          "predict_ms_median": 0.3272,
+          "predict_ms_p95": 0.42991,
+          "total_ms_median": 0.389,
+          "total_ms_p95": 0.49948,
+          "batch_ms_per_snippet": 0.056549,
+          "batch_snippets_per_s": 17683.917777,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.794324,
+          "rss_before_mb": 134.785156,
+          "peak_rss_mb": 154.65625,
+          "binarize_ms_median": 0.0562,
+          "binarize_ms_p95": 0.08153,
+          "predict_ms_median": 0.2826,
+          "predict_ms_p95": 0.40015,
+          "total_ms_median": 0.3426,
+          "total_ms_p95": 0.47082,
+          "batch_ms_per_snippet": 0.056735,
+          "batch_snippets_per_s": 17625.902948,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.780148,
+          "rss_before_mb": 134.296875,
+          "peak_rss_mb": 154.132812,
+          "binarize_ms_median": 0.053,
+          "binarize_ms_p95": 0.08013,
+          "predict_ms_median": 0.2617,
+          "predict_ms_p95": 0.38291,
+          "total_ms_median": 0.3176,
+          "total_ms_p95": 0.44473,
+          "batch_ms_per_snippet": 0.056276,
+          "batch_snippets_per_s": 17769.651944,
+          "n_snippets": 173
+        }
+      ]
+    },
+    {
+      "name": "tm_100 (seed 1)",
+      "spec": "tm:tm_100:1",
+      "model_kind": "TM model file (JSON)",
+      "model_kb": 33.361328,
+      "fit": {
+        "wall_s": 5.856774,
+        "cpu_s": 5.84375,
+        "rss_before_mb": 138.011719,
+        "peak_rss_mb": 214.648438,
+        "added_mb": 76.578125
+      },
+      "predict": {
+        "load_s": 0.840132,
+        "rss_before_mb": 133.105469,
+        "peak_rss_mb": 139.769531,
+        "binarize_ms_median": 0.0521,
+        "binarize_ms_p95": 0.08193,
+        "predict_ms_median": 0.1449,
+        "predict_ms_p95": 0.21264,
+        "total_ms_median": 0.1992,
+        "total_ms_p95": 0.28799,
+        "batch_ms_per_snippet": 0.03904,
+        "batch_snippets_per_s": 25614.830056,
+        "n_snippets": 173
+      },
+      "fit_runs": [
+        {
+          "wall_s": 6.681828,
+          "cpu_s": 6.609375,
+          "rss_before_mb": 138.003906,
+          "peak_rss_mb": 214.398438,
+          "added_mb": 76.394531
+        },
+        {
+          "wall_s": 5.856774,
+          "cpu_s": 5.84375,
+          "rss_before_mb": 138.011719,
+          "peak_rss_mb": 214.78125,
+          "added_mb": 76.769531
+        },
+        {
+          "wall_s": 5.759955,
+          "cpu_s": 5.75,
+          "rss_before_mb": 138.070312,
+          "peak_rss_mb": 214.648438,
+          "added_mb": 76.578125
+        }
+      ],
+      "predict_runs": [
+        {
+          "load_s": 0.845741,
+          "rss_before_mb": 133.105469,
+          "peak_rss_mb": 139.769531,
+          "binarize_ms_median": 0.0665,
+          "binarize_ms_p95": 0.12281,
+          "predict_ms_median": 0.1781,
+          "predict_ms_p95": 0.29273,
+          "total_ms_median": 0.2482,
+          "total_ms_p95": 0.39906,
+          "batch_ms_per_snippet": 0.04102,
+          "batch_snippets_per_s": 24378.214546,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.840132,
+          "rss_before_mb": 133.191406,
+          "peak_rss_mb": 139.90625,
+          "binarize_ms_median": 0.0521,
+          "binarize_ms_p95": 0.08193,
+          "predict_ms_median": 0.1448,
+          "predict_ms_p95": 0.21264,
+          "total_ms_median": 0.1992,
+          "total_ms_p95": 0.28799,
+          "batch_ms_per_snippet": 0.038244,
+          "batch_snippets_per_s": 26147.939789,
+          "n_snippets": 173
+        },
+        {
+          "load_s": 0.83731,
+          "rss_before_mb": 132.578125,
+          "peak_rss_mb": 139.289062,
+          "binarize_ms_median": 0.0506,
+          "binarize_ms_p95": 0.08193,
+          "predict_ms_median": 0.1449,
+          "predict_ms_p95": 0.20263,
+          "total_ms_median": 0.1961,
+          "total_ms_p95": 0.28562,
+          "batch_ms_per_snippet": 0.03904,
+          "batch_snippets_per_s": 25614.830056,
+          "n_snippets": 173
+        }
+      ]
+    }
+  ]
+}

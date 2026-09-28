@@ -26,10 +26,11 @@ Code snippet
 | Report figures (optional `viz` extra) | `figures.py` | `codelangtm report` |
 | TM classifier, TMU-free state, model files | `model.py` | (used by `tm-curve` and `tm-results`) |
 | TM experiment config, training curves | `config.py` (`TMConfig`), `configs/tm.yaml`, `curves.py` | `codelangtm tm-curve` |
-| TM vs baselines (per seed, significance tests) | `tm_results.py` | `codelangtm tm-results` |
+| TM vs baselines (per seed, significance tests), final models | `tm_results.py` | `codelangtm tm-results`, `tm-train`, `tm-select` |
+| Process-level resources (fresh process per job) | `resources.py` | `codelangtm resources` |
 | Rules, C export | `rules.py`, `export_c.py` | stubs (B6, M6) |
 
-Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`, `tm-curves.md`, `tm-results.md`), each with a JSON sidecar (`results.json`, `ablations.json`, `tm-curves.json`, `tm-results.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes) → embedded in the hand-written [report.md](report.md).
+Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`, `tm-curves.md`, `tm-results.md`, `resources.md`), each with a JSON sidecar (`results.json`, `ablations.json`, `tm-curves.json`, `tm-results.json`, `resources.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes) → embedded in the hand-written [report.md](report.md).
 
 ## Features
 `Binarizer` (scikit-learn transformer; refit inside every CV fold):
@@ -79,6 +80,7 @@ TMU 0.8.3 facts checked in the B1 spike ([issues-and-fixes](issues-and-fixes.md)
 
 - **Clauses** are listed per class in TMU's order: the first half start as "for" clauses (positive weight), the second half as "against" (negative weight). `literals` holds the ids of the included literals only (sparse); an empty list is an empty clause, which never fires.
 - **Prediction:** a clause fires when every included `has(j)` feature is present and every included `NOT has(j)` feature is absent. A class's sum is the total weight of its firing clauses; the highest sum wins, and ties go to the class listed first.
+- **Official model:** `models/tm.json` (gitignored; rebuild with `codelangtm tm-select` after `tm-results`, or `codelangtm tm-train --setting tm_400 --seed 4 --out models/tm.json`, which gives the identical file content). It is the `tm_400` seed whose CV score is the median of the 5 seeds (seed 4), chosen without test data; `meta.canonical` records the rule and every seed's CV score.
 - **Size:** the 400-clause model on the frozen features is about 160 KB as compact JSON (3,200 clauses, ~36,000 included literals, measured on one CV fold).
 
 ## Install notes
@@ -90,4 +92,4 @@ TMU 0.8.3 facts checked in the B1 spike ([issues-and-fixes](issues-and-fixes.md)
 ## Targets
 Macro-F1 >= 96% over 8 languages; < 0.1 ms/snippet; < 500 KB model.
 
-Every model, baseline or TM, is compared on accuracy (CV, test, repeated test) and on the same resource metrics: training wall/CPU time, peak memory, model size, latency and throughput ([results.md](results.md), protocol in the roadmap under M3).
+Every model, baseline or TM, is compared on accuracy (CV, test, repeated test) and on the same resource metrics: training wall/CPU time, peak memory, model size, latency and throughput ([results.md](results.md) for the in-process view, [resources.md](resources.md) for fresh-process measurements).

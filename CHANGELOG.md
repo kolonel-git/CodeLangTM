@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- `codelangtm resources` (`resources.py`): process-level resources, each job in a fresh Python process (fit: wall/CPU time, memory before and peak; predict: model load time, per-snippet binarize/predict/total latency median and p95, batch throughput), repeated with the median kept; process memory from the OS (Windows working set via `GetProcessMemoryInfo`, `getrusage` elsewhere). Writes `docs/resources.md` + `.json`; figure `process_resources.png` via `codelangtm report --resources`.
+- `codelangtm tm-train` (one TM from `configs/tm.yaml`, trained on all of train, saved as a model file) and `codelangtm tm-select` (copies the seed with the median CV score from a `tm-results` run to `models/tm.json`, recording the rule and every seed's CV score in the model's metadata).
 - `codelangtm tm-results` (`tm_results.py`): every TM setting x seed through the baselines' exact protocol (`evaluate_model`), baselines re-run beside them, corrected resampled t-test (Nadeau & Bengio) per fold and per repeated split; writes `docs/tm-results.md` + `.json` and the final models (one JSON per setting x seed) to `models/` (gitignored). Figures `tm_comparison.png`, `tm_per_language.png` via `codelangtm report --tm-results`.
 - `evaluate_model(keep_pipeline=True)` returns the final fitted pipeline (`ModelResult.pipeline`, never written to reports).
 - TM experiment config (`TMConfig`, `configs/tm.yaml`: seeds, TM settings, curve rule; features must equal the frozen baseline features).

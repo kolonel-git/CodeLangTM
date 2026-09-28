@@ -3,7 +3,7 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-27
-**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B4 done; B4b/B5 next)
+**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B5 done; B6 clause inspector next)
 **Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 166 KB model
 
 ## Milestone overview
@@ -31,7 +31,9 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - [x] B2 `TMLanguageClassifier`, `TMState`, JSON model file
 - [x] B4 training curves (run before B3): epochs 120 (400 clauses) and 142 (100 clauses), smoothed peak
 - [x] B3 full protocol: TM 400 matches the baselines (no significant difference); TM 100 significantly behind logistic regression
-- [ ] M3 branch B `feat/tm-training`: B4b `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
+- [x] B4b `tm-train` + `tm-select`: official model = tm_400 seed 4 (median CV)
+- [x] B5 process-level resources (`codelangtm resources`)
+- [ ] M3 branch B `feat/tm-training`: B6 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison (5 seeds, paired significance test)
 - [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
@@ -39,6 +41,26 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-28 — M3 branch B, B5: process-level resources
+- Choice (start of step): full protocol.
+- `resources.py` + `codelangtm resources`: every measurement in a fresh Python process doing one job (`python -m codelangtm.resources fit|predict`), 3 repeats, median kept. Fit: wall/CPU time, process memory before training and at its peak. Predict: load the saved model (TM: the JSON model file, NumPy only, no TMU; baselines: pickled pipeline), then every test snippet one at a time, 3 passes, binarize and predict timed separately (median, p95), plus one batch pass. Process memory from the OS: Windows `GetProcessMemoryInfo` (working set), `getrusage` elsewhere; includes C-extension memory that `tracemalloc` misses.
+- Models: Naive Bayes, logistic regression, TM 400 seed 4 (official), TM 100 seed 1 (its median-CV seed). 1 min 14 s in total.
+- **Results:**
+  - Training memory added is about 76 MB for every model: the binarizer's candidate table dominates (matches the M2 tracemalloc finding, issues-and-fixes M7). Training time: TM 400 7.7 s, TM 100 5.9 s, NB 0.35 s, LR 0.41 s.
+  - One snippet, median (p95): LR 0.089 (0.109), TM 100 0.199 (0.288), NB 0.215 (0.251), TM 400 0.343 (0.471) ms. Only LR meets < 0.1 ms per snippet in Python. The TM's cost is the classifier (0.28 ms): the dense NumPy matrix (500 x 3,200) is read for every snippet although clauses include ~12 literals each; NB pays scikit-learn's per-call input checks.
+  - Batch: 0.031-0.057 ms per snippet (TM 400: ~17,500 snippets/s).
+  - Binarize is identical code for all models yet measured 0.033-0.056 ms: the measurement noise floor on this machine.
+- Implication for M6: the C runtime should evaluate only included literals per clause (sparse); single-snippet latency is the number to beat.
+- Report: section 7.2 added (resources), section 6 points to it; concepts explains process memory, median/p95 and fresh processes.
+- Tests: 322 passing (7 new in `tests/test_resources.py`, figure and docs tests extended: current memory grows when 80 MB is touched, fit and predict jobs in fresh processes, failing job surfaces stderr, median-seed model choice, end-to-end CLI with a tiny TM, missing sidecar).
+
+### 2026-09-28 — M3 branch B, B4b: one-command training and the official model
+- Choice (start of step): both a `tm-train` command and a documented rule for which B3 model is official.
+- `codelangtm tm-train --setting tm_400 --seed 4`: trains one TM from `configs/tm.yaml` on all of train (no CV, no repeated splits; 7.9 s) and saves the model file; the test score is printed for information only.
+- `codelangtm tm-select`: the official model `models/tm.json` is the seed whose CV score is the median of the 5 (no test data). For `tm_400` the CV scores are 0.9461 (seed 5), 0.9488 (3), **0.9499 (4)**, 0.9505 (1), 0.9520 (2), so seed 4 (its test score, 0.954, played no part). The rule and all CV scores are stored in the model's metadata.
+- Check: retraining seed 4 with `tm-train` gives exactly B3's saved model (every clause and the vocabulary identical; test 0.953 both times). The official model is reproducible from the config in one command.
+- Tests: 314 passing (4 new: median rule incl. even counts and ties, selection copies the right model with metadata, `train_final` reproduces the protocol's model, CLI).
 
 ### 2026-09-28 — M3 branch B, B3: TM vs baselines, full protocol
 - Choices (start of step): full protocol for both TMs over 5 seeds; save the final models. Session paused while the run finished and resumed afterwards.
@@ -305,6 +327,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 | 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
+| 2026-09-28 | B5 process-level resources (fresh process per job, 3 repeats) | v5 | - | one snippet median: LR 0.089, TM100 0.199, NB 0.215, TM400 0.343 ms; batch 0.031-0.057 ms; training memory ~76 MB for all (binarizer); TM 400 fit 7.7 s, 164 KB |
 | 2026-09-28 | B3 TM vs baselines, full protocol, seeds 1-5 | v5 | TM 400: 0.949 / 0.958, repeated 0.966 ± 0.009; TM 100: 0.933 / 0.946, repeated 0.949 | NB 0.963 / 0.959 / 0.968; TM 400 − NB repeated −0.001 [−0.012, +0.010] p = 0.82; TM 100 − LR repeated −0.019, p = 0.016; TM 400 166 KB, 0.081 ms/snippet |
 | 2026-09-27 | B4 TM training curves, 5 folds x seeds 1-5, 150 epochs (CV only) | v5 | tm_400 (N_c=400/T=100/s=5): 0.951 at epoch 120 (levels off at 19: 0.946) / -; tm_100: 0.933 at epoch 142 (44: 0.928) / - | NB same folds 0.963; B1's 0.962 was seed 42 (lucky); 0.05 / 0.03 s/epoch |
 | 2026-09-27 | B1 spike: TMU, frozen features, 150 epochs (CV only) | v5 | N_c=100/T=30/s=3.5: 0.925-0.940 / -; N_c=400/T=100/s=5: 0.962 / - | last-20-epoch mean over 5 folds; NB same folds 0.963; 0.03-0.04 s/epoch; TMU predict 0.07-0.09 ms/snippet; N_c=400 clauses 400 KB dense / ~80 KB sparse |
