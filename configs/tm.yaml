@@ -1,0 +1,43 @@
+# M3 Tsetlin Machine experiments.
+#   uv run codelangtm tm-curve --config configs/tm.yaml    # B4: training curves -> docs/tm-curves.md
+# Every TM number is a mean over `seeds` (seed 0 is not allowed: TMU hangs, issues-and-fixes E6).
+# All choices are made on CV folds of train; the test set is only scored in the final protocol run.
+
+data: data/processed
+out: docs/tm-results.md          # B3: full protocol (CV, test, repeated splits, significance test)
+curves_out: docs/tm-curves.md    # B4: training curves and the epoch recommendation
+seeds: [1, 2, 3, 4, 5]
+repeats: 10                      # extra repo-level splits for the repeated test score
+baselines: [naive_bayes, logistic_regression]   # re-run beside the TM on identical splits
+
+# Must equal the frozen features in configs/baselines.yaml (a test checks this).
+features:
+  n_features: 500
+  ngram_sizes: [2, 3]
+  use_delimiters: false
+  selection: class_balanced
+  min_df: 1
+  word_tokens: false
+
+curves:
+  max_epochs: 150         # scan length
+  smooth_window: 11       # centred moving average over epochs (per-epoch F1 is noisy, +/-0.02)
+  plateau_tolerance: 0.005   # plateau epoch = first where smoothed held-out F1 >= smoothed max - this
+  # Rule for `epochs`: "plateau" (first levelled-off epoch) or "max" (smoothed peak).
+  # Changed plateau -> max on 2026-09-28, after seeing the CV curves and before any test-set
+  # look (plateau gave 19 / 44 epochs; max trades ~6x training time for ~0.005 CV F1).
+  epoch_rule: max
+
+tm:
+  tm_400:                 # main setting (B1 spike, CV only; option A)
+    n_clauses: 400        # per language: half vote for, half against
+    T: 100
+    s: 5.0
+    weighted_clauses: true
+    epochs: 120           # tm-curve: smoothed peak 0.951 (levels off at 19 with 0.946)
+  tm_100:                 # reference: the originally planned starting point
+    n_clauses: 100
+    T: 30
+    s: 3.5
+    weighted_clauses: true
+    epochs: 142           # tm-curve: smoothed peak 0.933 (levels off at 44 with 0.928)

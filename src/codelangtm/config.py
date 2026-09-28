@@ -190,6 +190,135 @@ def parse_ablations(raw: dict | None) -> AblationConfig:
     return replace(cfg, studies=tuple(parse_study(n, s, base) for n, s in studies.items()))
 
 
+EPOCH_RULES = ("plateau", "max")
+
+
+@dataclass(frozen=True)
+class CurveConfig:
+    """Training-curve scan (B4): how far to train and how to pick the epoch count."""
+
+    max_epochs: int = 150
+    smooth_window: int = 11  # moving-average width over epochs (odd)
+    plateau_tolerance: float = 0.005  # plateau rule: first epoch within this of the smoothed max
+    epoch_rule: str = "plateau"  # "plateau" (first levelled-off epoch) or "max" (smoothed peak)
+
+
+@dataclass(frozen=True)
+class TMSetting:
+    """One named TM configuration; `params` are TMLanguageClassifier arguments except seed."""
+
+    name: str
+    params: tuple[tuple[str, Any], ...]  # sorted (key, value) pairs, hashable
+
+    def kwargs(self) -> dict:
+        return dict(self.params)
+
+
+@dataclass(frozen=True)
+class TMConfig:
+    data: Path = Path("data/processed")
+    out: Path = Path("docs/tm-results.md")
+    curves_out: Path = Path("docs/tm-curves.md")
+    seeds: tuple[int, ...] = (1, 2, 3, 4, 5)
+    repeats: int = 10
+    baselines: tuple[str, ...] = ("naive_bayes", "logistic_regression")
+    features: FeatureConfig = field(default_factory=FeatureConfig)
+    curves: CurveConfig = field(default_factory=CurveConfig)
+    settings: tuple[TMSetting, ...] = ()
+
+    def setting(self, name: str) -> TMSetting:
+        for s in self.settings:
+            if s.name == name:
+                return s
+        available = [s.name for s in self.settings]
+        raise ValueError(f"unknown TM setting {name!r}; available: {available}")
+
+
+def _tm_param_names() -> set[str]:
+    from .model import TMLanguageClassifier
+
+    return set(TMLanguageClassifier().get_params()) - {"seed"}
+
+
+def _parse_tm_setting(name: str, raw: Any) -> TMSetting:
+    section = f"tm.{name}"
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError(f"{section}: expected a mapping of TMLanguageClassifier options")
+    _check_keys(section, raw, _tm_param_names())
+    for key in ("n_clauses", "T", "epochs"):
+        if key in raw:
+            _int(section, key, raw[key], 1)
+    if raw.get("n_clauses", 2) % 2:
+        raise ValueError(f"{section}.n_clauses: must be even (half for, half against)")
+    if "s" in raw and (isinstance(raw["s"], bool) or not isinstance(raw["s"], int | float)
+                       or raw["s"] < 1):  # fmt: skip
+        raise ValueError(f"{section}.s: expected a number >= 1, got {raw['s']!r}")
+    if "weighted_clauses" in raw and not isinstance(raw["weighted_clauses"], bool):
+        raise ValueError(f"{section}.weighted_clauses: expected true/false")
+    return TMSetting(name, tuple(sorted(raw.items())))
+
+
+def parse_tm(raw: dict | None) -> TMConfig:
+    raw = raw or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"config: expected a mapping, got {raw!r}")
+    allowed = {f.name for f in fields(TMConfig)} - {"settings"} | {"tm"}
+    _check_keys("config", raw, allowed)
+    cfg = TMConfig(features=parse_features(raw.get("features")))
+    for key in ("data", "out", "curves_out"):
+        if key in raw:
+            if not isinstance(raw[key], str):
+                raise ValueError(f"config.{key}: expected a path string")
+            cfg = replace(cfg, **{key: Path(raw[key])})
+    if "seeds" in raw:
+        seeds = raw["seeds"]
+        if not isinstance(seeds, list) or not seeds:
+            raise ValueError("config.seeds: expected a non-empty list of integers >= 1")
+        # TMU hangs with seed 0 (issues-and-fixes E6)
+        seeds = tuple(_int("config", "seeds", s, 1) for s in seeds)
+        if len(set(seeds)) != len(seeds):
+            raise ValueError("config.seeds: duplicate seeds")
+        cfg = replace(cfg, seeds=seeds)
+    if "repeats" in raw:
+        cfg = replace(cfg, repeats=_int("config", "repeats", raw["repeats"], 0))
+    if "baselines" in raw:
+        names = raw["baselines"]
+        if not isinstance(names, list) or not all(isinstance(m, str) for m in names):
+            raise ValueError("config.baselines: expected a list of baseline model names")
+        cfg = replace(cfg, baselines=tuple(names))
+    if "curves" in raw:
+        c = raw["curves"]
+        if not isinstance(c, dict):
+            raise ValueError("config.curves: expected a mapping")
+        _check_keys("curves", c, {f.name for f in fields(CurveConfig)})
+        curves = CurveConfig()
+        if "max_epochs" in c:
+            curves = replace(curves, max_epochs=_int("curves", "max_epochs", c["max_epochs"], 1))
+        if "smooth_window" in c:
+            w = _int("curves", "smooth_window", c["smooth_window"], 1)
+            if w % 2 == 0:
+                raise ValueError("curves.smooth_window: must be odd (centred average)")
+            curves = replace(curves, smooth_window=w)
+        if "plateau_tolerance" in c:
+            tol = c["plateau_tolerance"]
+            if isinstance(tol, bool) or not isinstance(tol, int | float) or tol < 0:
+                raise ValueError("curves.plateau_tolerance: expected a number >= 0")
+            curves = replace(curves, plateau_tolerance=float(tol))
+        if "epoch_rule" in c:
+            if c["epoch_rule"] not in EPOCH_RULES:
+                raise ValueError(f"curves.epoch_rule: expected one of {list(EPOCH_RULES)}")
+            curves = replace(curves, epoch_rule=c["epoch_rule"])
+        cfg = replace(cfg, curves=curves)
+    tm = raw.get("tm")
+    if not isinstance(tm, dict) or not tm:
+        raise ValueError("config.tm: expected a mapping of setting name -> TM options")
+    return replace(cfg, settings=tuple(_parse_tm_setting(n, s) for n, s in tm.items()))
+
+
+def load_tm_config(path: str | Path) -> TMConfig:
+    return parse_tm(load_yaml(path))
+
+
 def load_ablation_config(path: str | Path) -> AblationConfig:
     return parse_ablations(load_yaml(path))
 

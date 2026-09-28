@@ -21,6 +21,7 @@ data/cache/
 .env
 
 # Models / build outputs
+models/
 *.pkl
 *.npz
 *.o
