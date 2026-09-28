@@ -3,8 +3,8 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-27
-**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1, B2, B4 done; B3 next with 120 / 142 epochs)
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B: TM classifier and training curves done; over 5 seeds the 400-clause TM reaches 0.946-0.951 CV vs Naive Bayes 0.963
+**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B4 done; B4b/B5 next)
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 166 KB model
 
 ## Milestone overview
 
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1, B2, B4 done |
+| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B4 done (TM matches the baselines) |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -30,7 +30,8 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - [x] Direction agreed (see done log 2026-09-27): portfolio + later research write-up, research-ready rigor, Stage B after M3, CLI + C runtime + web demo, concepts guide
 - [x] B2 `TMLanguageClassifier`, `TMState`, JSON model file
 - [x] B4 training curves (run before B3): epochs 120 (400 clauses) and 142 (100 clauses), smoothed peak
-- [ ] M3 branch B `feat/tm-training`: B3 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
+- [x] B3 full protocol: TM 400 matches the baselines (no significant difference); TM 100 significantly behind logistic regression
+- [ ] M3 branch B `feat/tm-training`: B4b `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison (5 seeds, paired significance test)
 - [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
@@ -38,6 +39,19 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-28 — M3 branch B, B3: TM vs baselines, full protocol
+- Choices (start of step): full protocol for both TMs over 5 seeds; save the final models. Session paused while the run finished and resumed afterwards.
+- `tm_results.py` + `codelangtm tm-results`: each TM setting x seed runs `baselines.evaluate_model`, the exact code used for the baselines (5 CV folds, one fit on all of train scored once on test, 10 repeated splits, resource measurements); Naive Bayes and logistic regression re-run beside them. Corrected resampled t-test (Nadeau & Bengio) on per-fold and per-split differences, the TM averaged over seeds; test/train ratios 0.25 (CV) and the measured one for the repeated splits. Final models saved to `models/<setting>_seed<k>.json`; a test reloads them and reproduces the reported test F1 exactly.
+- **Result (dataset v5, seeds 1-5, 24 min 36 s):**
+  - TM 400 (120 epochs): CV 0.949 ± 0.023, test 0.958 (seeds 0.947-0.966), repeated 0.966 ± 0.009. Naive Bayes 0.963 / 0.959 / 0.968; logistic regression 0.953 / 0.971 / 0.968.
+  - TM 400 − Naive Bayes: repeated −0.001 [−0.012, +0.010] p = 0.82; CV −0.013 [−0.056, +0.030] p = 0.44. No significant difference from either baseline.
+  - TM 100 (142 epochs): 0.933 / 0.946 / 0.949; significantly behind logistic regression on the repeated splits (−0.019 [−0.034, −0.004], p = 0.016).
+  - The seed spread is small for the 400-clause TM (std 0.002 CV, 0.007 test, 0.004 repeated).
+- Size and speed (this run, loaded machine): TM 400 model file 166 KB (3,200 clauses, 12.1 literals each, 45 empty), 0.081 ms/snippet end to end (TMU's own predict 0.131), fit 7.7 s; TM 100 34 KB, 0.060 ms. Naive Bayes 0.038 ms, 67 KB.
+- Error pattern for B6b: summed over 5 seeds, Python attracts snippets from other languages (Java → Python 8, C++ → Python 3, Rust → Python 3); also Rust → C++ 5, HTML → JavaScript 5.
+- Figures: `tm_comparison.png`, `tm_per_language.png` (colour scale starts just below the lowest score so differences between strong models stay visible; the legend is stacked so it is not cut off). Report section 7 restructured: 7.1 head-to-head, 7.2 curves, 7.3 still to come; concepts explains p-values and intervals.
+- Tests: 310 passing (8 new in `tests/test_tm_results.py`, figure and docs tests extended: the t-test equals scipy's paired t-test without correction and widens with it, hand-checked t, edge cases, protocol shapes, saved models reproduce the test score, significance rows, JSON/markdown, CLI).
 
 ### 2026-09-27 — M3 branch B, B4: TM training curves (run before B3)
 - Choices (start of step): B4 before B3 so B3 uses a CV-chosen epoch count; 150 epochs; epoch rule = first epoch where the smoothed held-out curve (11-epoch centred moving average, mean over folds x seeds) is within 0.005 of its maximum. Significance test for B3 chosen: Nadeau-Bengio corrected resampled t-test; TM results go to `docs/tm-results.md`.
@@ -291,6 +305,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 | 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
+| 2026-09-28 | B3 TM vs baselines, full protocol, seeds 1-5 | v5 | TM 400: 0.949 / 0.958, repeated 0.966 ± 0.009; TM 100: 0.933 / 0.946, repeated 0.949 | NB 0.963 / 0.959 / 0.968; TM 400 − NB repeated −0.001 [−0.012, +0.010] p = 0.82; TM 100 − LR repeated −0.019, p = 0.016; TM 400 166 KB, 0.081 ms/snippet |
 | 2026-09-27 | B4 TM training curves, 5 folds x seeds 1-5, 150 epochs (CV only) | v5 | tm_400 (N_c=400/T=100/s=5): 0.951 at epoch 120 (levels off at 19: 0.946) / -; tm_100: 0.933 at epoch 142 (44: 0.928) / - | NB same folds 0.963; B1's 0.962 was seed 42 (lucky); 0.05 / 0.03 s/epoch |
 | 2026-09-27 | B1 spike: TMU, frozen features, 150 epochs (CV only) | v5 | N_c=100/T=30/s=3.5: 0.925-0.940 / -; N_c=400/T=100/s=5: 0.962 / - | last-20-epoch mean over 5 folds; NB same folds 0.963; 0.03-0.04 s/epoch; TMU predict 0.07-0.09 ms/snippet; N_c=400 clauses 400 KB dense / ~80 KB sparse |
 | 2026-09-25 | Same, after faster binarization | v5 | identical scores | 0.08-0.13 ms/snippet end-to-end (linear models / NB) on a loaded machine; binarize alone 5.4-6.0× faster than before (interleaved A/B); RF 0.75 |

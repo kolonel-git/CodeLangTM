@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- `codelangtm tm-results` (`tm_results.py`): every TM setting x seed through the baselines' exact protocol (`evaluate_model`), baselines re-run beside them, corrected resampled t-test (Nadeau & Bengio) per fold and per repeated split; writes `docs/tm-results.md` + `.json` and the final models (one JSON per setting x seed) to `models/` (gitignored). Figures `tm_comparison.png`, `tm_per_language.png` via `codelangtm report --tm-results`.
+- `evaluate_model(keep_pipeline=True)` returns the final fitted pipeline (`ModelResult.pipeline`, never written to reports).
 - TM experiment config (`TMConfig`, `configs/tm.yaml`: seeds, TM settings, curve rule; features must equal the frozen baseline features).
 - `codelangtm tm-curve` (`curves.py`): TM training curves on CV folds of train (every fold x seed, one epoch at a time), clause-formation statistics per epoch, smoothed epoch rule (`epoch_rule`: `plateau` or `max`, the smoothed peak); writes `docs/tm-curves.md` + `.json`. `codelangtm report --curves` draws `tm_curves.png` and `tm_clause_formation.png`.
 - `TMLanguageClassifier` (`model.py`): Tsetlin Machine as a scikit-learn estimator (`fit`, `partial_fit`, `predict`, `decision_function`, `predict_tmu`), TMU imported lazily and without its pycuda noise.
