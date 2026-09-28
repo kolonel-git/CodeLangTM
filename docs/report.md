@@ -1,10 +1,10 @@
 # CodeLangTM report
 
-A readable account of the project so far: what we are building, the data, how models are evaluated, what the classical baselines achieve, which feature choices mattered, and what the Tsetlin Machine (TM) has to match.
+A readable account of the project so far: what we are building, the data, how models are evaluated, what the classical baselines achieve, which feature choices mattered, how the Tsetlin Machine (TM) compares, and what its rules look like inside.
 
 New to the terms used here (clauses, T and s, macro-F1, CV, ablation)? See the [concepts guide](concepts.md).
 
-*Hand-written narrative.* The exact numbers live in generated files ([results.md](results.md), [ablations.md](ablations.md) and their `.json` twins). The figures are regenerated with `uv run codelangtm report`. Last updated 2026-09-27 (dataset v5, frozen features, before any TM training).
+*Hand-written narrative.* The exact numbers live in generated files ([results.md](results.md), [ablations.md](ablations.md), [tm-curves.md](tm-curves.md), [tm-results.md](tm-results.md), [resources.md](resources.md), [clauses.md](clauses.md) and their `.json` twins). The figures are regenerated with `uv run codelangtm report`. Last updated 2026-09-28 (dataset v5, frozen features, official TM model tm_400 seed 4).
 
 **Contents:** [1 Goal](#1-goal-and-approach) · [2 Data](#2-data) · [3 Evaluation](#3-how-models-are-evaluated) · [4 Baselines](#4-baselines-the-bar-for-the-tm) · [5 Feature ablations](#5-feature-ablations-what-mattered) · [6 Resources](#6-resources) · [7 Tsetlin Machine](#7-tsetlin-machine) · [8 Limitations](#8-limitations) · [9 Reproduce](#9-reproduce)
 
@@ -121,7 +121,7 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 ### 7.1 Head-to-head with the baselines
 
-**Result: the 400-clause TM is statistically indistinguishable from Naive Bayes and logistic regression**, while the rules it uses stay readable (the clause inspector, section 7.4, is next). Both TMs went through exactly the protocol of the baselines: the same code, 5 CV folds, one fit on all of train scored once on test, and the same 10 repeated splits, with every TM number averaged over 5 seeds ([tm-results.md](tm-results.md)).
+**Result: the 400-clause TM is statistically indistinguishable from Naive Bayes and logistic regression**, while the rules it uses stay readable (section 7.4 opens them up). Both TMs went through exactly the protocol of the baselines: the same code, 5 CV folds, one fit on all of train scored once on test, and the same 10 repeated splits, with every TM number averaged over 5 seeds ([tm-results.md](tm-results.md)).
 
 ![TM vs baselines](figures/tm_comparison.png)
 
@@ -152,7 +152,7 @@ Every model is measured the same way, so the TM will simply be one more row.
   - the 400-clause model file is **166 KB** (the 500 KB target is met): 3,200 clauses with 12 literals each on average;
   - prediction takes **0.08 ms per snippet** end to end (Naive Bayes 0.04 ms). Our NumPy prediction is about 1.6× faster than TMU's own;
   - training takes about 8 s (Naive Bayes 0.3 s).
-- **The official model** is the 400-clause TM trained with seed 4: of the 5 seeds, its CV score is the median (0.950), so it is a typical model rather than the luckiest one, and the choice used no test data. Retraining it from the config reproduces the saved model exactly. The clause inspector and the command-line tool will use this model.
+- **The official model** is the 400-clause TM trained with seed 4: of the 5 seeds, its CV score is the median (0.950), so it is a typical model rather than the luckiest one, and the choice used no test data. Retraining it from the config reproduces the saved model exactly. The clause inspector (section 7.4) and the command-line tool use this model.
 
 ### 7.2 Resources, measured in fresh processes
 
@@ -196,15 +196,103 @@ Every model was trained and used in a brand-new Python process doing one job, re
 - **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.05 s.
 - **Prediction can run without TMU.** A plain NumPy re-implementation gives exactly the same scores as TMU, and ran about twice as fast in a first measurement (0.03 vs 0.07 ms per snippet, one fold). A trained model is saved as one JSON file of about 160 KB and can be used and inspected without TMU installed.
 
-### 7.4 Still to come in M3
+### 7.4 Inside the model: the clause inspector
 
-- **How the TM works inside:**
-  - every learned clause, readable as a rule;
-  - the signature features of each language;
-  - which languages share literals, to explain confusable pairs;
-  - how clauses form over epochs;
-  - one prediction traced to the exact clauses that fired;
-  - an error analysis of the confusable pairs, including why Python attracts other languages.
+`codelangtm clauses` turns every one of the official model's 3,200 clauses into a readable rule and describes them on the training set ([clauses.md](clauses.md); every clause with its statistics in [clauses.json](clauses.json)). `codelangtm explain` traces a single prediction to the clauses that fired. The test set is not used for any of this.
+
+- **The rules are the model.** Each rule was evaluated straight from its text on every training snippet, independently of the model's own prediction code. Both fire in exactly the same places, for all 3,200 clauses. What you read is what the model computes.
+- **A strong rule looks like this** (Rust, weight 20): `has("fn ") AND NOT has("\t}") AND NOT has("\n<")`. It fires on 81% of Rust training snippets and on 0.7% of the others, and 95% of the snippets it fires on are Rust.
+
+**Signature n-grams.** For each language, these are the n-grams its "for" clauses use much more often than other languages' "for" clauses do:
+
+| Language | Signature n-grams (top 3) | In words |
+| --- | --- | --- |
+| C++ | `::`, `);`, `std` | scope operator, `std::` |
+| Go | `{`+newline+tab, newline+`fu`, `:=` | tab-indented blocks, `func`, short declarations |
+| HTML | `">`, `</`, `>`+newline | tags and attributes |
+| Java | `;`+newline, `ic `, `}`+blank line | statements, `public`/`static` |
+| JavaScript | ` }`, `ons`, `xp` | `const`, `export`, closing braces |
+| Python | newline+2 spaces, `:`+newline+space, `:`+newline | indented blocks after `:` |
+| Rust | ` le`, `!(`, `et ` | `let`, macros such as `println!(` |
+| SQL | newline+`-`, `LEC`, `INT` | `--` comments, `SELECT`, `INT` |
+
+![Signature n-grams and who uses them](figures/clause_signatures.png)
+
+- **Most signature n-grams are what a programmer would name**, and each language relies mostly on its own (the diagonal blocks in the figure). The ones shared across languages point at real overlaps: C++, Java and Rust all end statements with `;` + newline, and Rust also uses `::`.
+- **SQL is recognised mostly by exclusion.** Its signature n-grams are weak (each is in only about 2% of SQL's "for" clauses), and its broadest rules are long lists of `NOT has(...)`: no `:=`, no `*/`, no `elf` (as in `self`), and so on. The strongest SQL rule by coverage is 14 `NOT has(...)` parts and no `has(...)` part at all (70% coverage, 81% precision).
+- **Languages share about a fifth of their n-grams.** The Jaccard overlap between two languages' "for" n-gram sets is 0.16-0.31. The highest overlaps are JavaScript-Rust (0.31) and Python-Rust (0.28), and SQL overlaps least with everything.
+
+![Shared n-grams between languages](figures/clause_overlap.png)
+
+**The shape of the clauses.**
+
+![Clause length, weight and reach](figures/clause_shapes.png)
+
+- **Most clauses are short:** the median clause has 5-7 literals, and 41 of the 3,200 are empty (they never fire).
+- **A long tail of specialists:** 173 clauses have more than 40 literals, up to 268, almost all `NOT has(...)` parts. They fire on few training snippets (median 4) with near-perfect precision, and they carry above-average weight (median 9, against 6 for all clauses). They look like memorised small groups of training snippets: a readability cost, and a possible overfitting risk. M4 will test whether limiting clause length (TMU's `max_included_literals`) keeps accuracy while removing them.
+- **Some clauses are duplicates:** 35 clauses repeat another clause of the same language exactly, for example two Rust clauses that are both just `has("!(")`.
+
+**Stability across seeds.** The same setting was trained with seeds 1, 2, 3 and 5 and compared with the official model (seed 4).
+
+- The top-10 signature lists overlap by 20-62%, and the signature scores of all n-grams correlate at 0.49-0.85.
+- The clearest languages are the most stable (C++, HTML, Go: 0.79-0.85). SQL (0.49) and JavaScript (0.55) are the least.
+- So the broad picture repeats from seed to seed, but the exact top-10 list for a language should not be read as the one true fingerprint. Many n-grams are near-ties.
+
+**How the rules formed.** Retraining the official model epoch by epoch with the same seed ends at exactly the saved model.
+
+![How the rules formed](figures/clause_formation_replay.png)
+
+- **What is learned early, how is refined late.** 59 of the 80 signature n-grams settle within 10 epochs (median: epoch 5). Settled means their share stays at least half its final value from then on.
+- **The clauses themselves keep changing.** Measured as Jaccard similarity of the include decisions, they reach 0.48 of the final clauses by epoch 20 and 0.85 by epoch 80. This matches the training curves: the score levels off early while the clauses keep being rearranged.
+
+**One prediction, traced.** A short Rust function written for this report (not from the dataset):
+
+```rust
+use std::collections::HashMap;
+
+fn count_words(text: &str) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    for word in text.split_whitespace() {
+        *counts.entry(word.to_string()).or_insert(0) += 1;
+    }
+    counts
+}
+```
+
+```text
+$ uv run codelangtm explain --file count_words.rs --top 3
+prediction: rust
+
+votes per language (sum of fired clause weights):
+  rust           186
+  cpp            -65
+  java          -170
+  go            -177
+  html          -199
+  python        -249
+  sql           -253
+  javascript    -356
+
+rust: 48 clauses fired (+250 for, -64 against); strongest 3:
+   +20  #2563  has("fn ") AND NOT has("\t}") AND NOT has("\n<")
+   +17  #2477  has("et ") AND NOT has("SE") AND NOT has(" '") AND NOT has("=>") AND NOT has("ss ") AND NOT has("f (") AND ... (+7 more)
+   -17  #2764  has("ons") AND NOT has("\">\n") AND NOT has("#[") AND NOT has("c c") AND NOT has("\tf") AND NOT has("\np") AND ... (+3 more)
+
+cpp: 47 clauses fired (+162 for, -227 against); strongest 3:
+   +23  #155   has("\n}\n") AND NOT has("bli") AND NOT has("get") AND NOT has("// ")
+   -19  #209   has("fn ") AND has("et ")
+   +17  #17    has(";\n ") AND NOT has(">\n ") AND NOT has("):") AND NOT has("c ") AND NOT has(" '") AND NOT has("s=\"") AND ... (+18 more)
+
+82 of the model's features are present in the snippet
+```
+
+- Each language's votes are the sum of the weights of its clauses that fired, so the explanation adds up exactly to the prediction.
+- Rust wins mainly through `fn ` and `let`. One of Rust's own clauses votes against it (-17): its `has("ons")` part is triggered by `collections`, which is also typical of JavaScript's `const`.
+- C++ is the runner-up because of `std::` and the closing brace on its own line. A C++ "against" clause says it directly: `has("fn ") AND has("et ")` means "this looks like Rust, not C++".
+
+### 7.5 Still to come in M3
+
+- **Error analysis:** the confusable pairs, why Python attracts other languages' snippets, and where the TM and Naive Bayes disagree.
 
 ## 8. Limitations
 
@@ -222,7 +310,13 @@ uv run codelangtm collect github                                   # needs GITHU
 uv run codelangtm data build                                       # data/processed/ (dataset v5)
 uv run codelangtm baselines --config configs/baselines.yaml        # docs/results.md + .json
 uv run codelangtm ablate                                           # docs/ablations.md + .json
+uv run codelangtm tm-curve                                         # docs/tm-curves.md + .json
+uv run codelangtm tm-results                                       # docs/tm-results.md + .json, models/ (~25 min)
+uv run codelangtm tm-select                                        # models/tm.json (official model)
+uv run codelangtm resources                                        # docs/resources.md + .json
+uv run codelangtm clauses                                          # docs/clauses.md + .json
 uv run codelangtm report                                           # docs/figures/*.png
+uv run codelangtm explain --file my_snippet.py                     # one prediction, traced
 ```
 
 The data is not committed (`data/` is gitignored). Collection is recorded in [data-sources.md](data-sources.md), and dataset hashes are listed in the [dataset card](dataset-card.md) and in the header of every generated report.

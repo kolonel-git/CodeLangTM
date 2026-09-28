@@ -51,7 +51,18 @@ uv run codelangtm collect github                                  # data/raw/
 uv run codelangtm data build                                      # data/processed/
 uv run codelangtm baselines --config configs/baselines.yaml       # docs/results.md + .json
 uv run codelangtm ablate                                          # docs/ablations.md + .json
+uv run codelangtm tm-curve                                        # docs/tm-curves.md + .json
+uv run codelangtm tm-results                                      # docs/tm-results.md + .json, models/ (~25 min)
+uv run codelangtm tm-select                                       # models/tm.json (official model)
+uv run codelangtm resources                                       # docs/resources.md + .json
+uv run codelangtm clauses                                         # docs/clauses.md + .json
 uv run codelangtm report                                          # docs/figures/*.png
+```
+
+Ask the model why it chose a language:
+
+```bash
+uv run codelangtm explain --file my_snippet.rs                    # votes per language + the clauses that fired
 ```
 
 ## Status
@@ -63,7 +74,7 @@ Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with fi
 | M0 Foundations | done |
 | M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
 | M2 Features & baselines | done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
-| M3 TM training | in progress: the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 166 KB model) ([report](docs/report.md), section 7); resources and clause inspector next |
+| M3 TM training | in progress: the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 166 KB model) ([report](docs/report.md), section 7); every clause readable as a rule and every prediction traceable (`codelangtm explain`, [clauses](docs/clauses.md)); error analysis next |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |
 | M6 Deployment & benchmarks | planned |

@@ -2,9 +2,9 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-09-27
-**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B5 done; B6 clause inspector next)
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 166 KB model
+**Last updated:** 2026-09-28
+**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B6 done; B6b error analysis next)
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 166 KB model, and every clause is readable as a rule ([clauses](docs/clauses.md))
 
 ## Milestone overview
 
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B4 done (TM matches the baselines) |
+| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B6 done (TM matches the baselines; resources; clause inspector) |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -33,7 +33,8 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - [x] B3 full protocol: TM 400 matches the baselines (no significant difference); TM 100 significantly behind logistic regression
 - [x] B4b `tm-train` + `tm-select`: official model = tm_400 seed 4 (median CV)
 - [x] B5 process-level resources (`codelangtm resources`)
-- [ ] M3 branch B `feat/tm-training`: B6 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
+- [x] B6 clause inspector (`codelangtm clauses`, `codelangtm explain`)
+- [ ] M3 branch B `feat/tm-training`: B6b error analysis → B7 report → PR (details in the roadmap, M3)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison (5 seeds, paired significance test)
 - [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
@@ -41,6 +42,20 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-28 — M3 branch B, B6: clause inspector
+- Choices (start of step): summary `docs/clauses.md` + full `clauses.json`; official model plus a stability check against the other 4 seeds; include a formation replay.
+- `rules.py` + `codelangtm clauses` / `codelangtm explain` (details in the CHANGELOG). Statistics use the training set only; the command refuses a dataset whose hashes differ from the model's. Runtime about 1 min (the formation replay retrains 120 epochs).
+- **Checks:** every rule, evaluated from its literal list, fires exactly where `TMState.clause_outputs` says (all 3,200 clauses, all 696 training snippets). The formation replay ends at exactly the saved model.
+- **Results:**
+  - Signature n-grams match intuition: C++ `::`/`std`, Go tab-indented `{`/`:=`, HTML `">`/`</`, Rust `let`/`!(`/`fn `, Python `:`+newline/indentation, Java `;`+newline/`public`, JavaScript `const`/`export`. SQL is recognised mostly by exclusion (its broadest rule is 14 `NOT has(...)` parts).
+  - Clause length: median 5-7 literals, 41 empty, 35 exact duplicates. 173 clauses have more than 40 literals: specialists for a few training snippets with high weight (issues-and-fixes M10, input for M4's literal budget).
+  - Language overlap (Jaccard of "for" n-gram sets): 0.16-0.31; highest JavaScript-Rust 0.31, Python-Rust 0.28.
+  - Stability across seeds: top-10 signature overlap 20-62%, score correlation 0.49-0.85 (C++/HTML/Go most stable, SQL/JavaScript least). The broad picture repeats; exact top-10 lists do not.
+  - Formation: 59 of 80 signature n-grams settle within 10 epochs (median 5); the clauses keep changing (Jaccard with the final clauses 0.48 at epoch 20, 0.85 at epoch 80).
+- Fixed before commit: the first formation measures (raw agreement, first epoch seen) were uninformative (issues-and-fixes M9).
+- Report: section 7.4 (inspector, figures, one prediction traced), 7.5 (still to come); Reproduce section and header brought up to date (they predated TM training). README quickstart and status, CLAUDE.md, architecture, roadmap (B6 ticked, M5 items adjusted), concepts (rule, coverage/precision, signature n-gram, Jaccard, specialist clause, explanation, formation replay, correlation).
+- Tests: 343 passing (18 new in `tests/test_rules.py`: a hand-built model with known answers for naming, escaping, rule evaluation, statistics, summaries, signatures, overlap, stability, explanations summing to the class sums, JSON with every clause and the report; with TMU, formation replay reproducing the saved model and the CLI end to end; plus 2 figure tests).
 
 ### 2026-09-28 — M3 branch B, B5: process-level resources
 - Choice (start of step): full protocol.
@@ -327,6 +342,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 | 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
+| 2026-09-28 | B6 clause inspector, official model tm_400 seed 4 (train set only) | v5 | - | rules = model (3,200/3,200); median 5-7 literals, 173 clauses > 40 literals; overlap 0.16-0.31; seed score correlation 0.49-0.85; signatures settle by epoch 5 (median) |
 | 2026-09-28 | B5 process-level resources (fresh process per job, 3 repeats) | v5 | - | one snippet median: LR 0.089, TM100 0.199, NB 0.215, TM400 0.343 ms; batch 0.031-0.057 ms; training memory ~76 MB for all (binarizer); TM 400 fit 7.7 s, 164 KB |
 | 2026-09-28 | B3 TM vs baselines, full protocol, seeds 1-5 | v5 | TM 400: 0.949 / 0.958, repeated 0.966 ± 0.009; TM 100: 0.933 / 0.946, repeated 0.949 | NB 0.963 / 0.959 / 0.968; TM 400 − NB repeated −0.001 [−0.012, +0.010] p = 0.82; TM 100 − LR repeated −0.019, p = 0.016; TM 400 166 KB, 0.081 ms/snippet |
 | 2026-09-27 | B4 TM training curves, 5 folds x seeds 1-5, 150 epochs (CV only) | v5 | tm_400 (N_c=400/T=100/s=5): 0.951 at epoch 120 (levels off at 19: 0.946) / -; tm_100: 0.933 at epoch 142 (44: 0.928) / - | NB same folds 0.963; B1's 0.962 was seed 42 (lucky); 0.05 / 0.03 s/epoch |

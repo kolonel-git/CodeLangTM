@@ -43,6 +43,13 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 - **s (specificity):** controls how easily literals are dropped. A larger s gives longer, more specific clauses.
 - **Epoch:** one pass over all training snippets. The TM trains for many epochs.
 - **Model file:** the trained TM saved as one JSON file: the feature vocabulary, every clause (its included literals and weight) and metadata. Anything that can read JSON can use it to classify code, with no machine-learning library.
+- **Rule:** a clause written out as text, for example `rust = has("fn ") AND NOT has("\t}")`. Quotes show spaces; `\n` is a line break and `\t` a tab.
+- **Coverage, false fires, precision (of a clause):** *coverage* is the share of its own language's training snippets the clause fires on; *false fires* is the share of other languages' snippets it fires on; *precision* is, of all snippets it fires on, the share in its own language. A good "for" clause has high coverage and high precision.
+- **Signature n-gram:** an n-gram that a language's "for" clauses use much more often than other languages' "for" clauses do (C++ `::`, Go `:=`). Measured by *lift*: how many times more often it is used here than elsewhere.
+- **Jaccard similarity:** overlap between two sets, measured as the size of their intersection divided by the size of their union. It is 1 when the sets are identical and 0 when they share nothing. Used here to compare the n-grams two languages rely on, and a model's clauses during training with its final clauses.
+- **Specialist (narrow) clause:** a very long clause, mostly `NOT has(...)` parts, that fires on only a handful of training snippets. It is a way of memorising unusual examples, and costs readability.
+- **Explanation of a prediction:** the list of clauses that fired on a snippet, with their weights. Each language's votes are exactly the sum of those weights, so the explanation is complete, not an approximation.
+- **Formation replay:** retraining a model with the same seed, one epoch at a time, and saving a snapshot after each epoch to watch how its rules appeared. With the same seed, training is deterministic, so the replay ends at exactly the saved model.
 - **Seed:** the starting value of the random number generator. Training uses randomness, so the same seed reproduces the same model, and different seeds show how much results depend on luck. (TMU needs a seed of at least 1: with 0 its random number generator gets stuck.)
 
 ## Measuring quality
@@ -78,6 +85,7 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 - **Significance test:** a statistical check of whether a difference (for example TM vs Naive Bayes) is larger than chance variation would produce. Used for the headline comparisons, over several seeds and the same folds.
 - **p-value:** if there were truly no difference, how often would chance alone produce a difference at least this large? Below 0.05 is the usual line for "unlikely to be chance". A large p does not prove the models are equal; it means the data cannot tell them apart.
 - **95% interval (confidence interval):** the range of true differences that fits the data. If it contains 0, "no difference" is plausible; a narrow interval around 0 is evidence that any difference is small.
+- **Correlation (Pearson):** how closely two lists of numbers rise and fall together, from -1 (opposite) through 0 (unrelated) to 1 (in step). Used to compare the signature scores of every n-gram between models trained with different seeds, which is fairer than comparing two top-10 lists whose edges are decided by near-ties.
 - **Corrected resampled t-test (Nadeau & Bengio):** the test used here. A normal paired t-test assumes the repeated splits are independent, but they share most of their training data, which makes it too confident. The correction widens the uncertainty to account for that overlap.
 
 ## Speed and size
