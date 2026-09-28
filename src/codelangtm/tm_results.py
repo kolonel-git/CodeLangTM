@@ -20,12 +20,14 @@ from pathlib import Path
 
 import numpy as np
 from scipy import stats
+from sklearn.pipeline import Pipeline
 
 from . import LANGUAGES
 from .audit import load_dataset
 from .baselines import (
     SPLIT_SALT,
     ModelResult,
+    _macro_f1,
     dataset_meta,
     evaluate_model,
     load_folds,
@@ -226,6 +228,75 @@ def significance(baselines: Sequence[ModelResult], entries: Sequence[TMEntry], m
                 rows.append({"tm": entry.setting, "baseline": base.name,
                              "evaluation": "repeated test splits", **test})  # fmt: skip
     return rows
+
+
+# ------------------------------------------------------------------ final models
+
+
+CANONICAL_RULE = "median CV macro-F1 over seeds (no test data used)"
+
+
+def canonical_seed(data: dict, setting: str) -> int:
+    """The seed whose CV macro-F1 is the median of the setting's seeds (lower median if even,
+    lower seed on ties): a typical model, chosen without looking at the test set."""
+    seeds = data["tm"][setting]["seeds"]
+    ranked = sorted(seeds, key=lambda s: (s["cv_mean"], s["seed"]))
+    return ranked[(len(ranked) - 1) // 2]["seed"]
+
+
+def select_canonical(data: dict, setting: str, models_dir: str | Path, out: str | Path) -> dict:
+    """Copy `<models_dir>/<setting>_seed<k>.json` for the canonical seed to `out`, recording the
+    rule and every seed's CV score in the model's metadata. Returns that metadata."""
+    seed = canonical_seed(data, setting)
+    src = Path(models_dir) / f"{setting}_seed{seed}.json"
+    if not src.exists():
+        raise FileNotFoundError(f"{src} not found: rerun `codelangtm tm-results` to save models")
+    model = json.loads(src.read_text(encoding="utf-8"))
+    model["meta"]["canonical"] = {
+        "rule": CANONICAL_RULE,
+        "setting": setting,
+        "seed": seed,
+        "cv_by_seed": {str(s["seed"]): s["cv_mean"] for s in data["tm"][setting]["seeds"]},
+        "source": src.as_posix(),
+    }
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(model, ensure_ascii=False, separators=(",", ":")) + "\n",
+                   encoding="utf-8")  # fmt: skip
+    return model["meta"]
+
+
+def train_final(cfg: TMConfig, setting: str, seed: int, out: str | Path) -> dict:
+    """Train one TM on all of train (no CV, no repeated splits) and save it as a model file.
+    Returns a summary; the test score is printed for information only, not used for choices."""
+    s = cfg.setting(setting)
+    data_dir = Path(cfg.data)
+    dataset = load_dataset(data_dir)
+    folds = load_folds(data_dir)
+    meta = dataset_meta(data_dir, dataset, folds)
+    train, test = dataset["train"], dataset["test"]
+    binarizer = cfg.features.binarizer()
+    model = TMLanguageClassifier(**s.kwargs(), seed=seed)
+    start = time.perf_counter()
+    x_train = binarizer.fit([t.text for t in train], [t.language for t in train]).transform(
+        [t.text for t in train]
+    )
+    model.fit(x_train, [t.language for t in train])
+    seconds = time.perf_counter() - start
+    pipe = Pipeline([("binarize", binarizer), ("model", model)])
+    model_meta = {
+        "setting": setting, "seed": seed, "config_hash": config_hash(cfg),
+        "dataset_files": meta["dataset_files"], "trained_on": "train (all folds)",
+    }  # fmt: skip
+    path = save_pipeline(out, pipe, model_meta)
+    y_test = np.asarray([t.language for t in test])
+    return {
+        "path": path.as_posix(),
+        "fit_seconds": seconds,
+        "train_f1": _macro_f1(np.asarray([t.language for t in train]), model.predict(x_train)),
+        "test_f1": _macro_f1(y_test, pipe.predict([t.text for t in test])),
+        "epochs": model.epochs_trained_,
+    }
 
 
 # ------------------------------------------------------------------ reports

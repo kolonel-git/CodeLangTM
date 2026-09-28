@@ -94,7 +94,24 @@ def _build_parser() -> argparse.ArgumentParser:
         "--tm-results", type=Path, default=Path("docs/tm-results.json"),
         help="TM results sidecar (skipped if the file does not exist)",
     )  # fmt: skip
+    rep.add_argument(
+        "--resources", type=Path, default=Path("docs/resources.json"),
+        help="process-level resources sidecar (skipped if the file does not exist)",
+    )  # fmt: skip
     rep.add_argument("--out", type=Path, default=Path("docs/figures"))
+
+    res = sub.add_parser(
+        "resources", help="process-level fit/predict resources, each job in a fresh process"
+    )
+    res.add_argument("--config", type=Path, default=Path("configs/tm.yaml"))
+    res.add_argument(
+        "--results", type=Path, default=Path("docs/tm-results.json"),
+        help="tm-results sidecar (picks each TM setting's median-CV seed)",
+    )  # fmt: skip
+    res.add_argument("--models-dir", type=Path, default=Path("models"))
+    res.add_argument("--repeats", type=int, default=3, help="runs per job (median kept)")
+    res.add_argument("--passes", type=int, default=3, help="passes over the test set per run")
+    res.add_argument("--out", type=Path, default=Path("docs/resources.md"))
 
     tmr = sub.add_parser(
         "tm-results", help="TM vs baselines: full protocol per seed + significance tests"
@@ -109,6 +126,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="where the final models (one JSON per setting x seed) are saved (gitignored)",
     )  # fmt: skip
     tmr.add_argument("--no-save-models", action="store_true")
+
+    train = sub.add_parser("tm-train", help="train one TM on all of train and save the model file")
+    train.add_argument("--config", type=Path, default=Path("configs/tm.yaml"))
+    train.add_argument("--setting", help="TM setting from the config (default: the first)")
+    train.add_argument("--seed", type=int, default=1, help="TM seed (>= 1; default: 1)")
+    train.add_argument("--out", type=Path, help="default: models/<setting>_seed<seed>.json")
+
+    select = sub.add_parser(
+        "tm-select", help="copy the median-CV seed's model (from tm-results) to the official path"
+    )
+    select.add_argument("--results", type=Path, default=Path("docs/tm-results.json"))
+    select.add_argument("--setting", default="tm_400")
+    select.add_argument("--models-dir", type=Path, default=Path("models"))
+    select.add_argument("--out", type=Path, default=Path("models/tm.json"))
 
     curve = sub.add_parser(
         "tm-curve", help="TM training curves on CV folds (train only); recommends the epoch count"
@@ -147,14 +178,15 @@ def _report(args: argparse.Namespace) -> int:
     from .figures import render_all
 
     optional = {}
-    for key, label in (("curves", "TM curve"), ("tm_results", "TM result")):
+    for key, label in (("curves", "TM curve"), ("tm_results", "TM result"),
+                       ("resources", "resource")):  # fmt: skip
         path = getattr(args, key)
         optional[key] = path if path and path.exists() else None
         if path and optional[key] is None:
             print(f"note: {path.as_posix()} not found, skipping {label} figures")
     try:
         written = render_all(args.results, args.ablations, args.out, optional["curves"],
-                             optional["tm_results"])  # fmt: skip
+                             optional["tm_results"], optional["resources"])  # fmt: skip
     except (FileNotFoundError, ValueError, ImportError) as e:
         print(f"report failed: {e}", file=sys.stderr)
         return 1
@@ -187,6 +219,67 @@ def _tm_results(args: argparse.Namespace) -> int:
     print()
     print(summary_table(data))
     print(f"\nwrote {out} and {sidecar}")
+    return 0
+
+
+def _resources(args: argparse.Namespace) -> int:
+    from .baselines import sidecar_path, write_json
+    from .figures import load_sidecar
+    from .resources import measure_all, render_resources_md, resources_json, summary_table
+
+    try:
+        tm_results = load_sidecar(args.results, "codelangtm.tm-results/")
+        rows, meta = measure_all(args.config, tm_results, args.models_dir, args.repeats,
+                                 args.passes, progress=lambda m: print(m, flush=True))  # fmt: skip
+    except (FileNotFoundError, ValueError, RuntimeError) as e:
+        print(f"resources failed: {e}", file=sys.stderr)
+        return 1
+    meta["config_path"] = args.config.as_posix()
+    data = resources_json(rows, meta)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(render_resources_md(data), encoding="utf-8")
+    sidecar = write_json(data, sidecar_path(args.out))
+    print()
+    print(summary_table(data))
+    print(f"\nwrote {args.out} and {sidecar}")
+    return 0
+
+
+def _tm_train(args: argparse.Namespace) -> int:
+    from .config import load_tm_config
+    from .tm_results import train_final
+
+    try:
+        cfg = load_tm_config(args.config)
+        setting = args.setting or cfg.settings[0].name
+        out = args.out or Path("models") / f"{setting}_seed{args.seed}.json"
+        summary = train_final(cfg, setting, args.seed, out)
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"tm-train failed: {e}", file=sys.stderr)
+        return 1
+    print(f"trained {setting} seed {args.seed}: {summary['epochs']} epochs in "
+          f"{summary['fit_seconds']:.1f} s; train macro-F1 {summary['train_f1']:.3f}, "
+          f"test macro-F1 {summary['test_f1']:.3f} (information only)")  # fmt: skip
+    print(f"wrote {summary['path']}")
+    return 0
+
+
+def _tm_select(args: argparse.Namespace) -> int:
+    from .figures import load_sidecar
+    from .tm_results import select_canonical
+
+    try:
+        data = load_sidecar(args.results, "codelangtm.tm-results/")
+        if args.setting not in data["tm"]:
+            raise ValueError(f"setting {args.setting!r} not in {args.results}")
+        meta = select_canonical(data, args.setting, args.models_dir, args.out)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"tm-select failed: {e}", file=sys.stderr)
+        return 1
+    c = meta["canonical"]
+    scores = ", ".join(f"seed {k}: {v:.4f}" for k, v in c["cv_by_seed"].items())
+    print(f"canonical {c['setting']} model: seed {c['seed']} ({c['rule']}); CV {scores}")
+    print(f"wrote {args.out.as_posix()} (from {c['source']})")
     return 0
 
 
@@ -371,6 +464,12 @@ def main(argv: list[str] | None = None) -> int:
         return _tm_curve(args)
     if args.command == "tm-results":
         return _tm_results(args)
+    if args.command == "tm-train":
+        return _tm_train(args)
+    if args.command == "resources":
+        return _resources(args)
+    if args.command == "tm-select":
+        return _tm_select(args)
     if args.command == "diagnose":
         return _diagnose(args)
     parser.print_help()

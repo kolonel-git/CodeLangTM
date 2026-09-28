@@ -166,3 +166,58 @@ def test_cli_tm_results(processed, tmp_path, capsys):
     assert (tmp_path / "r.json").exists() and not models.exists()
     assert main(["tm-results", "--config", str(cfg), "--setting", "zz"]) == 1
     assert "unknown TM setting" in capsys.readouterr().err
+
+
+# ------------------------------------------------------------ final models (B4b)
+
+
+def fake_results(cvs):
+    return {"tm": {"t": {"seeds": [{"seed": s, "cv_mean": c} for s, c in cvs]}}}
+
+
+def test_canonical_seed_is_the_median_cv():
+    assert tr.canonical_seed(fake_results([(1, 0.95), (2, 0.96), (3, 0.94)]), "t") == 1
+    assert tr.canonical_seed(fake_results([(1, 0.9), (2, 0.8), (3, 0.7), (4, 0.6)]), "t") == 3
+    assert tr.canonical_seed(fake_results([(5, 0.9), (2, 0.9), (7, 0.9)]), "t") == 5  # ties
+
+
+def test_select_copies_the_median_model(run, tmp_path):
+    baselines, entries, meta, models = run
+    data = json.loads(json.dumps(tr.tm_results_json(small_cfg_for_select(), baselines, entries,
+                                                    meta, LANGS), default=float))  # fmt: skip
+    seed = tr.canonical_seed(data, "small")
+    out = tmp_path / "official" / "tm.json"
+    c = tr.select_canonical(data, "small", models, out)["canonical"]
+    assert c["seed"] == seed and c["rule"].startswith("median CV") and len(c["cv_by_seed"]) == 2
+    copied, source = load_model(out), load_model(models / f"small_seed{seed}.json")
+    assert copied.state == source.state and copied.meta["canonical"]["seed"] == seed
+    with pytest.raises(FileNotFoundError, match="rerun"):
+        tr.select_canonical(data, "small", tmp_path / "empty", out)
+
+
+def small_cfg_for_select():
+    return parse_tm({"tm": {"small": {"n_clauses": 10, "T": 5, "s": 3.0, "epochs": 2}}})
+
+
+def test_train_final_reproduces_the_protocol_model(run, processed, tmp_path):
+    _, _, _, models = run
+    summary = tr.train_final(small_cfg(processed), "small", 2, tmp_path / "m.json")
+    assert summary["epochs"] == 2 and 0 <= summary["test_f1"] <= 1
+    # same seed, same data: identical to the model saved by the full protocol run
+    assert load_model(tmp_path / "m.json").state == load_model(models / "small_seed2.json").state
+
+
+def test_cli_tm_train_and_select(processed, tmp_path, capsys, run):
+    pytest.importorskip("tmu")
+    cfg = tmp_path / "tm.yaml"
+    cfg.write_text(
+        f"data: {processed.as_posix()}\nseeds: [1]\nfeatures: {{n_features: 30}}\n"
+        "tm:\n  a: {n_clauses: 6, T: 3, epochs: 1}\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "a.json"
+    assert main(["tm-train", "--config", str(cfg), "--seed", "3", "--out", str(out)]) == 0
+    assert "trained a seed 3: 1 epochs" in capsys.readouterr().out and out.exists()
+    assert main(["tm-train", "--config", str(cfg), "--seed", "0", "--out", str(out)]) == 1
+    assert "seed must be" in capsys.readouterr().err
+    assert main(["tm-select", "--results", str(tmp_path / "none.json")]) == 1

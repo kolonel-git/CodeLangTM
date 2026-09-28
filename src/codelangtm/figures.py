@@ -599,6 +599,53 @@ def tm_per_language(tm_results: dict) -> object:
     return _draw(draw)
 
 
+# ---------------------------------------------------------- resources.json figures
+
+
+def process_resources(resources: dict) -> object:
+    """Small multiples, one scale each: training time, memory added by training, and
+    single-snippet latency split into binarize and predict (median; tick = p95 total)."""
+
+    def draw():
+        rows = resources["models"][::-1]
+        names = [_label(r["name"]) for r in rows]
+        y = list(range(len(rows)))
+        fig, axes = _new_figure(8.4, 0.5 * len(rows) + 1.8, ncols=3, sharey=True)
+        wall = [r["fit"]["wall_s"] for r in rows]
+        added = [r["fit"]["added_mb"] for r in rows]
+        axes[0].barh(y, wall, height=0.6, color=SERIES[0])
+        axes[1].barh(y, added, height=0.6, color=SERIES[0])
+        for ax, values, fmt in ((axes[0], wall, "{:.2f} s"), (axes[1], added, "{:.0f} MB")):
+            for i, v in enumerate(values):
+                ax.text(v, i, " " + fmt.format(v), va="center", fontsize=7.5, color=INK_2)
+            ax.set_xlim(right=max(values) * 1.45)
+        axes[0].set_title("training time", fontsize=9)
+        axes[1].set_title("training memory added", fontsize=9)
+        binarize = [r["predict"]["binarize_ms_median"] for r in rows]
+        predict = [r["predict"]["predict_ms_median"] for r in rows]
+        p95 = [r["predict"]["total_ms_p95"] for r in rows]
+        axes[2].barh(y, binarize, height=0.6, color=SERIES[0], label="binarize (median)",
+                     edgecolor=SURFACE, linewidth=1)  # fmt: skip
+        axes[2].barh(y, predict, left=binarize, height=0.6, color=SERIES[1],
+                     label="predict (median)", edgecolor=SURFACE, linewidth=1)  # fmt: skip
+        axes[2].scatter(p95, y, marker="|", s=120, color=INK_2, zorder=3, label="p95 total")
+        axes[2].axvline(0.1, color=MUTED, lw=1)
+        axes[2].text(0.1, len(rows) - 0.45, " target 0.1 ms", color=MUTED, fontsize=8,
+                     va="bottom")  # fmt: skip
+        axes[2].set_xlim(right=max(max(p95), 0.1) * 1.25)
+        axes[2].set_ylim(-0.6, len(rows) - 0.1)
+        axes[2].set_title("latency, 1 snippet (ms)", fontsize=9)
+        axes[2].legend(loc="upper left", bbox_to_anchor=(0, -0.12), ncols=1)
+        for ax in axes:
+            ax.grid(axis="y", visible=False)
+        axes[0].set_yticks(y, names)
+        fig.suptitle("Resources, measured in fresh processes (median of repeats)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
 # ------------------------------------------------------------------------ all figures
 
 RESULTS_FIGURES: dict[str, Callable[[dict], object]] = {
@@ -616,6 +663,9 @@ ABLATION_FIGURES: dict[str, Callable[[dict], object]] = {
 TM_RESULT_FIGURES: dict[str, Callable[[dict], object]] = {
     "tm_comparison": tm_comparison,
     "tm_per_language": tm_per_language,
+}
+RESOURCE_FIGURES: dict[str, Callable[[dict], object]] = {
+    "process_resources": process_resources,
 }
 CURVE_FIGURES: dict[str, Callable[[dict], object]] = {
     "tm_curves": tm_curves,
@@ -639,6 +689,7 @@ def render_all(
     out_dir: str | Path,
     curves_path: str | Path | None = None,
     tm_results_path: str | Path | None = None,
+    resources_path: str | Path | None = None,
 ) -> list[Path]:
     """Draw every figure whose sidecar is given; returns the written PNG paths."""
     _mpl()  # fail early with the install hint
@@ -652,6 +703,8 @@ def render_all(
         jobs.append((load_sidecar(curves_path, "codelangtm.tm-curves/"), CURVE_FIGURES))
     if tm_results_path:
         jobs.append((load_sidecar(tm_results_path, "codelangtm.tm-results/"), TM_RESULT_FIGURES))
+    if resources_path:
+        jobs.append((load_sidecar(resources_path, "codelangtm.resources/"), RESOURCE_FIGURES))
     for data, figures in jobs:
         for name, fn in figures.items():
             written.append(save_png(fn(data), Path(out_dir) / f"{name}.png"))
