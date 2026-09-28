@@ -3,8 +3,8 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-28
-**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B6b done; B7 report wrap-up and PR next)
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 166 KB model, and every clause is readable as a rule ([clauses](docs/clauses.md))
+**Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7 done, PR open). Next: Stage B data, then M4
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR open for branch B): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
 
 ## Milestone overview
 
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B6b done (TM matches the baselines; resources; clause inspector; error analysis) |
+| M3 TM training | Done (PR open) | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B7 (TM matches the baselines; resources; clause inspector; error analysis; report wrap-up) |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -21,7 +21,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 ## Next steps (in order)
 
-M0-M2 are finished; each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
+M0-M3 are finished (M3 once its PR is merged); each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
 
 - [x] M3 branch A `feat/report`: A0 housekeeping, A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + [docs/report.md](docs/report.md)
 - [x] Push `feat/report`, PR #6 merged; CI green with TMU and matplotlib installed (TMU builds on the Ubuntu runner)
@@ -35,14 +35,21 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - [x] B5 process-level resources (`codelangtm resources`)
 - [x] B6 clause inspector (`codelangtm clauses`, `codelangtm explain`)
 - [x] B6b error analysis (`codelangtm errors`, out of fold)
-- [ ] M3 branch B `feat/tm-training`: B7 report wrap-up → PR (details in the roadmap, M3)
-- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison (5 seeds, paired significance test)
+- [x] B7 report wrap-up (key findings, targets scorecard, section 7 in story order, docs audit)
+- [x] Repeated splits used for the final TM vs baselines comparison (5 seeds, corrected resampled t-test; B3)
+- [ ] Push `feat/tm-training`, open the PR, CI green, merge; then add the PR number to README / roadmap / PROGRESS
 - [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-28 — M3 branch B, B7: report wrap-up (M3 done, PR open)
+- Choices (start of step): key findings plus a targets scorecard at the top of the report; section 7 in story order; M3 recorded as done pending the merge.
+- Report: key findings (TM matches the baselines, rules are exactly the model, errors follow shared vocabulary, specialist clauses, caveats) and targets scorecard (macro-F1 met on repeated test only; latency not yet, 0.34 ms in Python; size met, 164 KB). Section 7 reordered: 7.1 training curves, 7.2 head-to-head, 7.3 resources, 7.4 inside the model, 7.5 errors; cross-references updated. Corrected earlier statements: the Python "sink" (did not replicate), "B5 will re-measure speed", the 0.08 ms figure, "snippets not reviewed yet", "the TM will be one more row", and the unqualified "fast (bitwise)" claim. 166 KB (seed mean) vs 164 KB (official model) made explicit. Limitations extended: choices made after seeing CV data, untuned setting, embedded languages, few errors.
+- Docs audit: README (a rule the model really learned, measured values beside the targets, M3 status), roadmap (B7 and the M3 exit criteria ticked with evidence; B5's unmeasured items moved to M4/M6 instead of being claimed; M3 follow-ups added to Stage B, M4 and M6), dataset card (the embedded-HTML finding), architecture, CHANGELOG.
+- Tests: 358 passing (docs links and anchors checked).
 
 ### 2026-09-28 — M3 branch B, B6b: error analysis
 - Choices (start of step): CV out-of-fold only (test untouched); snippet references committed, code only in a local review file; compare with Naive Bayes and logistic regression with McNemar tests; hypothesis probes with verdict rules. Mid-step check-in (surprise: the Python sink did not replicate): probe the language that really collects errors, and measure embedded `<script>`/`<style>` code in HTML.

@@ -6,7 +6,21 @@ New to the terms used here (clauses, T and s, macro-F1, CV, ablation)? See the [
 
 *Hand-written narrative.* The exact numbers live in generated files ([results.md](results.md), [ablations.md](ablations.md), [tm-curves.md](tm-curves.md), [tm-results.md](tm-results.md), [resources.md](resources.md), [clauses.md](clauses.md), [errors.md](errors.md) and their `.json` twins). The figures are regenerated with `uv run codelangtm report`. Last updated 2026-09-28 (dataset v5, frozen features, official TM model tm_400 seed 4).
 
-**Contents:** [1 Goal](#1-goal-and-approach) · [2 Data](#2-data) · [3 Evaluation](#3-how-models-are-evaluated) · [4 Baselines](#4-baselines-the-bar-for-the-tm) · [5 Feature ablations](#5-feature-ablations-what-mattered) · [6 Resources](#6-resources) · [7 Tsetlin Machine](#7-tsetlin-machine) · [8 Limitations](#8-limitations) · [9 Reproduce](#9-reproduce)
+## Key findings
+
+- **The Tsetlin Machine matches the best classical baselines.** With 400 clauses per language it scores 0.966 macro-F1 on repeated test splits, against 0.968 for Naive Bayes and logistic regression. The difference is not significant (p = 0.82, corrected resampled t-test, 5 seeds). A 100-clause TM is significantly worse (section 7.2).
+- **Its rules can be read, and they are exactly the model.** All 3,200 clauses were turned into text rules. Evaluated from the text, they fire exactly where the model's clauses fire. Each language's strongest rules use n-grams a programmer would name: `::` for C++, `:=` for Go, `let` and `!(` for Rust. Every prediction can be traced to the clauses that fired (section 7.4).
+- **Its mistakes follow shared vocabulary.** Languages whose rules share n-grams are confused more often. The snippets the TM always misses are mostly missed by the baselines too. JavaScript's broad brace-based rules collect the most errors, and some HTML windows are really embedded JavaScript (section 7.5).
+- **Readability has a cost to watch:** 173 very long clauses memorise a handful of training snippets each (section 7.4). M4 tests a literal budget to remove them.
+- **Honest caveats:** the epoch count and one hypothesis rule were changed after seeing CV data (both marked). A pattern seen on the small test set (a Python "sink") did not replicate. The TM needs about 20× longer to train than Naive Bayes, though still only seconds.
+
+| Target | Measured | Met? |
+| --- | --- | --- |
+| Macro-F1 ≥ 0.96 | 0.966 repeated test (single test 0.958, CV 0.949; 5-seed means) | on the most reliable estimate, yes; within noise of the baselines |
+| < 0.1 ms per snippet | 0.34 ms one snippet at a time in Python; 0.057 ms in batches | not yet: left to the C runtime (M6) |
+| < 500 KB model | 164 KB (official model, JSON) | yes |
+
+**Contents:** [Key findings](#key-findings) · [1 Goal](#1-goal-and-approach) · [2 Data](#2-data) · [3 Evaluation](#3-how-models-are-evaluated) · [4 Baselines](#4-baselines-the-bar-for-the-tm) · [5 Feature ablations](#5-feature-ablations-what-mattered) · [6 Resources](#6-resources) · [7 Tsetlin Machine](#7-tsetlin-machine) · [8 Limitations](#8-limitations) · [9 Reproduce](#9-reproduce)
 
 ## 1. Goal and approach
 
@@ -18,7 +32,7 @@ Most classifiers learn numeric weights that are hard to read. A **Tsetlin Machin
 python  <-  has("def ") AND has(":") AND NOT has(";")
 ```
 
-Each language has a set of clauses. Some vote *for* the language and some vote *against* it; the language with the most net votes wins. Because the rules are plain logic, every prediction can be traced to the clauses that fired. The same logic also makes the model small and fast (bitwise operations instead of matrix arithmetic).
+Each language has a set of clauses. Some vote *for* the language and some vote *against* it; the language with the most net votes wins. Because the rules are plain logic, every prediction can be traced to the clauses that fired. The same logic can also make the model small and fast: in compiled code, clauses are bitwise operations instead of matrix arithmetic (the C runtime is planned for M6; the Python version is not yet fast, section 7.3).
 
 **Pipeline:** snippet → binary features ("does the snippet contain this 2- or 3-character string?") → TM clauses → votes per language → prediction.
 
@@ -76,7 +90,7 @@ Naive Bayes gets 166 of 173 test snippets right. Its 7 mistakes are all single o
 - **HTML → JavaScript (1).**
 - **Java → Python (1).**
 
-The individual snippets have not been reviewed yet. The M3 error analysis will look at them, and check whether the TM's rules explain the confusable pairs.
+With only 7 errors, the test set is too small to study mistakes; section 7.5 studies them on out-of-fold predictions of the whole training set instead.
 
 ## 5. Feature ablations: what mattered
 
@@ -108,18 +122,40 @@ At M=500, label-aware selection lifts logistic regression from 0.917 to 0.959 an
 
 ## 6. Resources
 
-Every model is measured the same way, so the TM will simply be one more row.
+Every model is measured the same way; the TM appears in section 7.3.
 
 ![Fit time, latency and model size per model](figures/resources.png)
 
 - **Most models are small and fast.** They fit in under 0.5 s and predict in about 0.03 ms per snippet, end to end (feature extraction + prediction). Random forest is the exception: 7 MB and about 0.25 ms per snippet.
 - **Feature extraction, not the classifier, dominates.** Building the binary features used 72 MB of peak memory, against ≤ 4.3 MB for any classifier. It also takes most of the prediction time. A rewrite made it 5-6× faster with identical output ([M2](issues-and-fixes.md)).
 - **Timings are approximate.** On this machine, timings vary by about ±50% with background load. The < 0.1 ms target is confirmed only by the dedicated benchmark planned for M6.
-- **Memory, measured for the whole process:** the numbers above trace Python/NumPy allocations only. Section 7.2 repeats the measurement in fresh processes, which also sees memory used inside C libraries such as TMU.
+- **Memory, measured for the whole process:** the numbers above trace Python/NumPy allocations only. Section 7.3 repeats the measurement in fresh processes, which also sees memory used inside C libraries such as TMU.
 
 ## 7. Tsetlin Machine
 
-### 7.1 Head-to-head with the baselines
+### 7.1 Training curves: how long to train
+
+Before comparing the TM with anything, it needs a training length. Each TM setting was trained on the 5 folds with 5 seeds each (25 runs), for up to 150 epochs, scoring the held-out fold after every epoch ([tm-curves.md](tm-curves.md)).
+
+![TM training curves](figures/tm_curves.png)
+
+| TM setting | Epochs used (smoothed peak) | Held-out macro-F1 there | Where the curve levels off | Naive Bayes, same folds |
+| --- | --- | --- | --- | --- |
+| 400 clauses per language, T=100, s=5 | 120 | 0.951 | epoch 19 (0.946) | 0.963 |
+| 100 clauses per language, T=30, s=3.5 | 142 | 0.933 | epoch 44 (0.928) | 0.963 |
+
+- **Learning is fast, then flat.** The TM gets 99% of the training set right within 5 epochs, and the held-out score levels off after about 20 epochs (400 clauses). Training on to the peak of the smoothed curve (epoch 120) adds about 0.005.
+- **Which epoch, and why it changed.** The rule fixed before the run was "first epoch where the smoothed curve levels off" (epochs 19 and 44). After seeing the curves, and before any test-set evaluation, we switched to the peak of the smoothed curve (epochs 120 and 142): about 6× the training time for about 0.005 more F1 on CV. Smoothing keeps a single lucky epoch from deciding. Because the rule was changed after seeing the CV curves, the CV scores at the chosen epoch are slightly optimistic; the test set and the repeated splits in the next step are the independent check.
+- **On CV, the TM trails Naive Bayes by about 1.5 points** (0.946-0.951 vs 0.963), and the training score of 1.000 against about 0.95 held out shows it fits the training data completely. The head-to-head test (7.2) shows this CV gap is within the noise.
+- **One lucky seed misled the first experiment.** The throwaway spike (B1) measured 0.962 with seed 42, and chose the 400-clause setting on that basis. Averaged over seeds 1-5 the same setting gives 0.945-0.950 per seed; rerunning seed 42 with the final code reproduces 0.962, so the code is consistent and seed 42 was simply lucky (one fold scored 0.991). This is why every TM number is now a mean over 5 seeds ([issues-and-fixes M8](issues-and-fixes.md)).
+- **Clauses grow, then settle.** During training, clauses get longer (about 9 → 12.7 literals per clause with 400 clauses) and change less and less: from about 29,000 include decisions changing in the first epoch to under 100 per epoch near epoch 150.
+
+![How clauses form during training](figures/tm_clause_formation.png)
+
+- **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.05 s.
+- **Prediction can run without TMU.** A plain NumPy re-implementation gives exactly the same scores as TMU. A trained model is saved as one JSON file of about 160 KB and can be used and inspected without TMU installed (speed: section 7.3).
+
+### 7.2 Head-to-head with the baselines
 
 **Result: the 400-clause TM is statistically indistinguishable from Naive Bayes and logistic regression**, while the rules it uses stay readable (section 7.4 opens them up). Both TMs went through exactly the protocol of the baselines: the same code, 5 CV folds, one fit on all of train scored once on test, and the same 10 repeated splits, with every TM number averaged over 5 seeds ([tm-results.md](tm-results.md)).
 
@@ -143,18 +179,15 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 - **TM 400 vs the baselines:** every interval contains 0 and every p is far above 0.05. On the repeated splits, the most reliable estimate, the TM is within about 0.01 of Naive Bayes in either direction. The 1.5-point gap seen on CV is inside the noise: CV has only 5 folds, and its spread (± 0.023) is large.
 - **TM 100 is worse:** the smaller TM is significantly behind logistic regression on the repeated splits (about 2 points; the interval excludes 0). Capacity matters.
-- **Caveat on the epoch choice:** the epoch counts were picked after looking at the CV curves (section 7.3), which can flatter the CV score slightly. The test set and the repeated splits were not used for any choice, so they are the independent check, and they agree with the conclusion.
+- **Caveat on the epoch choice:** the epoch counts were picked after looking at the CV curves (section 7.1), which can flatter the CV score slightly. The test set and the repeated splits were not used for any choice, so they are the independent check, and they agree with the conclusion.
 
 ![Test F1 per language](figures/tm_per_language.png)
 
-- **Per language:** the TM is best on Go (1.00) and SQL (0.98), and weakest on Java (0.93), JavaScript and Python (0.94). Summed over the 5 seeds, its most frequent test mistakes are Java → Python (8), Rust → C++ (5), HTML → JavaScript (5), and C++ / Rust → Python (3 each). Python acts as a "sink" that attracts snippets from other languages, which the error analysis (next steps) will investigate by looking at the clauses that fired.
-- **Size and speed** (this run; timings on this machine vary with load, so B5 re-measures them properly):
-  - the 400-clause model file is **166 KB** (the 500 KB target is met): 3,200 clauses with 12 literals each on average;
-  - prediction takes **0.08 ms per snippet** end to end (Naive Bayes 0.04 ms). Our NumPy prediction is about 1.6× faster than TMU's own;
-  - training takes about 8 s (Naive Bayes 0.3 s).
+- **Per language:** the TM is best on Go (1.00) and SQL (0.98), and weakest on Java (0.93), JavaScript and Python (0.94). Summed over the 5 seeds, its most frequent test mistakes are Java → Python (8), Rust → C++ (5), HTML → JavaScript (5), and C++ / Rust → Python (3 each). Python looked like a "sink" attracting other languages, but that did not hold up on the larger out-of-fold view: it came from a few test repositories (section 7.5).
+- **Size:** the 400-clause model file is **166 KB** on average over the seeds (164 KB for the official model), within the 500 KB target: 3,200 clauses with 12 literals each on average. Speed is measured properly in section 7.3. In this run, the NumPy prediction was about 1.6× faster than TMU's own.
 - **The official model** is the 400-clause TM trained with seed 4: of the 5 seeds, its CV score is the median (0.950), so it is a typical model rather than the luckiest one, and the choice used no test data. Retraining it from the config reproduces the saved model exactly. The clause inspector (section 7.4) and the command-line tool use this model.
 
-### 7.2 Resources, measured in fresh processes
+### 7.3 Resources, measured in fresh processes
 
 Every model was trained and used in a brand-new Python process doing one job, repeated 3 times, with the median kept ([resources.md](resources.md)). This sees all memory the process uses, including C libraries, and keeps earlier work from polluting the timings.
 
@@ -173,28 +206,6 @@ Every model was trained and used in a brand-new Python process doing one job, re
 - **In batches** all models are fast: the TM classifies about 17,500 snippets per second (0.057 ms each).
 - **Size:** the TM model file is 164 KB, within the 500 KB target.
 - **Noise check:** the binarize step is identical code for every model, yet it measured 0.033-0.056 ms; differences of a few hundredths of a millisecond are within this machine's noise.
-
-### 7.3 Training curves
-
-**Training curves.** Each TM setting was trained on the 5 folds with 5 seeds each (25 runs), for up to 150 epochs, scoring the held-out fold after every epoch ([tm-curves.md](tm-curves.md)).
-
-![TM training curves](figures/tm_curves.png)
-
-| TM setting | Epochs used (smoothed peak) | Held-out macro-F1 there | Where the curve levels off | Naive Bayes, same folds |
-| --- | --- | --- | --- | --- |
-| 400 clauses per language, T=100, s=5 | 120 | 0.951 | epoch 19 (0.946) | 0.963 |
-| 100 clauses per language, T=30, s=3.5 | 142 | 0.933 | epoch 44 (0.928) | 0.963 |
-
-- **Learning is fast, then flat.** The TM gets 99% of the training set right within 5 epochs, and the held-out score levels off after about 20 epochs (400 clauses). Training on to the peak of the smoothed curve (epoch 120) adds about 0.005.
-- **Which epoch, and why it changed.** The rule fixed before the run was "first epoch where the smoothed curve levels off" (epochs 19 and 44). After seeing the curves, and before any test-set evaluation, we switched to the peak of the smoothed curve (epochs 120 and 142): about 6× the training time for about 0.005 more F1 on CV. Smoothing keeps a single lucky epoch from deciding. Because the rule was changed after seeing the CV curves, the CV scores at the chosen epoch are slightly optimistic; the test set and the repeated splits in the next step are the independent check.
-- **On CV, the TM trails Naive Bayes by about 1.5 points** (0.946-0.951 vs 0.963), and the training score of 1.000 against about 0.95 held out shows it fits the training data completely. The head-to-head test (7.1) shows this CV gap is within the noise.
-- **One lucky seed misled the first experiment.** The throwaway spike (B1) measured 0.962 with seed 42, and chose the 400-clause setting on that basis. Averaged over seeds 1-5 the same setting gives 0.945-0.950 per seed; rerunning seed 42 with the final code reproduces 0.962, so the code is consistent and seed 42 was simply lucky (one fold scored 0.991). This is why every TM number is now a mean over 5 seeds ([issues-and-fixes M8](issues-and-fixes.md)).
-- **Clauses grow, then settle.** During training, clauses get longer (about 9 → 12.7 literals per clause with 400 clauses) and change less and less: from about 29,000 include decisions changing in the first epoch to under 100 per epoch near epoch 150.
-
-![How clauses form during training](figures/tm_clause_formation.png)
-
-- **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.05 s.
-- **Prediction can run without TMU.** A plain NumPy re-implementation gives exactly the same scores as TMU, and ran about twice as fast in a first measurement (0.03 vs 0.07 ms per snippet, one fold). A trained model is saved as one JSON file of about 160 KB and can be used and inspected without TMU installed.
 
 ### 7.4 Inside the model: the clause inspector
 
@@ -365,10 +376,14 @@ Why JavaScript? Each hypothesis had a pass/fail rule written before the run. The
 ## 8. Limitations
 
 - **Snippet length:** only 20-50 line windows. Accuracy on one-line or very short snippets is not measured; this is a Future item in the [roadmap](roadmap.md).
-- **Small dataset:** 869 snippets and 8 languages. Test scores move by several points depending on which repositories are in test, which is why CV and repeated test are reported.
+- **Small dataset:** 869 snippets and 8 languages. Test scores move by several points depending on which repositories are in test, which is why CV and repeated test are reported. Stage B (after M3) grows the dataset before any tuning.
 - **Missing test sets and languages:** there is no "wild" test set yet (code from StackOverflow, blogs and docs), and stretch languages such as TypeScript and C# are deferred to Stage B.
 - **Labels are not hand-annotated.** They come from file extensions plus content checks. Checks and reviews found no mislabels, but some hard cases remain (for example, Rust code that mirrors C structures).
 - **Unstable timings:** timings come from a single, busy machine.
+- **Choices made after seeing CV data:** the TM's epoch rule (section 7.1) and one error-analysis verdict rule (section 7.5) were changed after seeing CV results, never test results. Both changes are marked where they apply, and the test set and the repeated splits remain the independent check.
+- **One TM setting, not tuned:** the 400-clause setting came from a small probe, and T, s and the clause count are not tuned yet (M4). A tuned TM might do better; a smaller one might match it.
+- **Embedded languages are not resolved:** some HTML windows are mostly `<script>` code (section 7.5), and whether they count as HTML is a labelling policy still to be set (Stage B).
+- **Few errors to learn from:** the error analysis rests on about 36 out-of-fold errors per seed. Patterns involving a handful of snippets, often from one repository, are reported as such.
 
 ## 9. Reproduce
 
