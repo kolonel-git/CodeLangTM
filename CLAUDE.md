@@ -16,13 +16,14 @@ Tsetlin Machine (TMU) classifier that identifies a snippet's programming languag
 - `uv run codelangtm tm-train [--setting] [--seed]` — one TM on all of train → models/<setting>_seed<k>.json (~8 s); `uv run codelangtm tm-select` — official model models/tm.json = median-CV seed of the tm-results run (tm_400 seed 4)
 - `uv run codelangtm resources` — process-level fit/predict resources (fresh process per job, 3 repeats) for the baselines + each TM's median-CV model → docs/resources.md + .json (~1-2 min)
 - `uv run codelangtm clauses` — clause inspector on models/tm.json: every clause as a rule + train statistics, signatures, overlap, cross-seed stability (other models/tm_400_seed*.json), formation replay (~1 min, needs TMU; `--no-formation` skips) → docs/clauses.md + clauses.json
+- `uv run codelangtm errors` — error analysis on out-of-fold CV predictions (TM seeds + baselines, train only; ~4 min) → docs/errors.md + errors.json; snippet code only in data/processed/errors-review.md (never commit)
 - `uv run codelangtm explain --file FILE|-` — one prediction traced to the clauses that fired (NumPy only)
 - `uv run codelangtm report` — figures from the JSON sidecars → docs/figures/*.png (narrative in docs/report.md is hand-written)
 
 ## Layout
 `src/codelangtm/` (full table in docs/architecture.md):
 - Data: `data.py` (schema), `github.py` + `windows.py` + `syntax.py` (collection), `labels.py` + `dedup.py` (cleaning), `build.py` + `splits.py` (stable repo split), `audit.py`
-- Features and evaluation: `features.py` (binarizer + literals), `config.py` (YAML configs), `baselines.py`, `ablations.py`, `diagnostics.py`, `curves.py` (TM training curves), `tm_results.py` (TM vs baselines, significance), `resources.py` (process-level resources), `figures.py` (report PNGs from the JSON sidecars; needs `--extra viz`)
+- Features and evaluation: `features.py` (binarizer + literals), `config.py` (YAML configs), `baselines.py`, `ablations.py`, `diagnostics.py`, `curves.py` (TM training curves), `tm_results.py` (TM vs baselines, significance), `resources.py` (process-level resources), `errors.py` (out-of-fold error analysis), `figures.py` (report PNGs from the JSON sidecars; needs `--extra viz`)
 - TM: `model.py` (`TMLanguageClassifier` estimator over TMU, TMU-free `TMState`, JSON model files `codelangtm.tm/1`), `rules.py` (clause inspector: rules, statistics, explanations, formation replay); stub until M6: `export_c.py` (C export)
 - TMU seeds must be >= 1 (seed 0 hangs TMU); tests with TMU use `pytest.importorskip("tmu")`
 - `cli.py`; experiment configs in `configs/`; generated reports `docs/results.md`, `docs/ablations.md`, their `.json` sidecars and `docs/figures/` (never edit by hand); `docs/report.md` is the hand-written narrative (update its numbers when results change)
