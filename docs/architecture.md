@@ -24,7 +24,7 @@ Code snippet
 | Feature ablations | `ablations.py` | `codelangtm ablate` |
 | Label-issue and shortcut checks | `diagnostics.py` | `codelangtm diagnose` |
 | Report figures (optional `viz` extra) | `figures.py` | `codelangtm report` |
-| TM classifier, TMU-free state, model files | `model.py` | (used by `tm-curve` and `tm-results`) |
+| TM classifier, TMU-free state, model files | `model.py` | (used by every TM command) |
 | TM experiment config, training curves | `config.py` (`TMConfig`), `configs/tm.yaml`, `curves.py` | `codelangtm tm-curve` |
 | TM vs baselines (per seed, significance tests), final models | `tm_results.py` | `codelangtm tm-results`, `tm-train`, `tm-select` |
 | Process-level resources (fresh process per job) | `resources.py` | `codelangtm resources` |

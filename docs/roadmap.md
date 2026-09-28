@@ -34,6 +34,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] *Stage B:* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
 - [x] **Stage A:** target 1,000 snippets (~125/language); reached 869 in v4 (SQL limited by available permissive repos)
 - [ ] *Stage B:* scale to 10,000+ and add stretch languages
+- [ ] *Stage B:* embedded-language policy beyond the 20%-markup rule: HTML windows that are mostly `<script>`/`<style>` (B6b: all out-of-fold HTML→JavaScript errors) and SQL inside other languages; decide relabel, drop or keep as hard examples
 - [x] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
 
 **Exit:** `codelangtm data build` reproduces the dataset from configs; no repo appears in both train and test; every row has a license.
@@ -74,14 +75,20 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] B4b `codelangtm tm-train` (train one model from the config on all of train and save it, ~8 s) and `codelangtm tm-select` (the official model `models/tm.json` = the B3 seed with the median CV score, no test data: seed 4 of `tm_400`). Retraining seed 4 reproduces B3's saved model exactly
 - [x] B5 resource comparison, same protocol for every model (`codelangtm resources` → `docs/resources.md`: fresh process per job, 3 repeats, median; result: training memory ~76 MB for every model (binarizer-dominated), TM 400 one-snippet latency 0.34 ms in NumPy vs 0.09 ms logistic regression, batch 0.057 ms; model file 164 KB) (baselines already report the first block in [results.md](results.md)):
   - training: wall time, CPU time, peak memory (Python heap for baselines; process-level peak RSS, measured in a subprocess, for both baselines and the TM, since TMU allocates in C), epochs to converge;
-  - model: size in KB (pickled, and for the TM also the bit-packed clause size that the C export will use), vocabulary size, number of clauses and average literals per clause (TM) or non-zero weights (linear models);
+  - model: size in KB (pickled; the TM's JSON model file), vocabulary size, number of clauses and average literals per clause (TM). Not measured in M3: the TM's bit-packed clause size (moves to M6, with the C export) and the linear models' non-zero weights (M4);
   - inference: latency (median, p95) and throughput, split into binarize vs predict;
   - reported as measured, including where the TM loses
 - [x] B6 clause inspector (pulled forward from M5): every clause as a readable rule (`codelangtm clauses` → `docs/clauses.md`, full `clauses.json`), per-clause statistics on train, signature features per language, signature-usage heatmap, class-overlap matrix, clause shapes, stability across the other 4 seeds, a formation replay of the official model's training, and `codelangtm explain` tracing one prediction to the clauses that fired. Result: rules evaluated from their text fire exactly where the model's clauses fire (all 3,200); signatures are recognisable (C++ `::`, Go `:=`, Rust `let`/`!(`, HTML `">`), SQL is recognised mostly by exclusion; 173 clauses of 40+ literals act as specialists for a few training snippets (input for M4's literal budget); signature scores correlate 0.49-0.85 across seeds
 - [x] B6b error analysis (short snippets moved to Future): `codelangtm errors` → `docs/errors.md` + `.json`, on out-of-fold CV predictions of every training snippet (TM 5 seeds, Naive Bayes, logistic regression; per-fold scores equal the B3 run; test set untouched; snippet code only in a local review file). Result: confusable pairs follow shared n-grams (Spearman ρ = 0.45, p = 0.017); 16 hard snippets (logistic regression also misses all 16); TM vs Naive Bayes significant for 1 of 5 seeds only (McNemar), seed majority vote 29 errors vs 26; the test-set Python sink does not replicate, JavaScript collects 29% of errors through broad brace/quote rules; HTML windows that are mostly `<script>` account for all HTML→JavaScript errors (input for the Stage B embedded-language policy)
-- [ ] B7 TM sections of [report.md](report.md) (results, curves, resources, "how the TM works inside")
+- [x] B7 TM sections of [report.md](report.md): key findings and a targets scorecard up front; section 7 in story order (curves, head-to-head, resources, inside the model, errors); stale statements from earlier steps corrected; limitations extended
 
 **Exit:** TM results in `docs/tm-results.md`, comparable to baselines on the same splits; reported as measured, including where the TM loses; every learned clause is inspectable and any prediction can be traced to the clauses that fired.
+
+**Status: done (branch `feat/tm-training`, PR open).** Exit criteria:
+- [x] TM results comparable to the baselines on the same splits: [tm-results.md](tm-results.md), same protocol, 5 seeds, corrected t-tests
+- [x] Reported as measured, including where the TM loses: slower to train (~20×), one-snippet latency 0.34 ms in Python against the 0.1 ms target, a significant loss for the 100-clause setting, errors 35.6 per seed out of fold against Naive Bayes' 26 ([report](report.md) sections 7.2, 7.3, 7.5)
+- [x] Every learned clause inspectable: [clauses.md](clauses.md) + `clauses.json` (all 3,200, checked against the model)
+- [x] Any prediction traceable: `codelangtm explain`
 
 ## M4 — Tuning & compression
 **Goal:** best accuracy per byte and per rule. Runs on the Stage B dataset (after M3).
@@ -91,6 +98,8 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] Drop clause + literal budgeting to prune redundant literals
 - [ ] Trade-off curves: macro-F1 vs model size vs average rule length
 - [ ] Smallest model within ~1 F1 point of the most accurate one (fewer clauses, literal budget), reported next to it
+- [ ] Literal budget vs the 173 specialist clauses found in B6 ([issues-and-fixes](issues-and-fixes.md) M10): accuracy and readability with and without them
+- [ ] Error analysis (`codelangtm errors`, out of fold) for the tuned model: does tuning narrow JavaScript's broad brace-pattern rules (B6b)?
 - [ ] Pick and freeze a release configuration
 
 **Exit:** frozen config in `configs/`; trade-off plots committed.
@@ -114,7 +123,8 @@ Rule extraction, per-prediction explanation and the per-language gallery move in
 - [ ] Pure C export of trained clauses (`export_c.export_c`)
 - [ ] Equivalence test: C predictions == Python predictions on the full test set
 - [ ] CLI: `codelangtm predict <file|->`
-- [ ] Benchmark script: latency per snippet (median, p95) and compiled model size
+- [ ] Sparse clause evaluation: check only each clause's included literals (the NumPy version reads a dense 500 × 3,200 matrix, 0.34 ms per snippet in B5)
+- [ ] Benchmark script: latency per snippet (median, p95) and compiled model size, including the bit-packed clause size (moved from M3 B5)
 - [ ] Results vs targets in README (< 0.1 ms, < 500 KB), reported as measured
 - [ ] Web demo: paste code, see the prediction, the votes and the clauses that fired. Technology decided later (options: static page with JavaScript inference, WebAssembly from the C runtime, or a hosted Python app); until then the saved model format stays portable and documented
 

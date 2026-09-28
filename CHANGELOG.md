@@ -44,6 +44,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Pickling a `Binarizer` or `TMLanguageClassifier` no longer modifies the original object (Python 3.11+ `__getstate__` returns the live dict).
 
 ### Changed
+- Report (M3 wrap-up): key findings and a targets scorecard up front; section 7 in story order (training curves, head-to-head, resources, inside the model, errors); statements from earlier steps corrected (the "Python sink", speed claims, pending reviews); limitations extended. README shows a rule the model really learned and measured values next to the targets.
 - CI installs the `tm` and `viz` extras so TM and figure tests run in CI.
 - `Binarizer.transform` is 5.4-6.0× faster (direct-address lookup of 1-3 character terms instead of building substring sets) with identical output; verified by fuzz tests against the `term in snippet` definition.
 - `data build` uses a stable hash-based per-language repo split (`stable_split`, `--salt`) instead of StratifiedGroupKFold; re-collecting one language no longer reshuffles other languages' test repos.
