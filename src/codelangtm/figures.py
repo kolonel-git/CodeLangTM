@@ -783,6 +783,103 @@ def clause_formation_replay(clauses: dict) -> object:
     return _draw(draw)
 
 
+# ------------------------------------------------------------- errors.json figures
+
+
+def _percent():
+    from matplotlib.ticker import PercentFormatter
+
+    return PercentFormatter(1.0, decimals=0)
+
+
+def errors_confusion(errors: dict) -> object:
+    """Out-of-fold confusion of the TM, all seeds pooled; colour = share of the true row."""
+
+    def draw():
+        langs = errors["languages"]
+        counts = errors["models"]["tm"]["confusion"]
+        shares = [[c / (sum(row) or 1) for c in row] for row in counts]
+        # colour the errors: the diagonal (mostly > 0.9) would otherwise flatten the scale
+        off = [[0.0 if i == j else v for j, v in enumerate(row)] for i, row in enumerate(shares)]
+        top = max(max(row) for row in off) or 1
+        fig, (ax,) = _new_figure(5.4, 4.6)
+        image = _heatmap(ax, off, langs, langs, 0.0, top, ".0%", blank_zero=True)
+        for text in list(ax.texts):
+            text.remove()
+        for i, row in enumerate(counts):
+            for j, c in enumerate(row):
+                if c:
+                    dark = i != j and off[i][j] / top > 0.55
+                    ax.text(j, i, str(c), ha="center", va="center", fontsize=8,
+                            color="#ffffff" if dark else (MUTED if i == j else INK))  # fmt: skip
+        ax.set_xlabel("predicted")
+        ax.set_ylabel("true")
+        bar = fig.colorbar(image, ax=ax, shrink=0.8, label="share of the true language (errors)")
+        bar.outline.set_visible(False)
+        n = len(errors["seeds"])
+        ax.set_title(f"TM errors out of fold ({n} seeds pooled; diagonal in grey)")
+        return fig
+
+    return _draw(draw)
+
+
+def errors_receivers(errors: dict) -> object:
+    """Share of each model's errors that each language receives (wrongly predicted as it)."""
+
+    def draw():
+        langs = errors["languages"][::-1]
+        models = ["tm", *errors["baselines"]][: len(SERIES)]
+        names = {"tm": f"{errors['setting']} (TM)", **{b: _label(b) for b in errors["baselines"]}}
+        fig, (ax,) = _new_figure(6.4, 0.42 * len(langs) + 1.6)
+        height = 0.8 / len(models)
+        for slot, key in enumerate(models):
+            flows = errors["inflow"][key]
+            y = [i + (len(models) - 1 - 2 * slot) * height / 2 for i in range(len(langs))]
+            total = sum(v["count"] for v in flows.values())
+            ax.barh(y, [flows[g]["share"] for g in langs], height=height, color=SERIES[slot],
+                    edgecolor=SURFACE, linewidth=1,
+                    label=f"{names[key]} ({total} errors)")  # fmt: skip
+        chance = 1 / (len(errors["languages"]) - 1)
+        ax.axvline(chance, color=MUTED, lw=1)
+        ax.text(chance, len(langs) - 0.45, f" even spread {chance:.0%}", color=MUTED, fontsize=8,
+                va="bottom")  # fmt: skip
+        ax.set_yticks(range(len(langs)), langs)
+        ax.set_ylim(-0.6, len(langs) - 0.1)
+        ax.xaxis.set_major_formatter(_percent())
+        ax.grid(axis="y", visible=False)
+        ax.set_xlabel("share of the model's errors predicted as this language")
+        ax.set_title("Which languages collect the errors (out of fold)")
+        ax.legend(loc="upper left", bbox_to_anchor=(0, -0.16), ncols=1)
+        return fig
+
+    return _draw(draw)
+
+
+def errors_embedded(errors: dict) -> object:
+    """HTML snippets: share of lines inside <script>/<style> vs how many seeds call them JS."""
+
+    def draw():
+        em = errors["embedded"]
+        n = len(errors["seeds"])
+        fig, (ax,) = _new_figure(6.4, 3.2)
+        xs = [p[0] for p in em["points"]]
+        # deterministic vertical jitter so snippets with equal counts stay visible
+        ys = [p[1] + ((i * 37) % 11 - 5) * 0.03 for i, p in enumerate(em["points"])]
+        ax.scatter(xs, ys, s=26, color=SERIES[0], alpha=0.7, edgecolor=SURFACE, linewidth=0.8)
+        ax.axvline(0.5, color=MUTED, lw=1)
+        ax.text(0.5, n + 0.35, " more than half embedded", color=MUTED, fontsize=8, va="bottom")
+        ax.set_xlim(-0.03, 1.03)
+        ax.set_ylim(-0.4, n + 0.8)
+        ax.set_yticks(range(n + 1))
+        ax.xaxis.set_major_formatter(_percent())
+        ax.set_xlabel(f"lines inside <script>/<style> (one dot per {em['host']} snippet)")
+        ax.set_ylabel(f"seeds predicting {em['guest']}")
+        ax.set_title(f"{em['host']} snippets mistaken for {em['guest']} are embedded code")
+        return fig
+
+    return _draw(draw)
+
+
 # ------------------------------------------------------------------------ all figures
 
 RESULTS_FIGURES: dict[str, Callable[[dict], object]] = {
@@ -810,6 +907,11 @@ CLAUSE_FIGURES: dict[str, Callable[[dict], object]] = {
     "clause_shapes": clause_shapes,
     "clause_formation_replay": clause_formation_replay,
 }
+ERROR_FIGURES: dict[str, Callable[[dict], object]] = {
+    "errors_confusion": errors_confusion,
+    "errors_receivers": errors_receivers,
+    "errors_embedded": errors_embedded,
+}
 CURVE_FIGURES: dict[str, Callable[[dict], object]] = {
     "tm_curves": tm_curves,
     "tm_clause_formation": tm_clause_formation,
@@ -834,6 +936,7 @@ def render_all(
     tm_results_path: str | Path | None = None,
     resources_path: str | Path | None = None,
     clauses_path: str | Path | None = None,
+    errors_path: str | Path | None = None,
 ) -> list[Path]:
     """Draw every figure whose sidecar is given; returns the written PNG paths."""
     _mpl()  # fail early with the install hint
@@ -854,6 +957,12 @@ def render_all(
         figures = CLAUSE_FIGURES
         if not data.get("formation"):  # inspector run with --no-formation
             figures = {k: v for k, v in figures.items() if k != "clause_formation_replay"}
+        jobs.append((data, figures))
+    if errors_path:
+        data = load_sidecar(errors_path, "codelangtm.errors/")
+        figures = ERROR_FIGURES
+        if not (data.get("embedded") or {}).get("points"):
+            figures = {k: v for k, v in figures.items() if k != "errors_embedded"}
         jobs.append((data, figures))
     for data, figures in jobs:
         for name, fn in figures.items():
