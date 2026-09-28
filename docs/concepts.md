@@ -85,5 +85,7 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 - **Latency:** time to classify one snippet, end to end: building its features plus prediction. Target < 0.1 ms.
 - **Throughput:** snippets per second (1000 / latency in ms).
 - **Model size:** bytes needed to store the trained model. For the TM, each clause's included literals can be stored as bits (*dense*, one bit per literal per clause) or as a list of the included literals only (*sparse*, much smaller when clauses are short). Target < 500 KB.
-- **Peak memory:** the most memory used at once while training or predicting.
+- **Peak memory:** the most memory used at once while training or predicting. *Process-level* memory (the operating system's view: working set on Windows, RSS on Linux) counts everything the process holds, including memory allocated by C libraries; Python's `tracemalloc` only sees Python and NumPy objects.
+- **Median and p95 latency:** the median is the typical time per snippet; p95 is the time that 95% of snippets beat, which shows how slow the slow cases get.
+- **Fresh process:** each measurement runs in a new Python interpreter that does one job, so imports, caches and earlier work cannot distort it.
 - **Deterministic output:** the same input always gives the same result, byte for byte. This matters for reproducible numbers and for figures that only change in git when the data changes.

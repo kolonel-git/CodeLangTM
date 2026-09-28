@@ -115,13 +115,13 @@ Every model is measured the same way, so the TM will simply be one more row.
 - **Most models are small and fast.** They fit in under 0.5 s and predict in about 0.03 ms per snippet, end to end (feature extraction + prediction). Random forest is the exception: 7 MB and about 0.25 ms per snippet.
 - **Feature extraction, not the classifier, dominates.** Building the binary features used 72 MB of peak memory, against ≤ 4.3 MB for any classifier. It also takes most of the prediction time. A rewrite made it 5-6× faster with identical output ([M2](issues-and-fixes.md)).
 - **Timings are approximate.** On this machine, timings vary by about ±50% with background load. The < 0.1 ms target is confirmed only by the dedicated benchmark planned for M6.
-- **Memory measurement is incomplete for C code.** Memory is traced for Python/NumPy allocations only, so memory used inside C libraries is not seen. M3 adds a process-level measurement for all models, the TM included.
+- **Memory, measured for the whole process:** the numbers above trace Python/NumPy allocations only. Section 7.2 repeats the measurement in fresh processes, which also sees memory used inside C libraries such as TMU.
 
 ## 7. Tsetlin Machine
 
 ### 7.1 Head-to-head with the baselines
 
-**Result: the 400-clause TM is statistically indistinguishable from Naive Bayes and logistic regression**, while the rules it uses stay readable (section 7.3 onwards, in progress). Both TMs went through exactly the protocol of the baselines: the same code, 5 CV folds, one fit on all of train scored once on test, and the same 10 repeated splits, with every TM number averaged over 5 seeds ([tm-results.md](tm-results.md)).
+**Result: the 400-clause TM is statistically indistinguishable from Naive Bayes and logistic regression**, while the rules it uses stay readable (the clause inspector, section 7.4, is next). Both TMs went through exactly the protocol of the baselines: the same code, 5 CV folds, one fit on all of train scored once on test, and the same 10 repeated splits, with every TM number averaged over 5 seeds ([tm-results.md](tm-results.md)).
 
 ![TM vs baselines](figures/tm_comparison.png)
 
@@ -143,7 +143,7 @@ Every model is measured the same way, so the TM will simply be one more row.
 
 - **TM 400 vs the baselines:** every interval contains 0 and every p is far above 0.05. On the repeated splits, the most reliable estimate, the TM is within about 0.01 of Naive Bayes in either direction. The 1.5-point gap seen on CV is inside the noise: CV has only 5 folds, and its spread (± 0.023) is large.
 - **TM 100 is worse:** the smaller TM is significantly behind logistic regression on the repeated splits (about 2 points; the interval excludes 0). Capacity matters.
-- **Caveat on the epoch choice:** the epoch counts were picked after looking at the CV curves (section 7.2), which can flatter the CV score slightly. The test set and the repeated splits were not used for any choice, so they are the independent check, and they agree with the conclusion.
+- **Caveat on the epoch choice:** the epoch counts were picked after looking at the CV curves (section 7.3), which can flatter the CV score slightly. The test set and the repeated splits were not used for any choice, so they are the independent check, and they agree with the conclusion.
 
 ![Test F1 per language](figures/tm_per_language.png)
 
@@ -152,8 +152,29 @@ Every model is measured the same way, so the TM will simply be one more row.
   - the 400-clause model file is **166 KB** (the 500 KB target is met): 3,200 clauses with 12 literals each on average;
   - prediction takes **0.08 ms per snippet** end to end (Naive Bayes 0.04 ms). Our NumPy prediction is about 1.6× faster than TMU's own;
   - training takes about 8 s (Naive Bayes 0.3 s).
+- **The official model** is the 400-clause TM trained with seed 4: of the 5 seeds, its CV score is the median (0.950), so it is a typical model rather than the luckiest one, and the choice used no test data. Retraining it from the config reproduces the saved model exactly. The clause inspector and the command-line tool will use this model.
 
-### 7.2 Training curves
+### 7.2 Resources, measured in fresh processes
+
+Every model was trained and used in a brand-new Python process doing one job, repeated 3 times, with the median kept ([resources.md](resources.md)). This sees all memory the process uses, including C libraries, and keeps earlier work from polluting the timings.
+
+![Process-level resources](figures/process_resources.png)
+
+| Model | Training time | Training memory added | One snippet: median (p95) | Batch, per snippet | Model file |
+| --- | --- | --- | --- | --- | --- |
+| Naive Bayes | 0.35 s | 77 MB | 0.215 ms (0.251) | 0.039 ms | 67 KB |
+| Logistic regression | 0.41 s | 76 MB | 0.089 ms (0.109) | 0.031 ms | 35 KB |
+| **TM, 400 clauses** (official model) | 7.7 s | 76 MB | 0.343 ms (0.471) | 0.057 ms | 164 KB |
+| TM, 100 clauses | 5.9 s | 77 MB | 0.199 ms (0.288) | 0.039 ms | 33 KB |
+
+- **Memory is the same for every model.** Training adds about 76 MB, and almost all of it is the binarizer's table of candidate n-grams, which every model shares. The TM's own learning state is small in comparison.
+- **Training:** the TM takes about 20× longer to train (7.7 s vs 0.35 s), still only seconds.
+- **One snippet at a time:** only logistic regression is under the 0.1 ms target in Python. The 400-clause TM takes 0.34 ms, 0.28 ms of it in the classifier: our simple NumPy version multiplies every snippet against a dense 500 × 3,200 matrix, although each clause includes only about 12 literals. That was the agreed trade-off (clear and exactly equal to TMU, speed left to the C runtime in M6, which evaluates only the included literals). Naive Bayes is slower than expected (0.22 ms) because scikit-learn validates its input on every call.
+- **In batches** all models are fast: the TM classifies about 17,500 snippets per second (0.057 ms each).
+- **Size:** the TM model file is 164 KB, within the 500 KB target.
+- **Noise check:** the binarize step is identical code for every model, yet it measured 0.033-0.056 ms; differences of a few hundredths of a millisecond are within this machine's noise.
+
+### 7.3 Training curves
 
 **Training curves.** Each TM setting was trained on the 5 folds with 5 seeds each (25 runs), for up to 150 epochs, scoring the held-out fold after every epoch ([tm-curves.md](tm-curves.md)).
 
@@ -175,9 +196,8 @@ Every model is measured the same way, so the TM will simply be one more row.
 - **Training is cheap:** one epoch (one pass over about 550 snippets) takes 0.03-0.05 s.
 - **Prediction can run without TMU.** A plain NumPy re-implementation gives exactly the same scores as TMU, and ran about twice as fast in a first measurement (0.03 vs 0.07 ms per snippet, one fold). A trained model is saved as one JSON file of about 160 KB and can be used and inspected without TMU installed.
 
-### 7.3 Still to come in M3
+### 7.4 Still to come in M3
 
-- **Resources, properly measured:** process-level memory and latency in isolated processes, for the TM and the baselines alike.
 - **How the TM works inside:**
   - every learned clause, readable as a rule;
   - the signature features of each language;
