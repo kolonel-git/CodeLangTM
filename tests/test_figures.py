@@ -133,8 +133,34 @@ def resources_sidecar():
             "models": [row("naive_bayes", 0.35, 0.2), row("tm_400 (seed 4)", 7.7, 0.34)]}
 
 
+def clauses_sidecar(formation=True):
+    def clause(i, polarity, n, fires):
+        weight = (1 + i % 7) * (1 if polarity == "for" else -1)
+        return {"index": i, "polarity": polarity, "weight": weight, "n_literals": n,
+                "fires_own": fires, "fires_other": i % 3}  # fmt: skip
+
+    clauses = [clause(i, ("for", "against")[i % 2], (i * 7) % 60, (i * 5) % 40) for i in range(90)]
+    data = {
+        "schema": "codelangtm.clauses/1",
+        "languages": list(LANGS),
+        "signature_matrix": {"features": ['"def"', '":="', '"SEL"'],
+                             "owner": list(LANGS), "ids": [0, 1, 2],
+                             "usage": [[0.12, 0.0, 0.004], [0.01, 0.1, 0.0],
+                                       [0.0, 0.0, 0.03]]},  # fmt: skip
+        "overlap": [[1.0, 0.2, 0.25], [0.2, 1.0, 0.18], [0.25, 0.18, 1.0]],
+        "clauses": clauses,
+        "formation": None,
+    }
+    if formation:
+        settled = {"python": {'"def"': 1, '"):"': 12}, "go": {'":="': 3}, "sql": {'"SEL"': None}}
+        data["formation"] = {"epochs": 30, "jaccard_with_final": [i / 30 for i in range(1, 31)],
+                             "settled_epoch": settled}  # fmt: skip
+    return data
+
+
 ALL_FIGURES = (set(fg.RESULTS_FIGURES) | set(fg.ABLATION_FIGURES) | set(fg.CURVE_FIGURES)
-               | set(fg.TM_RESULT_FIGURES) | set(fg.RESOURCE_FIGURES))  # fmt: skip
+               | set(fg.TM_RESULT_FIGURES) | set(fg.RESOURCE_FIGURES)
+               | set(fg.CLAUSE_FIGURES))  # fmt: skip
 
 
 @pytest.fixture
@@ -146,7 +172,8 @@ def sidecars(tmp_path):
     curves = bl.write_json(curves_sidecar(), tmp_path / "tm-curves.json")
     tm_results = bl.write_json(tm_results_sidecar(), tmp_path / "tm-results.json")
     res = bl.write_json(resources_sidecar(), tmp_path / "resources.json")
-    return results, ablations, curves, tm_results, res
+    clauses = bl.write_json(clauses_sidecar(), tmp_path / "clauses.json")
+    return results, ablations, curves, tm_results, res, clauses
 
 
 def test_render_all_writes_every_figure(sidecars, tmp_path):
@@ -176,6 +203,18 @@ def test_sidecar_errors(sidecars, tmp_path):
         fg.render_all(tmp_path / "missing.json", None, tmp_path)
     with pytest.raises(ValueError, match="expected schema codelangtm.results/"):
         fg.render_all(sidecars[1], None, tmp_path)  # ablations file passed as results
+
+
+def test_clause_figures_without_formation(sidecars, tmp_path):
+    path = bl.write_json(clauses_sidecar(formation=False), tmp_path / "c.json")
+    written = fg.render_all(None, None, tmp_path / "c", clauses_path=path)
+    assert {p.stem for p in written} == set(fg.CLAUSE_FIGURES) - {"clause_formation_replay"}
+
+
+def test_clause_signature_cells_show_small_shares(sidecars):
+    ax = fg.clause_signatures(clauses_sidecar()).axes[0]
+    shown = sorted(t.get_text() for t in ax.texts)
+    assert shown == sorted(["12", "<1", "1", "10", "3"])  # percent; exact zeros left blank
 
 
 def test_confusion_defaults_to_best_and_colours_by_row_share(sidecars):
@@ -231,7 +270,7 @@ def test_cli_report(sidecars, tmp_path, capsys):
     args = ["report", "--results", str(sidecars[0]), "--ablations", str(sidecars[1]),
             "--out", str(out)]  # fmt: skip
     missing = ["--curves", str(tmp_path / "no.json"), "--tm-results", str(tmp_path / "no2.json"),
-               "--resources", str(tmp_path / "no3.json")]
+               "--resources", str(tmp_path / "no3.json"), "--clauses", str(tmp_path / "no4.json")]
     assert main([*args, *missing]) == 0
     printed = capsys.readouterr().out
     assert "wrote" in printed and "skipping TM curve figures" in printed
@@ -240,7 +279,7 @@ def test_cli_report(sidecars, tmp_path, capsys):
         fg.ABLATION_FIGURES
     )
     assert main([*args, "--curves", str(sidecars[2]), "--tm-results", str(sidecars[3]),
-                 "--resources", str(sidecars[4])]) == 0
+                 "--resources", str(sidecars[4]), "--clauses", str(sidecars[5])]) == 0
     assert {p.stem for p in out.glob("*.png")} == ALL_FIGURES
     assert main(["report", "--results", str(tmp_path / "none.json"), "--out", str(out)]) == 1
     assert "sidecar not found" in capsys.readouterr().err

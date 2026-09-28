@@ -646,6 +646,143 @@ def process_resources(resources: dict) -> object:
     return _draw(draw)
 
 
+# ------------------------------------------------------------ clauses.json figures
+
+
+def clause_signatures(clauses: dict) -> object:
+    """Top signature n-grams of every language (rows) and how often each language's "for"
+    clauses include them (columns): a strong diagonal block means languages rely on their own."""
+
+    def draw():
+        sm = clauses["signature_matrix"]
+        langs = clauses["languages"]
+        rows = [f"{f}  ({owner})" for f, owner in zip(sm["features"], sm["owner"], strict=True)]
+        values = [[100 * v for v in row] for row in sm["usage"]]
+        fig, (ax,) = _new_figure(6.4, 0.24 * len(rows) + 1.6)
+        top = max(max(row) for row in values) or 1
+        image = _heatmap(ax, values, rows, langs, 0.0, top, ".0f", blank_zero=True)
+        for text in list(ax.texts):  # rewrite labels: tiny but non-zero shares read "<1"
+            text.remove()
+        for i, row in enumerate(values):
+            for j, v in enumerate(row):
+                if v:
+                    ax.text(j, i, "<1" if v < 0.5 else f"{v:.0f}", ha="center", va="center",
+                            fontsize=7, color="#ffffff" if v / top > 0.55 else INK)  # fmt: skip
+        ax.set_yticks(range(len(rows)), rows, fontfamily="DejaVu Sans Mono", fontsize=7.5)
+        ax.set_xlabel("language whose \"for\" clauses include the n-gram")
+        bar = fig.colorbar(image, ax=ax, shrink=0.6, label="% of the language's \"for\" clauses")
+        bar.outline.set_visible(False)
+        ax.set_title("Signature n-grams (top 3 per language) and who uses them")
+        return fig
+
+    return _draw(draw)
+
+
+def clause_overlap(clauses: dict) -> object:
+    """Jaccard similarity of the n-gram sets used by each language's "for" clauses."""
+
+    def draw():
+        langs = clauses["languages"]
+        values = [[0.0 if i == j else v for j, v in enumerate(row)]
+                  for i, row in enumerate(clauses["overlap"])]  # fmt: skip
+        off = [v for i, row in enumerate(values) for j, v in enumerate(row) if i != j]
+        # Start the scale just below the smallest similarity so differences stay visible
+        # (the diagonal, blank, falls below it and shows as the lightest step).
+        low, top = math.floor(min(off) * 20) / 20, max(off)
+        fig, (ax,) = _new_figure(5.2, 4.4)
+        image = _heatmap(ax, values, langs, langs, low, top, ".2f", blank_zero=True)
+        bar = fig.colorbar(image, ax=ax, shrink=0.8, label="Jaccard similarity")
+        bar.outline.set_visible(False)
+        ax.set_title("Shared n-grams between languages' \"for\" clauses")
+        return fig
+
+    return _draw(draw)
+
+
+LENGTH_CAP = 40
+
+
+def clause_shapes(clauses: dict) -> object:
+    """How long clauses are (literals per non-empty clause) and how strongly they vote
+    (absolute weight), "for" and "against" clauses side by side."""
+
+    def draw():
+        fig, axes = _new_figure(10.4, 3.3, ncols=3)
+        groups = (("for", SERIES[0], MARKERS[0]), ("against", SERIES[1], MARKERS[1]))
+        cl = [c for c in clauses["clauses"] if c["n_literals"] > 0]
+        cap = LENGTH_CAP
+        for ax, key in ((axes[0], "n_literals"), (axes[1], "weight")):
+            data = {p: [abs(c[key]) for c in cl if c["polarity"] == p] for p, *_ in groups}
+            if key == "n_literals":  # a long tail of very long clauses: one overflow bin
+                data = {p: [min(v, cap + 1) for v in vs] for p, vs in data.items()}
+            hi = max(max(v) for v in data.values() if v)
+            edges = [e - 0.5 for e in range(1, hi + 2)]
+            ax.hist([data[p] for p, *_ in groups], bins=edges, color=[c for _, c, _ in groups],
+                    label=[f"{p} ({len(data[p]):,})" for p, *_ in groups], edgecolor=SURFACE,
+                    linewidth=0.4)  # fmt: skip
+            ax.grid(axis="x", visible=False)
+        longer = sum(c["n_literals"] > cap for c in cl)
+        axes[0].set_xticks([1, 10, 20, 30, cap + 1], ["1", "10", "20", "30", f">{cap}"])
+        axes[0].set_xlabel(f"literals in the clause ({longer} clauses have more than {cap})")
+        axes[0].set_ylabel("clauses")
+        axes[0].set_title("clause length", fontsize=9)
+        axes[0].legend(loc="upper right")
+        axes[1].set_xlabel("|weight| (votes when the clause fires)")
+        axes[1].set_title("clause weight", fontsize=9)
+        for p, color, marker in groups:
+            mine = [c for c in cl if c["polarity"] == p]
+            axes[2].scatter([c["n_literals"] for c in mine],
+                            [c["fires_own"] + c["fires_other"] + 1 for c in mine], s=9,
+                            color=color, marker=marker, alpha=0.35, linewidth=0,
+                            label=p)  # fmt: skip
+        axes[2].set_xscale("log")
+        axes[2].set_yscale("log")
+        axes[2].set_xlabel("literals in the clause (log)")
+        axes[2].set_ylabel("training snippets it fires on + 1 (log)")
+        axes[2].set_title("long clauses fire on few snippets", fontsize=9)
+        empty = sum(1 for c in clauses["clauses"] if c["n_literals"] == 0)
+        fig.suptitle(f"Shape of the {len(clauses['clauses']):,} clauses ({empty} empty clauses "
+                     "not shown)", x=0.01, ha="left", fontweight="bold", fontsize=10,
+                     color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
+def clause_formation_replay(clauses: dict) -> object:
+    """Replay of training: similarity of the clauses to the final model per epoch, and the
+    epoch at which each language's signature n-grams settled."""
+
+    def draw():
+        fm = clauses["formation"]
+        langs = clauses["languages"]
+        fig, axes = _new_figure(8.0, 3.3, ncols=2)
+        epochs = list(range(1, fm["epochs"] + 1))
+        axes[0].plot(epochs, fm["jaccard_with_final"], color=SERIES[0])
+        axes[0].set_ylim(0, 1.02)
+        axes[0].set_xlabel("epoch")
+        axes[0].set_ylabel("Jaccard similarity")
+        axes[0].set_title("clauses so far vs final clauses", fontsize=9)
+        ys, xs = [], []
+        for i, lang in enumerate(langs[::-1]):
+            for e in fm["settled_epoch"][lang].values():
+                if e is not None:
+                    ys.append(i)
+                    xs.append(e)
+        axes[1].scatter(xs, ys, s=28, color=SERIES[0], alpha=0.55, edgecolor=SURFACE,
+                        linewidth=0.8)  # fmt: skip
+        axes[1].set_yticks(range(len(langs)), langs[::-1])
+        axes[1].set_xlim(0, fm["epochs"] + 1)
+        axes[1].grid(axis="y", visible=False)
+        axes[1].set_xlabel("settled epoch (one dot per signature n-gram)")
+        axes[1].set_title("when signature n-grams settled", fontsize=9)
+        fig.suptitle("How the rules formed (replay of the official model's training)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
 # ------------------------------------------------------------------------ all figures
 
 RESULTS_FIGURES: dict[str, Callable[[dict], object]] = {
@@ -666,6 +803,12 @@ TM_RESULT_FIGURES: dict[str, Callable[[dict], object]] = {
 }
 RESOURCE_FIGURES: dict[str, Callable[[dict], object]] = {
     "process_resources": process_resources,
+}
+CLAUSE_FIGURES: dict[str, Callable[[dict], object]] = {
+    "clause_signatures": clause_signatures,
+    "clause_overlap": clause_overlap,
+    "clause_shapes": clause_shapes,
+    "clause_formation_replay": clause_formation_replay,
 }
 CURVE_FIGURES: dict[str, Callable[[dict], object]] = {
     "tm_curves": tm_curves,
@@ -690,6 +833,7 @@ def render_all(
     curves_path: str | Path | None = None,
     tm_results_path: str | Path | None = None,
     resources_path: str | Path | None = None,
+    clauses_path: str | Path | None = None,
 ) -> list[Path]:
     """Draw every figure whose sidecar is given; returns the written PNG paths."""
     _mpl()  # fail early with the install hint
@@ -705,6 +849,12 @@ def render_all(
         jobs.append((load_sidecar(tm_results_path, "codelangtm.tm-results/"), TM_RESULT_FIGURES))
     if resources_path:
         jobs.append((load_sidecar(resources_path, "codelangtm.resources/"), RESOURCE_FIGURES))
+    if clauses_path:
+        data = load_sidecar(clauses_path, "codelangtm.clauses/")
+        figures = CLAUSE_FIGURES
+        if not data.get("formation"):  # inspector run with --no-formation
+            figures = {k: v for k, v in figures.items() if k != "clause_formation_replay"}
+        jobs.append((data, figures))
     for data, figures in jobs:
         for name, fn in figures.items():
             written.append(save_png(fn(data), Path(out_dir) / f"{name}.png"))
