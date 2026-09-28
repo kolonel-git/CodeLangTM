@@ -3,7 +3,7 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-28
-**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B6 done; B6b error analysis next)
+**Current milestone:** M3 — TM training (branch A merged, PR #6; branch B `feat/tm-training`: B1-B6b done; B7 report wrap-up and PR next)
 **Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 166 KB model, and every clause is readable as a rule ([clauses](docs/clauses.md))
 
 ## Milestone overview
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B6 done (TM matches the baselines; resources; clause inspector) |
+| M3 TM training | In progress | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B6b done (TM matches the baselines; resources; clause inspector; error analysis) |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -34,7 +34,8 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - [x] B4b `tm-train` + `tm-select`: official model = tm_400 seed 4 (median CV)
 - [x] B5 process-level resources (`codelangtm resources`)
 - [x] B6 clause inspector (`codelangtm clauses`, `codelangtm explain`)
-- [ ] M3 branch B `feat/tm-training`: B6b error analysis → B7 report → PR (details in the roadmap, M3)
+- [x] B6b error analysis (`codelangtm errors`, out of fold)
+- [ ] M3 branch B `feat/tm-training`: B7 report wrap-up → PR (details in the roadmap, M3)
 - [ ] M3/M4: use repeated splits for the final TM vs baselines comparison (5 seeds, paired significance test)
 - [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
@@ -42,6 +43,19 @@ M0-M2 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-28 — M3 branch B, B6b: error analysis
+- Choices (start of step): CV out-of-fold only (test untouched); snippet references committed, code only in a local review file; compare with Naive Bayes and logistic regression with McNemar tests; hypothesis probes with verdict rules. Mid-step check-in (surprise: the Python sink did not replicate): probe the language that really collects errors, and measure embedded `<script>`/`<style>` code in HTML.
+- `errors.py` + `codelangtm errors` (~4 min): every training snippet predicted by the model of the other 4 folds, for TM 400 seeds 1-5, Naive Bayes and logistic regression. **Check:** all 35 per-fold scores equal the B3 run (differences ≤ 5e-7, the sidecar's rounding).
+- **Results:**
+  - Errors out of fold: TM 35.6 per seed (5.1%), Naive Bayes 26 (3.7%), logistic regression 34 (4.9%).
+  - Confusable pairs: JavaScript-HTML 6.4 per seed, C++-Java 5.4, Java-JavaScript 3.4, C++-Rust 3.2, SQL→Python 2.4. Pair confusion follows shared n-grams (Spearman ρ = 0.45, p = 0.017).
+  - 629 snippets always right, 51 unlucky, 16 hard; logistic regression misses all 16 hard ones, Naive Bayes 10.
+  - McNemar vs Naive Bayes: significant for seed 5 only (p = 0.017; others 0.08-0.14); seed majority vote 29 errors vs 26 (p = 0.63). vs logistic regression: p ≥ 0.42.
+  - The test-set Python sink does not replicate (Python gets 12% of errors, chance 14%). JavaScript collects 29% (H1 supported). H2 (little evidence), H3 (narrow wins), H4 (weak rejection), H6 (generic signatures) not supported. H5: brace n-gram rules pull C++/Java in. H7 supported: all HTML→JavaScript errors are 4 HTML windows that are 54-100% `<script>`/`<style>` (3 from one repo).
+- Fixed on the way: H1's first rule ignored chance (issues-and-fixes M11, changed openly after seeing data); H5 ordering made deterministic on ties.
+- Report section 7.5; concepts (out-of-fold, hard/unlucky error, error sink, McNemar, Mann-Whitney, Spearman, verdict rule, embedded code); roadmap B6b ticked; CLAUDE.md, architecture, README, CHANGELOG.
+- Tests: 358 passing (12 new in `tests/test_errors.py`: hand-built out-of-fold data with known answers for every analysis, embedded-share parsing, reports; with TMU, fold scores equal `evaluate_model` and the CLI end to end; plus 2 figure tests).
 
 ### 2026-09-28 — M3 branch B, B6: clause inspector
 - Choices (start of step): summary `docs/clauses.md` + full `clauses.json`; official model plus a stability check against the other 4 seeds; include a formation replay.
@@ -342,6 +356,7 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 | 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
+| 2026-09-28 | B6b error analysis, out of fold (train only) | v5 | - | errors: TM 35.6/seed (5.1%), NB 26, LR 34; seed majority 29; McNemar TM vs NB significant for 1 of 5 seeds; JavaScript collects 29% of TM errors; Python sink not replicated |
 | 2026-09-28 | B6 clause inspector, official model tm_400 seed 4 (train set only) | v5 | - | rules = model (3,200/3,200); median 5-7 literals, 173 clauses > 40 literals; overlap 0.16-0.31; seed score correlation 0.49-0.85; signatures settle by epoch 5 (median) |
 | 2026-09-28 | B5 process-level resources (fresh process per job, 3 repeats) | v5 | - | one snippet median: LR 0.089, TM100 0.199, NB 0.215, TM400 0.343 ms; batch 0.031-0.057 ms; training memory ~76 MB for all (binarizer); TM 400 fit 7.7 s, 164 KB |
 | 2026-09-28 | B3 TM vs baselines, full protocol, seeds 1-5 | v5 | TM 400: 0.949 / 0.958, repeated 0.966 ± 0.009; TM 100: 0.933 / 0.946, repeated 0.949 | NB 0.963 / 0.959 / 0.968; TM 400 − NB repeated −0.001 [−0.012, +0.010] p = 0.82; TM 100 − LR repeated −0.019, p = 0.016; TM 400 166 KB, 0.081 ms/snippet |

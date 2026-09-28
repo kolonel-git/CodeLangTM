@@ -86,6 +86,14 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 - **p-value:** if there were truly no difference, how often would chance alone produce a difference at least this large? Below 0.05 is the usual line for "unlikely to be chance". A large p does not prove the models are equal; it means the data cannot tell them apart.
 - **95% interval (confidence interval):** the range of true differences that fits the data. If it contains 0, "no difference" is plausible; a narrow interval around 0 is evidence that any difference is small.
 - **Correlation (Pearson):** how closely two lists of numbers rise and fall together, from -1 (opposite) through 0 (unrelated) to 1 (in step). Used to compare the signature scores of every n-gram between models trained with different seeds, which is fairer than comparing two top-10 lists whose edges are decided by near-ties.
+- **Out-of-fold prediction:** predict each training snippet with the model trained on the *other* CV folds, which never saw it. Every snippet gets an honest prediction without touching the test set, so there are many more errors to study than the test set alone gives.
+- **Hard vs unlucky error:** a snippet that every seed gets wrong is *hard* (something about the snippet misleads the model); one that only some seeds get wrong is *unlucky* (the random start decided it).
+- **Error sink:** a language that collects a large share of a model's mistakes, the class the model falls back on when unsure.
+- **McNemar test:** compares two models on the *same* snippets. It ignores snippets both get right or both get wrong, and asks whether "only model A wrong" happens significantly more often than "only model B wrong".
+- **Mann-Whitney U test:** checks whether values in one group tend to be larger than in another (for example, snippet length for errors vs correct predictions), without assuming the values follow a bell curve.
+- **Spearman correlation:** like Pearson correlation, but computed on ranks, so it asks "does more of one go with more of the other?" without assuming a straight-line relation.
+- **Verdict rule:** the pass/fail criterion for a hypothesis, written down before looking at the result, so the data cannot quietly move the goalposts. Any rule changed afterwards is reported as changed.
+- **Embedded code:** one language inside another's file, like JavaScript inside an HTML `<script>` block. Whether such a snippet counts as HTML or JavaScript is a labelling decision, not something a model can get right by itself.
 - **Corrected resampled t-test (Nadeau & Bengio):** the test used here. A normal paired t-test assumes the repeated splits are independent, but they share most of their training data, which makes it too confident. The correction widens the uncertainty to account for that overlap.
 
 ## Speed and size

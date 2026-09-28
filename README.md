@@ -56,6 +56,7 @@ uv run codelangtm tm-results                                      # docs/tm-resu
 uv run codelangtm tm-select                                       # models/tm.json (official model)
 uv run codelangtm resources                                       # docs/resources.md + .json
 uv run codelangtm clauses                                         # docs/clauses.md + .json
+uv run codelangtm errors                                          # docs/errors.md + .json
 uv run codelangtm report                                          # docs/figures/*.png
 ```
 
@@ -74,7 +75,7 @@ Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with fi
 | M0 Foundations | done |
 | M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
 | M2 Features & baselines | done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
-| M3 TM training | in progress: the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 166 KB model) ([report](docs/report.md), section 7); every clause readable as a rule and every prediction traceable (`codelangtm explain`, [clauses](docs/clauses.md)); error analysis next |
+| M3 TM training | in progress: the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 166 KB model) ([report](docs/report.md), section 7); every clause readable as a rule and every prediction traceable (`codelangtm explain`, [clauses](docs/clauses.md)); errors studied out of fold ([errors](docs/errors.md)); report wrap-up next |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |
 | M6 Deployment & benchmarks | planned |

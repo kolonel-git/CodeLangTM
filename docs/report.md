@@ -4,7 +4,7 @@ A readable account of the project so far: what we are building, the data, how mo
 
 New to the terms used here (clauses, T and s, macro-F1, CV, ablation)? See the [concepts guide](concepts.md).
 
-*Hand-written narrative.* The exact numbers live in generated files ([results.md](results.md), [ablations.md](ablations.md), [tm-curves.md](tm-curves.md), [tm-results.md](tm-results.md), [resources.md](resources.md), [clauses.md](clauses.md) and their `.json` twins). The figures are regenerated with `uv run codelangtm report`. Last updated 2026-09-28 (dataset v5, frozen features, official TM model tm_400 seed 4).
+*Hand-written narrative.* The exact numbers live in generated files ([results.md](results.md), [ablations.md](ablations.md), [tm-curves.md](tm-curves.md), [tm-results.md](tm-results.md), [resources.md](resources.md), [clauses.md](clauses.md), [errors.md](errors.md) and their `.json` twins). The figures are regenerated with `uv run codelangtm report`. Last updated 2026-09-28 (dataset v5, frozen features, official TM model tm_400 seed 4).
 
 **Contents:** [1 Goal](#1-goal-and-approach) · [2 Data](#2-data) · [3 Evaluation](#3-how-models-are-evaluated) · [4 Baselines](#4-baselines-the-bar-for-the-tm) · [5 Feature ablations](#5-feature-ablations-what-mattered) · [6 Resources](#6-resources) · [7 Tsetlin Machine](#7-tsetlin-machine) · [8 Limitations](#8-limitations) · [9 Reproduce](#9-reproduce)
 
@@ -290,9 +290,77 @@ cpp: 47 clauses fired (+162 for, -227 against); strongest 3:
 - Rust wins mainly through `fn ` and `let`. One of Rust's own clauses votes against it (-17): its `has("ons")` part is triggered by `collections`, which is also typical of JavaScript's `const`.
 - C++ is the runner-up because of `std::` and the closing brace on its own line. A C++ "against" clause says it directly: `has("fn ") AND has("et ")` means "this looks like Rust, not C++".
 
-### 7.5 Still to come in M3
+### 7.5 Where the TM goes wrong
 
-- **Error analysis:** the confusable pairs, why Python attracts other languages' snippets, and where the TM and Naive Bayes disagree.
+The test set has 173 snippets, so the TM makes only about 5 errors per seed there: too few to study. Instead, `codelangtm errors` predicts every one of the 696 training snippets *out of fold*, with the model trained on the other 4 CV folds, which never saw it. This covers the TM (5 seeds) and Naive Bayes and logistic regression on the same folds ([errors.md](errors.md)).
+
+- **Faithful replication:** the per-fold scores equal the B3 run's for every model (35 scores).
+- **Test set untouched:** it was not used, so these findings can guide M4 without leaking test information.
+- **Code stays local:** the misclassified snippets' code is written only to a local review file, not committed.
+
+| Model | Errors out of fold | Error rate |
+| --- | --- | --- |
+| TM, 400 clauses (mean per seed) | 35.6 | 5.1% |
+| Naive Bayes | 26 | 3.7% |
+| Logistic regression | 34 | 4.9% |
+
+![TM errors out of fold](figures/errors_confusion.png)
+
+**Confusable pairs.** The pairs the TM mixes up most (errors in both directions, mean per seed):
+
+| Pair | Errors per seed |
+| --- | --- |
+| JavaScript-HTML | 6.4 |
+| C++-Java | 5.4 |
+| Java-JavaScript | 3.4 |
+| C++-Rust | 3.2 |
+| SQL→Python | 2.4 |
+
+- Pairs that share more n-grams in their "for" clauses (the overlap from section 7.4) are confused more often: Spearman ρ = 0.45 over the 28 pairs, p = 0.017.
+- The shared vocabulary that the clause inspector shows really is where the mistakes happen.
+
+**Hard and unlucky errors.**
+
+- **Most snippets are safe:** 629 of the 696 snippets are right for every seed.
+- **Unlucky (51 snippets):** wrong for only some seeds, so the random start decided them.
+- **Hard (16 snippets):** wrong for all 5 seeds. Most are hard for the baselines too: logistic regression gets all 16 wrong as well, and Naive Bayes 10 of them. So these are mostly genuinely ambiguous snippets, not TM weaknesses. Examples include C++ code written against a GUI framework (Ultimate++), Python files that are only data (a settings dictionary, a list of Finnish stop words), and HTML test pages that are mostly `<script>`.
+
+**TM vs the baselines, snippet by snippet (McNemar test).**
+
+- **Against Naive Bayes:** a single TM seed is "the only one wrong" more often (15-20 snippets, against 5-10 for Naive Bayes), but the difference is significant for only 1 of the 5 seeds (p = 0.017; the others 0.08-0.14). Five tests at the 0.05 level make one such result unsurprising.
+- **Against logistic regression:** the two are balanced (p ≥ 0.42 for every seed).
+- **Majority vote over the 5 seeds** (the most common prediction) makes 29 errors: close to Naive Bayes (26, p = 0.63) and below logistic regression (34). Seed-to-seed noise explains part of the single-seed gap.
+
+**The "Python sink" did not replicate.**
+
+- On the test set, other languages' snippets fell into Python (Java→Python 8 times over 5 seeds). Out of fold, Python receives only 12% of the TM's errors, below the 14% an even spread would give.
+- The pattern came from a few test repositories ([issues-and-fixes](issues-and-fixes.md) M11).
+- The language that really collects errors is **JavaScript**: 29% of the TM's errors, against 19% for Naive Bayes and 26% for logistic regression.
+
+![Which languages collect the errors](figures/errors_receivers.png)
+
+Why JavaScript? Each hypothesis had a pass/fail rule written before the run. The one exception is H1's "above chance" condition, added after the Python result showed the first rule was too weak:
+
+| Hypothesis | Result |
+| --- | --- |
+| H1 JavaScript really attracts the TM's errors (above chance and above both baselines) | **supported**: 29% vs 19% / 26%, chance 14% |
+| H2 the snippets that fall into it carry little evidence (fewer features present) | not supported (median 72 vs 84 features, p = 0.10) |
+| H3 they are narrow wins | not supported: JavaScript wins those by a median 70 votes, *more* than other errors (52) |
+| H4 JavaScript rejects foreign code weakly | not supported: JavaScript and Java tie for the weakest rejection (-175 votes on average), so the effect is not specific to JavaScript |
+| H6 its signature n-grams are generic | not supported: Java's are more generic (36% vs 30% of foreign snippets contain them) |
+| H7 HTML snippets called JavaScript are embedded code | **supported**, on few snippets (see below) |
+
+- **What pulls snippets in** (H5, descriptive): the JavaScript rules that fire on these errors are built from brace n-grams: `{`+newline+space, ` }`, ` {`, and the single most frequent rule is just `has("{ ")`. C++ and Java use the same braces. JavaScript's clauses cover a broad "C-style code with quotes" region, and some C++ and Java snippets land inside it.
+- **Embedded code** (H7): 21 of the 76 HTML training snippets are more than half `<script>`/`<style>` lines. The TM calls 4 of them JavaScript on every seed, and never a snippet that is mostly markup.
+
+  ![HTML snippets mistaken for JavaScript](figures/errors_embedded.png)
+
+  This rests on 4 snippets, 3 of them from one repository. The honest reading: these windows are arguably JavaScript. Whether they should be labelled HTML is the embedded-language policy planned for Stage B, not something the model can fix.
+
+**What this means for the next steps.**
+
+- **Stage B data:** an explicit embedded-language policy for HTML (and for SQL inside other languages), and more repositories per language to dilute single-repository quirks.
+- **M4 tuning:** check whether a literal budget or more clauses narrows JavaScript's broad brace-pattern rules. Report errors out of fold, not only on the small test set.
 
 ## 8. Limitations
 
@@ -315,6 +383,7 @@ uv run codelangtm tm-results                                       # docs/tm-res
 uv run codelangtm tm-select                                        # models/tm.json (official model)
 uv run codelangtm resources                                        # docs/resources.md + .json
 uv run codelangtm clauses                                          # docs/clauses.md + .json
+uv run codelangtm errors                                           # docs/errors.md + .json
 uv run codelangtm report                                           # docs/figures/*.png
 uv run codelangtm explain --file my_snippet.py                     # one prediction, traced
 ```

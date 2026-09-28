@@ -18,6 +18,12 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
+### M11. The "Python sink" did not replicate, and a verdict rule was too weak (B6b)
+- **Symptom:** on the test set the TM sent other languages' snippets to Python (Java→Python 8 over 5 seeds), so B6b set out to explain a Python sink. On out-of-fold CV predictions (every training snippet, 5 seeds), Python receives only 21 of the TM's 178 errors (12%), *below* the 14% that an even spread over the other 7 languages would give.
+- **Second problem:** hypothesis H1 ("the sink is real") was first written as "the TM sends a larger share of its errors to Python than the baselines do". Python passed (TM 12% against 4% and 9%), although it receives fewer errors than chance. The rule compared against the wrong reference.
+- **Fix:** H1 now also requires a share above chance. This was changed after seeing the data and is marked as such in [errors.md](errors.md) and the report. With the user's agreement, the probes were then run on the language that really collects most errors out of fold: JavaScript (52 of 178, 29%).
+- **Lesson:** the test set has 173 snippets and about 5 TM errors per seed. A pattern in so few errors, most from a handful of repositories, is anecdote, not evidence. The out-of-fold view gives ~36 errors per seed, all without spending the test set.
+
 ### M10. Very long clauses that memorise a few training snippets (B6, open: M4)
 - **Symptom:** the clause inspector found 173 of the official model's 3,200 clauses with more than 40 literals (up to 268), almost all `NOT has(...)` parts, 157 of them "for" clauses. They fire on few training snippets (median 4; 40 fire on at most one) with median precision 1.0, and carry above-average weight (median |weight| 9, against 6 for all clauses).
 - **Reading:** Type II feedback keeps adding "not this n-gram" literals until a clause stops firing on other languages. For odd snippets that no short rule covers, the clause ends up describing those few snippets. This is memorisation: it costs readability, and possibly generalisation.
