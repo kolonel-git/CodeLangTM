@@ -77,7 +77,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
   - model: size in KB (pickled, and for the TM also the bit-packed clause size that the C export will use), vocabulary size, number of clauses and average literals per clause (TM) or non-zero weights (linear models);
   - inference: latency (median, p95) and throughput, split into binarize vs predict;
   - reported as measured, including where the TM loses
-- [ ] B6 clause inspector (pulled forward from M5): every clause as a readable rule (`docs/clauses.md`, `clauses.json`), per-clause statistics on train, signature features per language, literal-usage heatmap, class-overlap matrix, clause formation over epochs, `codelangtm explain` traces one prediction to the clauses that fired
+- [x] B6 clause inspector (pulled forward from M5): every clause as a readable rule (`codelangtm clauses` → `docs/clauses.md`, full `clauses.json`), per-clause statistics on train, signature features per language, signature-usage heatmap, class-overlap matrix, clause shapes, stability across the other 4 seeds, a formation replay of the official model's training, and `codelangtm explain` tracing one prediction to the clauses that fired. Result: rules evaluated from their text fire exactly where the model's clauses fire (all 3,200); signatures are recognisable (C++ `::`, Go `:=`, Rust `let`/`!(`, HTML `">`), SQL is recognised mostly by exclusion; 173 clauses of 40+ literals act as specialists for a few training snippets (input for M4's literal budget); signature scores correlate 0.49-0.85 across seeds
 - [ ] B6b error analysis: confusable pairs, disagreement with Naive Bayes (short snippets moved to Future)
 - [ ] B7 TM sections of [report.md](report.md) (results, curves, resources, "how the TM works inside")
 
@@ -100,11 +100,11 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 
 Rule extraction, per-prediction explanation and the per-language gallery move into M3 (B6, clause inspector). M5 keeps what builds on them: rule quality on the test set, the HTML report and a polished `predict --explain`.
 
-- [ ] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`); name features via `Binarizer.get_feature_names_out()` so word features read `word("SELECT")`, not the internal marker
-- [ ] Per-prediction explanation: `codelangtm predict --explain` shows winning clauses and vote totals
-- [ ] Rule quality metrics: length, coverage, precision, overlap between classes
+- [x] Rule extraction: clauses -> `has("def ") AND NOT has(";")` per class (`rules.extract_rules`, done in B6); word features read `word("SELECT")`, not the internal marker
+- [ ] Per-prediction explanation: `codelangtm predict --explain` shows winning clauses and vote totals (B6 added `codelangtm explain`; M5 folds it into `predict`)
+- [ ] Rule quality metrics: length, coverage, precision, overlap between classes (on train in B6; M5 adds the test set)
 - [ ] HTML report: matched n-grams highlighted in the snippet, votes per language
-- [ ] Per-language rule gallery (top rules by coverage/precision)
+- [ ] Per-language rule gallery (top rules by coverage/precision; a markdown version is in `docs/clauses.md` since B6)
 
 **Exit:** for any snippet, the report shows exactly which rules drove the prediction.
 

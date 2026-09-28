@@ -28,9 +28,10 @@ Code snippet
 | TM experiment config, training curves | `config.py` (`TMConfig`), `configs/tm.yaml`, `curves.py` | `codelangtm tm-curve` |
 | TM vs baselines (per seed, significance tests), final models | `tm_results.py` | `codelangtm tm-results`, `tm-train`, `tm-select` |
 | Process-level resources (fresh process per job) | `resources.py` | `codelangtm resources` |
-| Rules, C export | `rules.py`, `export_c.py` | stubs (B6, M6) |
+| Clause inspector: clauses as readable rules, statistics, explanations | `rules.py` | `codelangtm clauses`, `codelangtm explain` |
+| C export | `export_c.py` | stub (M6) |
 
-Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`, `tm-curves.md`, `tm-results.md`, `resources.md`), each with a JSON sidecar (`results.json`, `ablations.json`, `tm-curves.json`, `tm-results.json`, `resources.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes) → embedded in the hand-written [report.md](report.md).
+Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`, `tm-curves.md`, `tm-results.md`, `resources.md`, `clauses.md`), each with a JSON sidecar (`results.json`, `ablations.json`, `tm-curves.json`, `tm-results.json`, `resources.json`, `clauses.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes) → embedded in the hand-written [report.md](report.md).
 
 ## Features
 `Binarizer` (scikit-learn transformer; refit inside every CV fold):
@@ -82,6 +83,7 @@ TMU 0.8.3 facts checked in the B1 spike ([issues-and-fixes](issues-and-fixes.md)
 - **Prediction:** a clause fires when every included `has(j)` feature is present and every included `NOT has(j)` feature is absent. A class's sum is the total weight of its firing clauses; the highest sum wins, and ties go to the class listed first.
 - **Official model:** `models/tm.json` (gitignored; rebuild with `codelangtm tm-select` after `tm-results`, or `codelangtm tm-train --setting tm_400 --seed 4 --out models/tm.json`, which gives the identical file content). It is the `tm_400` seed whose CV score is the median of the 5 seeds (seed 4), chosen without test data; `meta.canonical` records the rule and every seed's CV score.
 - **Size:** the 400-clause model on the frozen features is about 160 KB as compact JSON (3,200 clauses, ~36,000 included literals, measured on one CV fold).
+- **Reading it as rules:** `rules.extract_rules` turns every clause into text (`has("fn ") AND NOT has("\t}")`; quotes show spaces, `\n`/`\t` show line breaks and tabs, word features read `word("SELECT")`). `codelangtm clauses` checks that each rule, evaluated from its literal list, fires exactly where `TMState.clause_outputs` says the clause fires, and writes `docs/clauses.md` + `clauses.json` (every clause with its training-set statistics; one clause per line).
 
 ## Install notes
 - TMU builds a C extension; Python 3.12 is pinned. It installs natively on Windows (checked with TMU 0.8.3); WSL2 or Docker is only a fallback.

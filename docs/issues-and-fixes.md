@@ -18,6 +18,16 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
+### M10. Very long clauses that memorise a few training snippets (B6, open: M4)
+- **Symptom:** the clause inspector found 173 of the official model's 3,200 clauses with more than 40 literals (up to 268), almost all `NOT has(...)` parts, 157 of them "for" clauses. They fire on few training snippets (median 4; 40 fire on at most one) with median precision 1.0, and carry above-average weight (median |weight| 9, against 6 for all clauses).
+- **Reading:** Type II feedback keeps adding "not this n-gram" literals until a clause stops firing on other languages. For odd snippets that no short rule covers, the clause ends up describing those few snippets. This is memorisation: it costs readability, and possibly generalisation.
+- **Next:** M4 tries TMU's `max_included_literals` (a literal budget) and reports accuracy with and without these specialists. It stays unfixed here, because the frozen M3 setting is what the comparison with the baselines measured.
+
+### M9. Formation measures that looked fine but meant nothing (B6, fixed before commit)
+- **Symptom:** the first formation replay reported that 98.3% of include decisions already matched the final model after epoch 1, and that every signature n-gram appeared in a "for" clause at epoch 1.
+- **Root cause:** about 99% of all (clause, literal) slots are "exclude" in any sparse model, so raw agreement is near 100% from the start. And after one epoch clauses hold about 9 literals each, so almost every n-gram is included somewhere by chance.
+- **Fix:** compare only the included decisions (Jaccard similarity with the final include set: 0.10 after epoch 1, 0.48 after 20, 0.85 after 80), and follow each signature n-gram's *share* of the language's "for" clauses per epoch. Its *settled epoch* is the one from which that share stays at least half its final value (median: epoch 5).
+
 ### M8. The planned TM setting trails the baselines (B1 spike, CV only)
 - **Setup:** throwaway spike, not committed. TMU 0.8.3 `TMClassifier` on the frozen features, 5 repo-grouped CV folds of train (the test set was not used), 150 epochs, macro-F1 on the held-out fold after every epoch. Naive Bayes on the same folds: 0.963 ± 0.005.
 - **Symptom:** the planned starting point (N_c=100 clauses per class, T=30, s=3.5, weighted clauses) ends at 0.925-0.940 (mean of the last 20 epochs, 3 seeds), about 3 points below Naive Bayes. Training F1 reaches 1.0 by epoch 15-60 while held-out F1 stays lower: the model fits the training set completely.
