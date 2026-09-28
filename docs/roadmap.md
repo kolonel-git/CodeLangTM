@@ -84,7 +84,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 
 **Exit:** TM results in `docs/tm-results.md`, comparable to baselines on the same splits; reported as measured, including where the TM loses; every learned clause is inspectable and any prediction can be traced to the clauses that fired.
 
-**Status: done (branch `feat/tm-training`, PR open).** Exit criteria:
+**Status: done (branch `feat/tm-training`, PR #7 merged).** Exit criteria:
 - [x] TM results comparable to the baselines on the same splits: [tm-results.md](tm-results.md), same protocol, 5 seeds, corrected t-tests
 - [x] Reported as measured, including where the TM loses: slower to train (~20×), one-snippet latency 0.34 ms in Python against the 0.1 ms target, a significant loss for the 100-clause setting, errors 35.6 per seed out of fold against Naive Bayes' 26 ([report](report.md) sections 7.2, 7.3, 7.5)
 - [x] Every learned clause inspectable: [clauses.md](clauses.md) + `clauses.json` (all 3,200, checked against the model)

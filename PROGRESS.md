@@ -3,8 +3,8 @@
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
 **Last updated:** 2026-09-28
-**Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7 done, PR open). Next: Stage B data, then M4
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR open for branch B): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
+**Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7, PR #7 merged; a Linux-only CI failure after the merge fixed on `fix/linux-peak-memory`). Next: Stage B data, then M4
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR #7 merged): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
 
 ## Milestone overview
 
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | Done (PR open) | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B7 (TM matches the baselines; resources; clause inspector; error analysis; report wrap-up) |
+| M3 TM training | Done | Branch A merged (PR #6: report + figures); branch B merged (PR #7): B1-B7 (TM matches the baselines; resources; clause inspector; error analysis; report wrap-up) |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -21,7 +21,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 ## Next steps (in order)
 
-M0-M3 are finished (M3 once its PR is merged); each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
+M0-M3 are finished; each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
 
 - [x] M3 branch A `feat/report`: A0 housekeeping, A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + [docs/report.md](docs/report.md)
 - [x] Push `feat/report`, PR #6 merged; CI green with TMU and matplotlib installed (TMU builds on the Ubuntu runner)
@@ -37,13 +37,18 @@ M0-M3 are finished (M3 once its PR is merged); each item is recorded in the done
 - [x] B6b error analysis (`codelangtm errors`, out of fold)
 - [x] B7 report wrap-up (key findings, targets scorecard, section 7 in story order, docs audit)
 - [x] Repeated splits used for the final TM vs baselines comparison (5 seeds, corrected resampled t-test; B3)
-- [ ] Push `feat/tm-training`, open the PR, CI green, merge; then add the PR number to README / roadmap / PROGRESS
+- [x] Push `feat/tm-training`, PR #7 merged
+- [ ] CI fix after the merge: Linux peak memory below current (`fix/linux-peak-memory`, issues-and-fixes W7); merge and confirm CI green
 - [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-28 — CI fix after merging PR #7
+- CI on Ubuntu failed in `test_memory_is_measured_and_grows`: the peak memory (from `getrusage`, updated lazily by the Linux kernel) was below the current memory (from `/proc/self/status`). Fix: both values from the same `/proc/self/status` snapshot (`VmRSS`, `VmHWM`), peak never below current; a new test fakes the Linux inputs so it runs on every OS (issues-and-fixes W7). B5 numbers unaffected (measured on Windows).
+- Tests: 359 passing.
 
 ### 2026-09-28 — M3 branch B, B7: report wrap-up (M3 done, PR open)
 - Choices (start of step): key findings plus a targets scorecard at the top of the report; section 7 in story order; M3 recorded as done pending the merge.

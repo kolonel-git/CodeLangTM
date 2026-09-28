@@ -194,6 +194,13 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Tooling & workflow
 
+### W7. CI failed after the M3 merge: "peak" memory below "current" on Linux
+- **Symptom:** `test_memory_is_measured_and_grows` failed on the Ubuntu CI runner after PR #7 was merged (it passes on Windows): current 318.68 MB but peak 318.44 MB.
+- **Root cause:** on Linux, `resources.memory_mb` read current memory from `/proc/self/status` (`VmRSS`) but the peak from `getrusage` (`ru_maxrss`). The kernel updates `ru_maxrss` lazily, so right after new pages are touched it can lag behind the current value. The test had just touched 80 MB.
+- **Fix:** read both from the same `/proc/self/status` snapshot (`VmRSS` and `VmHWM`; the kernel reports `VmHWM` as at least the current value), keep `getrusage` only as a fallback, and never report a peak below the current value. A new test simulates the lagging `getrusage` on any OS.
+- **Impact on results:** none. The B5 resource numbers were measured on Windows, which reads both values from one `GetProcessMemoryInfo` call.
+- **Lesson:** CI runs on a different OS than development; code with OS-specific branches needs a test that exercises each branch everywhere (here by faking the Linux inputs).
+
 ### W6. Pickling a model silently stripped it (fixed before commit)
 - **Symptom:** B2 smoke test: after `pickle.dumps(pipeline)`, calling `predict_tmu` on the *original* model failed with "not fitted".
 - **Root cause:** `__getstate__` removed the TMU object from the state dict. Since Python 3.11, `object.__getstate__()` (which scikit-learn's `BaseEstimator.__getstate__` calls) can return the object's **live** `__dict__`, not a copy, so the removal hit the model itself. `Binarizer.__getstate__` had the same pattern (harmless there: it only drops a cache that is rebuilt on demand).
