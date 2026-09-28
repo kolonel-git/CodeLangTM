@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -98,6 +99,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--resources", type=Path, default=Path("docs/resources.json"),
         help="process-level resources sidecar (skipped if the file does not exist)",
     )  # fmt: skip
+    rep.add_argument(
+        "--clauses", type=Path, default=Path("docs/clauses.json"),
+        help="clause inspector sidecar (skipped if the file does not exist)",
+    )  # fmt: skip
     rep.add_argument("--out", type=Path, default=Path("docs/figures"))
 
     res = sub.add_parser(
@@ -141,6 +146,26 @@ def _build_parser() -> argparse.ArgumentParser:
     select.add_argument("--models-dir", type=Path, default=Path("models"))
     select.add_argument("--out", type=Path, default=Path("models/tm.json"))
 
+    cl = sub.add_parser(
+        "clauses", help="clause inspector: every clause of a model file as a readable rule"
+    )
+    cl.add_argument("--model", type=Path, default=Path("models/tm.json"))
+    cl.add_argument(
+        "--data", type=Path, default=Path("data/processed"),
+        help="dataset the model was trained on (clause statistics use its train split only)",
+    )  # fmt: skip
+    cl.add_argument(
+        "--models-dir", type=Path, default=Path("models"),
+        help="other seeds of the same setting (<setting>_seed<k>.json) for the stability check",
+    )  # fmt: skip
+    cl.add_argument("--no-formation", action="store_true", help="skip the formation replay")
+    cl.add_argument("--out", type=Path, default=Path("docs/clauses.md"))
+
+    ex = sub.add_parser("explain", help="predict one snippet and show the clauses that fired")
+    ex.add_argument("--model", type=Path, default=Path("models/tm.json"))
+    ex.add_argument("--file", required=True, help="snippet file, or - for standard input")
+    ex.add_argument("--top", type=int, default=8, help="clauses shown per language")
+
     curve = sub.add_parser(
         "tm-curve", help="TM training curves on CV folds (train only); recommends the epoch count"
     )
@@ -179,14 +204,15 @@ def _report(args: argparse.Namespace) -> int:
 
     optional = {}
     for key, label in (("curves", "TM curve"), ("tm_results", "TM result"),
-                       ("resources", "resource")):  # fmt: skip
+                       ("resources", "resource"), ("clauses", "clause")):  # fmt: skip
         path = getattr(args, key)
         optional[key] = path if path and path.exists() else None
         if path and optional[key] is None:
             print(f"note: {path.as_posix()} not found, skipping {label} figures")
     try:
         written = render_all(args.results, args.ablations, args.out, optional["curves"],
-                             optional["tm_results"], optional["resources"])  # fmt: skip
+                             optional["tm_results"], optional["resources"],
+                             optional["clauses"])  # fmt: skip
     except (FileNotFoundError, ValueError, ImportError) as e:
         print(f"report failed: {e}", file=sys.stderr)
         return 1
@@ -280,6 +306,71 @@ def _tm_select(args: argparse.Namespace) -> int:
     scores = ", ".join(f"seed {k}: {v:.4f}" for k, v in c["cv_by_seed"].items())
     print(f"canonical {c['setting']} model: seed {c['seed']} ({c['rule']}); CV {scores}")
     print(f"wrote {args.out.as_posix()} (from {c['source']})")
+    return 0
+
+
+def _seed_models(models_dir: Path, meta: dict) -> dict:
+    """Other seeds of the model's setting found in `models_dir` (not the model's own seed)."""
+    from .model import load_model
+
+    setting, seed = meta.get("setting"), meta.get("seed")
+    found = {}
+    for path in sorted(models_dir.glob(f"{setting}_seed*.json")):
+        match = re.fullmatch(rf"{re.escape(str(setting))}_seed(\d+)", path.stem)
+        if match and int(match.group(1)) != seed:
+            found[f"seed {match.group(1)}"] = load_model(path)
+    return found
+
+
+def _clauses(args: argparse.Namespace) -> int:
+    from .audit import load_dataset
+    from .baselines import sidecar_path
+    from .model import load_model
+    from .rules import clauses_json_text, inspect_model, render_clauses_md, summary_table
+
+    try:
+        model = load_model(args.model)
+        train = load_dataset(args.data)["train"]
+        manifest = args.data / "dataset.json"
+        expected = model.meta.get("dataset_files")
+        if expected and manifest.exists():
+            files = json.loads(manifest.read_text(encoding="utf-8")).get("files", {})
+            if {k: v[:12] for k, v in files.items()} != expected:
+                raise ValueError(f"{args.data} is not the dataset {args.model} was trained on")
+        others = _seed_models(args.models_dir, model.meta)
+        data = inspect_model(model, [s.text for s in train], [s.language for s in train], others,
+                             formation=not args.no_formation,
+                             progress=lambda m: print(m, flush=True))  # fmt: skip
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"clauses failed: {e}", file=sys.stderr)
+        return 1
+    data["model"]["path"] = args.model.as_posix()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(render_clauses_md(data), encoding="utf-8")
+    sidecar = sidecar_path(args.out)
+    sidecar.write_text(clauses_json_text(data), encoding="utf-8")
+    print()
+    print(summary_table(data))
+    if not data["checks"]["rules_match_model"]:
+        print("WARNING: rules do not reproduce the model's clause outputs", file=sys.stderr)
+    print(f"\nwrote {args.out} and {sidecar}")
+    return 0
+
+
+def _explain(args: argparse.Namespace) -> int:
+    from .model import load_model
+    from .rules import explain_snippet, format_explanation
+
+    try:
+        model = load_model(args.model)
+        if args.file == "-":
+            text = sys.stdin.buffer.read().decode("utf-8", errors="replace")
+        else:
+            text = Path(args.file).read_text(encoding="utf-8", errors="replace")
+    except (FileNotFoundError, ValueError) as e:
+        print(f"explain failed: {e}", file=sys.stderr)
+        return 1
+    print(format_explanation(explain_snippet(model, text), top=args.top))
     return 0
 
 
@@ -470,6 +561,10 @@ def main(argv: list[str] | None = None) -> int:
         return _resources(args)
     if args.command == "tm-select":
         return _tm_select(args)
+    if args.command == "clauses":
+        return _clauses(args)
+    if args.command == "explain":
+        return _explain(args)
     if args.command == "diagnose":
         return _diagnose(args)
     parser.print_help()
