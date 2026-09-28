@@ -18,6 +18,42 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Modelling
 
+### M11. The "Python sink" did not replicate, and a verdict rule was too weak (B6b)
+- **Symptom:** on the test set the TM sent other languages' snippets to Python (Java→Python 8 over 5 seeds), so B6b set out to explain a Python sink. On out-of-fold CV predictions (every training snippet, 5 seeds), Python receives only 21 of the TM's 178 errors (12%), *below* the 14% that an even spread over the other 7 languages would give.
+- **Second problem:** hypothesis H1 ("the sink is real") was first written as "the TM sends a larger share of its errors to Python than the baselines do". Python passed (TM 12% against 4% and 9%), although it receives fewer errors than chance. The rule compared against the wrong reference.
+- **Fix:** H1 now also requires a share above chance. This was changed after seeing the data and is marked as such in [errors.md](errors.md) and the report. With the user's agreement, the probes were then run on the language that really collects most errors out of fold: JavaScript (52 of 178, 29%).
+- **Lesson:** the test set has 173 snippets and about 5 TM errors per seed. A pattern in so few errors, most from a handful of repositories, is anecdote, not evidence. The out-of-fold view gives ~36 errors per seed, all without spending the test set.
+
+### M10. Very long clauses that memorise a few training snippets (B6, open: M4)
+- **Symptom:** the clause inspector found 173 of the official model's 3,200 clauses with more than 40 literals (up to 268), almost all `NOT has(...)` parts, 157 of them "for" clauses. They fire on few training snippets (median 4; 40 fire on at most one) with median precision 1.0, and carry above-average weight (median |weight| 9, against 6 for all clauses).
+- **Reading:** Type II feedback keeps adding "not this n-gram" literals until a clause stops firing on other languages. For odd snippets that no short rule covers, the clause ends up describing those few snippets. This is memorisation: it costs readability, and possibly generalisation.
+- **Next:** M4 tries TMU's `max_included_literals` (a literal budget) and reports accuracy with and without these specialists. It stays unfixed here, because the frozen M3 setting is what the comparison with the baselines measured.
+
+### M9. Formation measures that looked fine but meant nothing (B6, fixed before commit)
+- **Symptom:** the first formation replay reported that 98.3% of include decisions already matched the final model after epoch 1, and that every signature n-gram appeared in a "for" clause at epoch 1.
+- **Root cause:** about 99% of all (clause, literal) slots are "exclude" in any sparse model, so raw agreement is near 100% from the start. And after one epoch clauses hold about 9 literals each, so almost every n-gram is included somewhere by chance.
+- **Fix:** compare only the included decisions (Jaccard similarity with the final include set: 0.10 after epoch 1, 0.48 after 20, 0.85 after 80), and follow each signature n-gram's *share* of the language's "for" clauses per epoch. Its *settled epoch* is the one from which that share stays at least half its final value (median: epoch 5).
+
+### M8. The planned TM setting trails the baselines (B1 spike, CV only)
+- **Setup:** throwaway spike, not committed. TMU 0.8.3 `TMClassifier` on the frozen features, 5 repo-grouped CV folds of train (the test set was not used), 150 epochs, macro-F1 on the held-out fold after every epoch. Naive Bayes on the same folds: 0.963 ± 0.005.
+- **Symptom:** the planned starting point (N_c=100 clauses per class, T=30, s=3.5, weighted clauses) ends at 0.925-0.940 (mean of the last 20 epochs, 3 seeds), about 3 points below Naive Bayes. Training F1 reaches 1.0 by epoch 15-60 while held-out F1 stays lower: the model fits the training set completely.
+- **Probe (6 settings, a sanity check rather than tuning; M4 tunes properly):**
+
+  | Setting | Last-20-epoch mean | Best epoch mean (optimistic) | s/epoch |
+  | --- | --- | --- | --- |
+  | N_c=100, T=30, s=3.5 (seeds 42 / 7 / 123) | 0.925 / 0.940 / 0.934 | 0.951 / 0.949 / 0.946 | 0.028 |
+  | same, unweighted clauses | 0.891 (falls after epoch ~30) | 0.944 | 0.046 |
+  | N_c=100, T=15, s=3.5 | 0.935 | 0.949 | 0.028 |
+  | N_c=100, T=30, s=6 | 0.916 | 0.946 | 0.028 |
+  | N_c=200, T=50, s=3.5 | 0.950 | 0.962 | 0.031 |
+  | **N_c=400, T=100, s=5** | **0.962** | 0.969 | 0.037 |
+
+- **Reading:** capacity (more clauses, with T scaled up so the votes do not saturate) closes the gap; changing s alone does not. "Best epoch" is the maximum of 150 noisy means, so it flatters every setting; the last-20 mean is the fairer number.
+- **Noise:** held-out F1 moves ±0.02 between consecutive epochs and the fold std is 0.02-0.03. A "smallest epoch within one std of the best" rule picks epochs 5-12 here, too early; B4 needs a smoothed curve or a window average.
+- **Cost of the larger setting:** 8 × 400 = 3,200 clauses over 1,000 literals, 35,960 included literals (11.2 per clause). Bit-packed include matrix: 400 KB, close to the 500 KB target; stored sparsely (2-byte literal ids + clause offsets + weights) about 80 KB.
+- **Decision (2026-09-27):** B3 uses N_c=400, T=100, s=5, weighted clauses as the main TM setting (chosen on CV only), with the planned N_c=100/T=30/s=3.5 kept as a reference row; both are reported over 5 seeds. Full tuning stays in M4, which also looks for the smallest model within ~1 F1 point.
+- **Correction after B4 (5 seeds): the 0.962 was a lucky seed.** The B4 training curves (seeds 1-5, same folds, final code) give the 400-clause setting 0.945-0.950 per seed over the last 20 epochs (mean 0.948), not 0.962. Rerunning seed 42 through the final code reproduces 0.962 (per fold 0.915 / 0.970 / 0.969 / 0.966 / 0.991), so the code is consistent and seed 42 is an outlier. The probe above compared six settings on that single seed and kept the best, which is selection bias twice over (one seed, best of six). The ranking still holds (400 clauses beat 100 by about 0.016 over 5 seeds), but the TM trails Naive Bayes (0.963) by about 1.5 points, not zero. The multi-seed rule (roadmap Principles) exists for exactly this.
+
 ### M7. First resource numbers were misleading (fixed before commit)
 - **Symptom:** the first "Resources" table showed fit CPU 2.7 s against 0.45 s wall time, and an identical 71.7 MB peak memory for all five models.
 - **Root cause:** both came from one memory-traced fit. `tracemalloc` slows code down about 6×, which inflated CPU time; and the peak was the binarizer's candidate table (same for every model), which hid the differences between classifiers.
@@ -125,6 +161,17 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Environment
 
+### E6. TMU training hangs forever with `seed=0`
+- **Symptom:** while writing B2's tests, a tiny TM (4 clauses, 3 classes) never finished its first epoch. Any clause count or T hung the same way, yet the same model trained in 0.05 s in other tests.
+- **Cause found by elimination:** the difference was the seed. `seed=0` hangs; 1 and 42 do not. TMU passes the seed to `lib.pcg32_seed` and `lib.xorshift128p_seed` in its C code. A xorshift128+ generator whose state is all zeros returns 0 forever, and a TMU loop that draws random numbers until a condition holds then never ends. That mechanism is inferred from the source and the behaviour (the compiled C was not stepped through); the trigger, seed 0, is confirmed.
+- **Fix:** `TMLanguageClassifier` rejects seeds below 1 (and non-integers) with a clear message; the default seed is 1. Seeds for multi-seed runs start at 1. Test: seeds 0, -1, 1.5 and `True` are rejected before TMU is touched.
+- **Lesson:** the B1 spike used seed 42 and never met this; a test suite with small, fast models surfaced it.
+
+### E5. TMU prints a pycuda traceback on import
+- **Symptom:** importing `tmu.models.classification` logs a WARNING and an ERROR with a full `No module named 'pycuda'` traceback.
+- **Root cause:** TMU tries to load its CUDA backend at import and logs the failure with `_LOGGER.exception`. Harmless: the CPU backend works.
+- **Fix (B2):** raise the level of the `tmu.clause_bank.clause_bank_cuda` and `tmu.util.cuda_profiler` loggers before importing TMU, so real errors still show.
+
 ### E4. `uv sync` removed TMU
 - **Symptom:** after a plain `uv sync`, TMU disappeared from the venv.
 - **Root cause:** `uv sync` makes the venv match exactly the requested extras; unrequested extras are uninstalled.
@@ -146,6 +193,11 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 ---
 
 ## Tooling & workflow
+
+### W6. Pickling a model silently stripped it (fixed before commit)
+- **Symptom:** B2 smoke test: after `pickle.dumps(pipeline)`, calling `predict_tmu` on the *original* model failed with "not fitted".
+- **Root cause:** `__getstate__` removed the TMU object from the state dict. Since Python 3.11, `object.__getstate__()` (which scikit-learn's `BaseEstimator.__getstate__` calls) can return the object's **live** `__dict__`, not a copy, so the removal hit the model itself. `Binarizer.__getstate__` had the same pattern (harmless there: it only drops a cache that is rebuilt on demand).
+- **Fix:** both copy the dict first (`dict(super().__getstate__())`). Regression test: after pickling, the original still has its TMU object and keeps training; the unpickled copy predicts identically and refuses to train with a clear message.
 
 ### W5. Keeping figure files stable in git
 - **Goal:** redrawing a figure from the same sidecar must give the same bytes, on this machine and in CI, so regenerated PNGs only show up in git when the numbers change.

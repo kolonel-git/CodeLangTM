@@ -6,15 +6,18 @@
 
 **Interpretable source code language identification via Tsetlin Machines.**
 
-CodeLangTM learns transparent Boolean rules instead of opaque floating-point weights:
+CodeLangTM learns transparent Boolean rules instead of opaque floating-point weights. A rule the trained model actually learned (it fires on 81% of Rust training snippets, and 95% of what it fires on is Rust):
 
 ```
-python = has("def ") AND has(":") AND NOT has(";")
+rust = has("fn ") AND NOT has("\t}") AND NOT has("\n<")
 ```
 
-- **Fast, cheap inference** — bitwise AND/OR/NOT instead of matrix multiplication.
-- **Explainable** — every prediction traces to human-readable clauses.
-- **Tiny** — no weight matrices; target < 500 KB.
+- **Accurate** — matches Naive Bayes and logistic regression (repeated-test macro-F1 0.966 vs 0.968, no significant difference over 5 seeds).
+- **Explainable** — every prediction traces to human-readable clauses (`codelangtm explain`), and the rules are checked to be exactly the model.
+- **Small** — the model is one 164 KB JSON file (target < 500 KB).
+- **Fast (planned)** — clauses are bitwise AND/NOT tests; the C runtime (M6) is where the speed target will be met. The Python version takes 0.34 ms per snippet today.
+
+Planned deliverables: a `codelangtm predict` CLI, a zero-dependency C runtime and a web demo that shows the clauses behind each prediction. The project is a portfolio piece, written so it can later become a research write-up (multi-seed results, significance tests, saved raw runs).
 
 ## Pipeline
 
@@ -26,11 +29,11 @@ See [docs/architecture.md](docs/architecture.md). Data is real-world code only, 
 
 ## Targets
 
-| Metric | Target |
-| --- | --- |
-| Macro F1 (8 languages) | >= 96% |
-| Latency / snippet | < 0.1 ms |
-| Model size | < 500 KB |
+| Metric | Target | Measured (M3, 400-clause TM) |
+| --- | --- | --- |
+| Macro F1 (8 languages) | >= 96% | 96.6% repeated test, 95.8% single test, 94.9% CV (5-seed means) |
+| Latency / snippet | < 0.1 ms | 0.34 ms in Python, one snippet at a time (C runtime in M6) |
+| Model size | < 500 KB | 164 KB |
 
 Languages: Python, C++, Java, JavaScript, Rust, Go, SQL, HTML.
 
@@ -49,19 +52,31 @@ uv run codelangtm collect github                                  # data/raw/
 uv run codelangtm data build                                      # data/processed/
 uv run codelangtm baselines --config configs/baselines.yaml       # docs/results.md + .json
 uv run codelangtm ablate                                          # docs/ablations.md + .json
+uv run codelangtm tm-curve                                        # docs/tm-curves.md + .json
+uv run codelangtm tm-results                                      # docs/tm-results.md + .json, models/ (~25 min)
+uv run codelangtm tm-select                                       # models/tm.json (official model)
+uv run codelangtm resources                                       # docs/resources.md + .json
+uv run codelangtm clauses                                         # docs/clauses.md + .json
+uv run codelangtm errors                                          # docs/errors.md + .json
 uv run codelangtm report                                          # docs/figures/*.png
+```
+
+Ask the model why it chose a language:
+
+```bash
+uv run codelangtm explain --file my_snippet.rs                    # votes per language + the clauses that fired
 ```
 
 ## Status
 
-Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with figures. Full plan in [docs/roadmap.md](docs/roadmap.md).
+Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with figures; new to Tsetlin Machines or the evaluation terms? Start with the [concepts guide](docs/concepts.md). Full plan in [docs/roadmap.md](docs/roadmap.md).
 
 | Milestone | Status |
 | --- | --- |
 | M0 Foundations | done |
 | M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
 | M2 Features & baselines | done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
-| M3 TM training | in progress: results report with figures done ([report](docs/report.md)); TM training next |
+| M3 TM training | done (PR open): the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 164 KB model) ([report](docs/report.md), key findings and section 7); every clause readable as a rule and every prediction traceable ([clauses](docs/clauses.md)); errors studied out of fold ([errors](docs/errors.md)). Next: Stage B data, then M4 |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |
 | M6 Deployment & benchmarks | planned |

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -450,6 +451,435 @@ def ablation_deltas(ablations: dict) -> object:
     return _draw(draw)
 
 
+# ---------------------------------------------------------- tm-curves.json figures
+
+
+def tm_curves(curves: dict) -> object:
+    """Held-out and training macro-F1 per epoch, one panel per TM setting, chosen epoch marked."""
+
+    def draw():
+        settings = list(curves["settings"].items())
+        fig, axes = _new_figure(3.8 * len(settings), 3.3, ncols=len(settings), sharey=True)
+        for ax, (name, s) in zip(axes, settings, strict=True):
+            sm = s["summary"]
+            epochs = list(range(1, len(sm["val_mean"]) + 1))
+            lo = [m - d for m, d in zip(sm["val_mean"], sm["val_std_folds"], strict=True)]
+            hi = [m + d for m, d in zip(sm["val_mean"], sm["val_std_folds"], strict=True)]
+            ax.fill_between(epochs, lo, hi, color=SERIES[0], alpha=0.12, lw=0)
+            ax.plot(epochs, sm["val_mean"], color=SERIES[0], lw=1, alpha=0.45)
+            ax.plot(epochs, sm["val_smoothed"], color=SERIES[0], lw=2,
+                    label="held-out (smoothed; band ± std over folds)")  # fmt: skip
+            ax.plot(epochs, sm["train_mean"], color=SERIES[1], lw=1.5, ls="-", label="train")
+            e = sm["chosen_epoch"]
+            ax.axvline(e, color=INK_2, lw=1)
+            ax.text(e, 0.0, f" epoch {e}", transform=ax.get_xaxis_transform(), color=INK_2,
+                    fontsize=8, va="bottom")  # fmt: skip
+            ax.axhline(TARGET_F1, color=MUTED, lw=1, label=f"target {TARGET_F1}")
+            params = s["params"]
+            title = (f"{name}: {params.get('n_clauses')} clauses/language, "
+                     f"T={params.get('T')}, s={params.get('s')}")  # fmt: skip
+            ax.set_title(title, fontsize=9)
+            ax.set_xlabel("epoch")
+        axes[0].set_ylabel("macro-F1")
+        axes[0].set_ylim(bottom=max(0.0, min(min(s["summary"]["val_mean"]) for _, s in settings)
+                                    - 0.05), top=1.01)  # fmt: skip
+        axes[0].legend(loc="lower right")
+        fig.suptitle("TM training curves (CV folds of train, mean over folds x seeds)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
+def tm_clause_formation(curves: dict) -> object:
+    """Clause growth and stability per epoch: included literals per clause, decisions changed."""
+
+    def draw():
+        settings = list(curves["settings"].items())
+        fig, axes = _new_figure(7.6, 3.1, ncols=2)
+        for slot, (name, s) in enumerate(settings[: len(SERIES)]):
+            sm = s["summary"]
+            epochs = list(range(1, len(sm["val_mean"]) + 1))
+            per_clause = [i / n if n else 0.0 for i, n in
+                          zip(sm["included_mean"], sm["nonempty_mean"], strict=True)]  # fmt: skip
+            every = max(1, len(epochs) // 10)
+            style = dict(color=SERIES[slot], marker=MARKERS[slot], ms=4, markevery=every,
+                         label=name)  # fmt: skip
+            axes[0].plot(epochs, per_clause, **style)
+            axes[1].plot(epochs, sm["changed_mean"], **style)
+        axes[0].set_title("literals per non-empty clause", fontsize=9)
+        axes[1].set_title("include decisions changed per epoch (log scale)", fontsize=9)
+        axes[1].set_yscale("log")
+        for ax in axes:
+            ax.set_xlabel("epoch")
+        axes[0].legend(loc="lower right")
+        fig.suptitle("How clauses form during training (mean over folds x seeds)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
+# --------------------------------------------------------- tm-results.json figures
+
+
+def _tm_rows(tm_results: dict) -> list[dict]:
+    """Baselines then TM settings as dicts: CV, repeated test and test scores with spreads."""
+    rows = []
+    for b in tm_results["baselines"]:
+        rows.append(dict(name=_label(b["name"]), cv=b["cv_mean"], cv_err=b["cv_std"],
+                         rep=b["repeat_mean"], rep_err=b["repeat_std"], test=b["test_f1"],
+                         test_lo=b["test_f1"], test_hi=b["test_f1"]))  # fmt: skip
+    for name, t in tm_results["tm"].items():
+        a = t["aggregate"]
+        rows.append(dict(name=f"{name} (TM)", cv=a["cv_mean"], cv_err=a["cv_std_folds"],
+                         rep=a.get("repeat_mean"), rep_err=a.get("repeat_std_splits"),
+                         test=a["test_mean"], test_lo=a["test_min"],
+                         test_hi=a["test_max"]))  # fmt: skip
+    return rows
+
+
+def tm_comparison(tm_results: dict) -> object:
+    """TM settings beside the baselines: CV, repeated test, single test (TM: range over seeds)."""
+
+    def draw():
+        rows = _tm_rows(tm_results)[::-1]
+        fig, (ax,) = _new_figure(6.4, 0.55 * len(rows) + 1.5)
+        y = list(range(len(rows)))
+        ax.errorbar([r["cv"] for r in rows], [i + 0.15 for i in y],
+                    xerr=[r["cv_err"] for r in rows], fmt=MARKERS[0], color=SERIES[0], ms=6,
+                    capsize=3, lw=1.5, label="CV, mean ± std over folds")  # fmt: skip
+        rep = [(i, r) for i, r in zip(y, rows, strict=True) if r["rep"] is not None]
+        if rep:
+            ax.errorbar([r["rep"] for _, r in rep], [i - 0.15 for i, _ in rep],
+                        xerr=[r["rep_err"] for _, r in rep], fmt=MARKERS[1], color=SERIES[1],
+                        ms=6, capsize=3, lw=1.5, label="repeated test, mean ± std")  # fmt: skip
+        for i, r in zip(y, rows, strict=True):
+            if r["test_hi"] > r["test_lo"]:
+                ax.plot([r["test_lo"], r["test_hi"]], [i, i], color=INK_2, lw=1, alpha=0.6)
+        ax.scatter([r["test"] for r in rows], y, marker="|", s=120, color=INK_2, zorder=3,
+                   label="single test (TM: mean, line = range over seeds)")  # fmt: skip
+        ax.axvline(TARGET_F1, color=MUTED, lw=1)
+        ax.text(TARGET_F1, len(rows) - 0.45, f" target {TARGET_F1}", color=MUTED, fontsize=8,
+                va="bottom")  # fmt: skip
+        ax.set_yticks(y, [r["name"] for r in rows])
+        ax.set_ylim(-0.6, len(rows) - 0.1)
+        ax.grid(axis="y", visible=False)
+        ax.set_xlabel("macro-F1")
+        seeds = len(next(iter(tm_results["tm"].values()))["seeds"]) if tm_results["tm"] else 0
+        ax.set_title(f"TM vs baselines, same splits (TM: mean over {seeds} seeds)")
+        ax.legend(loc="upper left", bbox_to_anchor=(0, -0.2), ncols=1)
+        return fig
+
+    return _draw(draw)
+
+
+def tm_per_language(tm_results: dict) -> object:
+    """Test F1 per language: baselines and TM settings (TM averaged over seeds)."""
+
+    def draw():
+        langs = tm_results["languages"]
+        names, values = [], []
+        for b in tm_results["baselines"]:
+            names.append(_label(b["name"]))
+            values.append([b["per_language_f1"][g] for g in langs])
+        for name, t in tm_results["tm"].items():
+            names.append(f"{name} (TM)")
+            values.append([t["aggregate"]["per_language_f1"][g] for g in langs])
+        # All scores here are high: start the scale just below the lowest one so differences
+        # between strong models stay visible (the printed values are exact either way).
+        low = min(min(row) for row in values)
+        vmin = math.floor((low - 0.05) * 10) / 10
+        fig, (ax,) = _new_figure(6.4, 0.42 * len(names) + 1.5)
+        image = _heatmap(ax, values, names, langs, vmin, 1.0, ".2f")
+        fig.colorbar(image, ax=ax, shrink=0.8, label="test F1").outline.set_visible(False)
+        ax.set_title("Test F1 per language: TM vs baselines")
+        return fig
+
+    return _draw(draw)
+
+
+# ---------------------------------------------------------- resources.json figures
+
+
+def process_resources(resources: dict) -> object:
+    """Small multiples, one scale each: training time, memory added by training, and
+    single-snippet latency split into binarize and predict (median; tick = p95 total)."""
+
+    def draw():
+        rows = resources["models"][::-1]
+        names = [_label(r["name"]) for r in rows]
+        y = list(range(len(rows)))
+        fig, axes = _new_figure(8.4, 0.5 * len(rows) + 1.8, ncols=3, sharey=True)
+        wall = [r["fit"]["wall_s"] for r in rows]
+        added = [r["fit"]["added_mb"] for r in rows]
+        axes[0].barh(y, wall, height=0.6, color=SERIES[0])
+        axes[1].barh(y, added, height=0.6, color=SERIES[0])
+        for ax, values, fmt in ((axes[0], wall, "{:.2f} s"), (axes[1], added, "{:.0f} MB")):
+            for i, v in enumerate(values):
+                ax.text(v, i, " " + fmt.format(v), va="center", fontsize=7.5, color=INK_2)
+            ax.set_xlim(right=max(values) * 1.45)
+        axes[0].set_title("training time", fontsize=9)
+        axes[1].set_title("training memory added", fontsize=9)
+        binarize = [r["predict"]["binarize_ms_median"] for r in rows]
+        predict = [r["predict"]["predict_ms_median"] for r in rows]
+        p95 = [r["predict"]["total_ms_p95"] for r in rows]
+        axes[2].barh(y, binarize, height=0.6, color=SERIES[0], label="binarize (median)",
+                     edgecolor=SURFACE, linewidth=1)  # fmt: skip
+        axes[2].barh(y, predict, left=binarize, height=0.6, color=SERIES[1],
+                     label="predict (median)", edgecolor=SURFACE, linewidth=1)  # fmt: skip
+        axes[2].scatter(p95, y, marker="|", s=120, color=INK_2, zorder=3, label="p95 total")
+        axes[2].axvline(0.1, color=MUTED, lw=1)
+        axes[2].text(0.1, len(rows) - 0.45, " target 0.1 ms", color=MUTED, fontsize=8,
+                     va="bottom")  # fmt: skip
+        axes[2].set_xlim(right=max(max(p95), 0.1) * 1.25)
+        axes[2].set_ylim(-0.6, len(rows) - 0.1)
+        axes[2].set_title("latency, 1 snippet (ms)", fontsize=9)
+        axes[2].legend(loc="upper left", bbox_to_anchor=(0, -0.12), ncols=1)
+        for ax in axes:
+            ax.grid(axis="y", visible=False)
+        axes[0].set_yticks(y, names)
+        fig.suptitle("Resources, measured in fresh processes (median of repeats)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
+# ------------------------------------------------------------ clauses.json figures
+
+
+def clause_signatures(clauses: dict) -> object:
+    """Top signature n-grams of every language (rows) and how often each language's "for"
+    clauses include them (columns): a strong diagonal block means languages rely on their own."""
+
+    def draw():
+        sm = clauses["signature_matrix"]
+        langs = clauses["languages"]
+        rows = [f"{f}  ({owner})" for f, owner in zip(sm["features"], sm["owner"], strict=True)]
+        values = [[100 * v for v in row] for row in sm["usage"]]
+        fig, (ax,) = _new_figure(6.4, 0.24 * len(rows) + 1.6)
+        top = max(max(row) for row in values) or 1
+        image = _heatmap(ax, values, rows, langs, 0.0, top, ".0f", blank_zero=True)
+        for text in list(ax.texts):  # rewrite labels: tiny but non-zero shares read "<1"
+            text.remove()
+        for i, row in enumerate(values):
+            for j, v in enumerate(row):
+                if v:
+                    ax.text(j, i, "<1" if v < 0.5 else f"{v:.0f}", ha="center", va="center",
+                            fontsize=7, color="#ffffff" if v / top > 0.55 else INK)  # fmt: skip
+        ax.set_yticks(range(len(rows)), rows, fontfamily="DejaVu Sans Mono", fontsize=7.5)
+        ax.set_xlabel("language whose \"for\" clauses include the n-gram")
+        bar = fig.colorbar(image, ax=ax, shrink=0.6, label="% of the language's \"for\" clauses")
+        bar.outline.set_visible(False)
+        ax.set_title("Signature n-grams (top 3 per language) and who uses them")
+        return fig
+
+    return _draw(draw)
+
+
+def clause_overlap(clauses: dict) -> object:
+    """Jaccard similarity of the n-gram sets used by each language's "for" clauses."""
+
+    def draw():
+        langs = clauses["languages"]
+        values = [[0.0 if i == j else v for j, v in enumerate(row)]
+                  for i, row in enumerate(clauses["overlap"])]  # fmt: skip
+        off = [v for i, row in enumerate(values) for j, v in enumerate(row) if i != j]
+        # Start the scale just below the smallest similarity so differences stay visible
+        # (the diagonal, blank, falls below it and shows as the lightest step).
+        low, top = math.floor(min(off) * 20) / 20, max(off)
+        fig, (ax,) = _new_figure(5.2, 4.4)
+        image = _heatmap(ax, values, langs, langs, low, top, ".2f", blank_zero=True)
+        bar = fig.colorbar(image, ax=ax, shrink=0.8, label="Jaccard similarity")
+        bar.outline.set_visible(False)
+        ax.set_title("Shared n-grams between languages' \"for\" clauses")
+        return fig
+
+    return _draw(draw)
+
+
+LENGTH_CAP = 40
+
+
+def clause_shapes(clauses: dict) -> object:
+    """How long clauses are (literals per non-empty clause) and how strongly they vote
+    (absolute weight), "for" and "against" clauses side by side."""
+
+    def draw():
+        fig, axes = _new_figure(10.4, 3.3, ncols=3)
+        groups = (("for", SERIES[0], MARKERS[0]), ("against", SERIES[1], MARKERS[1]))
+        cl = [c for c in clauses["clauses"] if c["n_literals"] > 0]
+        cap = LENGTH_CAP
+        for ax, key in ((axes[0], "n_literals"), (axes[1], "weight")):
+            data = {p: [abs(c[key]) for c in cl if c["polarity"] == p] for p, *_ in groups}
+            if key == "n_literals":  # a long tail of very long clauses: one overflow bin
+                data = {p: [min(v, cap + 1) for v in vs] for p, vs in data.items()}
+            hi = max(max(v) for v in data.values() if v)
+            edges = [e - 0.5 for e in range(1, hi + 2)]
+            ax.hist([data[p] for p, *_ in groups], bins=edges, color=[c for _, c, _ in groups],
+                    label=[f"{p} ({len(data[p]):,})" for p, *_ in groups], edgecolor=SURFACE,
+                    linewidth=0.4)  # fmt: skip
+            ax.grid(axis="x", visible=False)
+        longer = sum(c["n_literals"] > cap for c in cl)
+        axes[0].set_xticks([1, 10, 20, 30, cap + 1], ["1", "10", "20", "30", f">{cap}"])
+        axes[0].set_xlabel(f"literals in the clause ({longer} clauses have more than {cap})")
+        axes[0].set_ylabel("clauses")
+        axes[0].set_title("clause length", fontsize=9)
+        axes[0].legend(loc="upper right")
+        axes[1].set_xlabel("|weight| (votes when the clause fires)")
+        axes[1].set_title("clause weight", fontsize=9)
+        for p, color, marker in groups:
+            mine = [c for c in cl if c["polarity"] == p]
+            axes[2].scatter([c["n_literals"] for c in mine],
+                            [c["fires_own"] + c["fires_other"] + 1 for c in mine], s=9,
+                            color=color, marker=marker, alpha=0.35, linewidth=0,
+                            label=p)  # fmt: skip
+        axes[2].set_xscale("log")
+        axes[2].set_yscale("log")
+        axes[2].set_xlabel("literals in the clause (log)")
+        axes[2].set_ylabel("training snippets it fires on + 1 (log)")
+        axes[2].set_title("long clauses fire on few snippets", fontsize=9)
+        empty = sum(1 for c in clauses["clauses"] if c["n_literals"] == 0)
+        fig.suptitle(f"Shape of the {len(clauses['clauses']):,} clauses ({empty} empty clauses "
+                     "not shown)", x=0.01, ha="left", fontweight="bold", fontsize=10,
+                     color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
+def clause_formation_replay(clauses: dict) -> object:
+    """Replay of training: similarity of the clauses to the final model per epoch, and the
+    epoch at which each language's signature n-grams settled."""
+
+    def draw():
+        fm = clauses["formation"]
+        langs = clauses["languages"]
+        fig, axes = _new_figure(8.0, 3.3, ncols=2)
+        epochs = list(range(1, fm["epochs"] + 1))
+        axes[0].plot(epochs, fm["jaccard_with_final"], color=SERIES[0])
+        axes[0].set_ylim(0, 1.02)
+        axes[0].set_xlabel("epoch")
+        axes[0].set_ylabel("Jaccard similarity")
+        axes[0].set_title("clauses so far vs final clauses", fontsize=9)
+        ys, xs = [], []
+        for i, lang in enumerate(langs[::-1]):
+            for e in fm["settled_epoch"][lang].values():
+                if e is not None:
+                    ys.append(i)
+                    xs.append(e)
+        axes[1].scatter(xs, ys, s=28, color=SERIES[0], alpha=0.55, edgecolor=SURFACE,
+                        linewidth=0.8)  # fmt: skip
+        axes[1].set_yticks(range(len(langs)), langs[::-1])
+        axes[1].set_xlim(0, fm["epochs"] + 1)
+        axes[1].grid(axis="y", visible=False)
+        axes[1].set_xlabel("settled epoch (one dot per signature n-gram)")
+        axes[1].set_title("when signature n-grams settled", fontsize=9)
+        fig.suptitle("How the rules formed (replay of the official model's training)", x=0.01,
+                     ha="left", fontweight="bold", fontsize=10, color=INK)  # fmt: skip
+        return fig
+
+    return _draw(draw)
+
+
+# ------------------------------------------------------------- errors.json figures
+
+
+def _percent():
+    from matplotlib.ticker import PercentFormatter
+
+    return PercentFormatter(1.0, decimals=0)
+
+
+def errors_confusion(errors: dict) -> object:
+    """Out-of-fold confusion of the TM, all seeds pooled; colour = share of the true row."""
+
+    def draw():
+        langs = errors["languages"]
+        counts = errors["models"]["tm"]["confusion"]
+        shares = [[c / (sum(row) or 1) for c in row] for row in counts]
+        # colour the errors: the diagonal (mostly > 0.9) would otherwise flatten the scale
+        off = [[0.0 if i == j else v for j, v in enumerate(row)] for i, row in enumerate(shares)]
+        top = max(max(row) for row in off) or 1
+        fig, (ax,) = _new_figure(5.4, 4.6)
+        image = _heatmap(ax, off, langs, langs, 0.0, top, ".0%", blank_zero=True)
+        for text in list(ax.texts):
+            text.remove()
+        for i, row in enumerate(counts):
+            for j, c in enumerate(row):
+                if c:
+                    dark = i != j and off[i][j] / top > 0.55
+                    ax.text(j, i, str(c), ha="center", va="center", fontsize=8,
+                            color="#ffffff" if dark else (MUTED if i == j else INK))  # fmt: skip
+        ax.set_xlabel("predicted")
+        ax.set_ylabel("true")
+        bar = fig.colorbar(image, ax=ax, shrink=0.8, label="share of the true language (errors)")
+        bar.outline.set_visible(False)
+        n = len(errors["seeds"])
+        ax.set_title(f"TM errors out of fold ({n} seeds pooled; diagonal in grey)")
+        return fig
+
+    return _draw(draw)
+
+
+def errors_receivers(errors: dict) -> object:
+    """Share of each model's errors that each language receives (wrongly predicted as it)."""
+
+    def draw():
+        langs = errors["languages"][::-1]
+        models = ["tm", *errors["baselines"]][: len(SERIES)]
+        names = {"tm": f"{errors['setting']} (TM)", **{b: _label(b) for b in errors["baselines"]}}
+        fig, (ax,) = _new_figure(6.4, 0.42 * len(langs) + 1.6)
+        height = 0.8 / len(models)
+        for slot, key in enumerate(models):
+            flows = errors["inflow"][key]
+            y = [i + (len(models) - 1 - 2 * slot) * height / 2 for i in range(len(langs))]
+            total = sum(v["count"] for v in flows.values())
+            ax.barh(y, [flows[g]["share"] for g in langs], height=height, color=SERIES[slot],
+                    edgecolor=SURFACE, linewidth=1,
+                    label=f"{names[key]} ({total} errors)")  # fmt: skip
+        chance = 1 / (len(errors["languages"]) - 1)
+        ax.axvline(chance, color=MUTED, lw=1)
+        ax.text(chance, len(langs) - 0.45, f" even spread {chance:.0%}", color=MUTED, fontsize=8,
+                va="bottom")  # fmt: skip
+        ax.set_yticks(range(len(langs)), langs)
+        ax.set_ylim(-0.6, len(langs) - 0.1)
+        ax.xaxis.set_major_formatter(_percent())
+        ax.grid(axis="y", visible=False)
+        ax.set_xlabel("share of the model's errors predicted as this language")
+        ax.set_title("Which languages collect the errors (out of fold)")
+        ax.legend(loc="upper left", bbox_to_anchor=(0, -0.16), ncols=1)
+        return fig
+
+    return _draw(draw)
+
+
+def errors_embedded(errors: dict) -> object:
+    """HTML snippets: share of lines inside <script>/<style> vs how many seeds call them JS."""
+
+    def draw():
+        em = errors["embedded"]
+        n = len(errors["seeds"])
+        fig, (ax,) = _new_figure(6.4, 3.2)
+        xs = [p[0] for p in em["points"]]
+        # deterministic vertical jitter so snippets with equal counts stay visible
+        ys = [p[1] + ((i * 37) % 11 - 5) * 0.03 for i, p in enumerate(em["points"])]
+        ax.scatter(xs, ys, s=26, color=SERIES[0], alpha=0.7, edgecolor=SURFACE, linewidth=0.8)
+        ax.axvline(0.5, color=MUTED, lw=1)
+        ax.text(0.5, n + 0.35, " more than half embedded", color=MUTED, fontsize=8, va="bottom")
+        ax.set_xlim(-0.03, 1.03)
+        ax.set_ylim(-0.4, n + 0.8)
+        ax.set_yticks(range(n + 1))
+        ax.xaxis.set_major_formatter(_percent())
+        ax.set_xlabel(f"lines inside <script>/<style> (one dot per {em['host']} snippet)")
+        ax.set_ylabel(f"seeds predicting {em['guest']}")
+        ax.set_title(f"{em['host']} snippets mistaken for {em['guest']} are embedded code")
+        return fig
+
+    return _draw(draw)
+
+
 # ------------------------------------------------------------------------ all figures
 
 RESULTS_FIGURES: dict[str, Callable[[dict], object]] = {
@@ -464,6 +894,28 @@ ABLATION_FIGURES: dict[str, Callable[[dict], object]] = {
     "ablation_ngrams": ablation_ngrams,
     "ablation_deltas": ablation_deltas,
 }
+TM_RESULT_FIGURES: dict[str, Callable[[dict], object]] = {
+    "tm_comparison": tm_comparison,
+    "tm_per_language": tm_per_language,
+}
+RESOURCE_FIGURES: dict[str, Callable[[dict], object]] = {
+    "process_resources": process_resources,
+}
+CLAUSE_FIGURES: dict[str, Callable[[dict], object]] = {
+    "clause_signatures": clause_signatures,
+    "clause_overlap": clause_overlap,
+    "clause_shapes": clause_shapes,
+    "clause_formation_replay": clause_formation_replay,
+}
+ERROR_FIGURES: dict[str, Callable[[dict], object]] = {
+    "errors_confusion": errors_confusion,
+    "errors_receivers": errors_receivers,
+    "errors_embedded": errors_embedded,
+}
+CURVE_FIGURES: dict[str, Callable[[dict], object]] = {
+    "tm_curves": tm_curves,
+    "tm_clause_formation": tm_clause_formation,
+}
 
 
 def load_sidecar(path: str | Path, schema_prefix: str) -> dict:
@@ -477,7 +929,14 @@ def load_sidecar(path: str | Path, schema_prefix: str) -> dict:
 
 
 def render_all(
-    results_path: str | Path | None, ablations_path: str | Path | None, out_dir: str | Path
+    results_path: str | Path | None,
+    ablations_path: str | Path | None,
+    out_dir: str | Path,
+    curves_path: str | Path | None = None,
+    tm_results_path: str | Path | None = None,
+    resources_path: str | Path | None = None,
+    clauses_path: str | Path | None = None,
+    errors_path: str | Path | None = None,
 ) -> list[Path]:
     """Draw every figure whose sidecar is given; returns the written PNG paths."""
     _mpl()  # fail early with the install hint
@@ -487,6 +946,24 @@ def render_all(
         jobs.append((load_sidecar(results_path, "codelangtm.results/"), RESULTS_FIGURES))
     if ablations_path:
         jobs.append((load_sidecar(ablations_path, "codelangtm.ablations/"), ABLATION_FIGURES))
+    if curves_path:
+        jobs.append((load_sidecar(curves_path, "codelangtm.tm-curves/"), CURVE_FIGURES))
+    if tm_results_path:
+        jobs.append((load_sidecar(tm_results_path, "codelangtm.tm-results/"), TM_RESULT_FIGURES))
+    if resources_path:
+        jobs.append((load_sidecar(resources_path, "codelangtm.resources/"), RESOURCE_FIGURES))
+    if clauses_path:
+        data = load_sidecar(clauses_path, "codelangtm.clauses/")
+        figures = CLAUSE_FIGURES
+        if not data.get("formation"):  # inspector run with --no-formation
+            figures = {k: v for k, v in figures.items() if k != "clause_formation_replay"}
+        jobs.append((data, figures))
+    if errors_path:
+        data = load_sidecar(errors_path, "codelangtm.errors/")
+        figures = ERROR_FIGURES
+        if not (data.get("embedded") or {}).get("points"):
+            figures = {k: v for k, v in figures.items() if k != "errors_embedded"}
+        jobs.append((data, figures))
     for data, figures in jobs:
         for name, fn in figures.items():
             written.append(save_png(fn(data), Path(out_dir) / f"{name}.png"))

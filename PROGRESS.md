@@ -2,9 +2,9 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-09-27
-**Current milestone:** M3 — TM training (branch A `feat/report` complete, ready for PR; branch B next)
-**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 in progress: branch A done (results [report](docs/report.md) with figures), next branch B (TM training)
+**Last updated:** 2026-09-28
+**Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7 done, PR open). Next: Stage B data, then M4
+**Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR open for branch B): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
 
 ## Milestone overview
 
@@ -13,7 +13,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
 | M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
-| M3 TM training | In progress | Branch A `feat/report` done (report + figures), PR pending; then branch B `feat/tm-training` |
+| M3 TM training | Done (PR open) | Branch A merged (PR #6: report + figures); branch B `feat/tm-training`: B1-B7 (TM matches the baselines; resources; clause inspector; error analysis; report wrap-up) |
 | M4 Tuning & compression | Planned | |
 | M5 Explainability | Planned | |
 | M6 Deployment & benchmarks | Planned | |
@@ -21,18 +21,145 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 
 ## Next steps (in order)
 
-M0-M2 are finished; each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
+M0-M3 are finished (M3 once its PR is merged); each item is recorded in the done log below and ticked in [docs/roadmap.md](docs/roadmap.md).
 
 - [x] M3 branch A `feat/report`: A0 housekeeping, A1 JSON sidecars, A2 `figures.py`, A3 `codelangtm report` + [docs/report.md](docs/report.md)
-- [ ] Push `feat/report`, open PR, check the first CI run (TMU and matplotlib now installed in CI), merge
-- [ ] M3 branch B `feat/tm-training`: B1 spike → B2 `TMLanguageClassifier` → B3 config + protocol → B4 curves, B4b `tm-train` → B5 resources → B6 clause inspector → B6b error analysis → B7 report (details in the roadmap, M3)
-- [ ] M3/M4: use repeated splits for the final TM vs baselines comparison
-- [ ] Later: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
+- [x] Push `feat/report`, PR #6 merged; CI green with TMU and matplotlib installed (TMU builds on the Ubuntu runner)
+- [x] B1 spike: timing, NumPy-vs-TMU equivalence, first CV numbers (issues-and-fixes M8)
+- [x] B3 main TM setting chosen: N_c=400, T=100, s=5 (planned 100/30/3.5 kept as a reference row)
+- [x] Direction agreed (see done log 2026-09-27): portfolio + later research write-up, research-ready rigor, Stage B after M3, CLI + C runtime + web demo, concepts guide
+- [x] B2 `TMLanguageClassifier`, `TMState`, JSON model file
+- [x] B4 training curves (run before B3): epochs 120 (400 clauses) and 142 (100 clauses), smoothed peak
+- [x] B3 full protocol: TM 400 matches the baselines (no significant difference); TM 100 significantly behind logistic regression
+- [x] B4b `tm-train` + `tm-select`: official model = tm_400 seed 4 (median CV)
+- [x] B5 process-level resources (`codelangtm resources`)
+- [x] B6 clause inspector (`codelangtm clauses`, `codelangtm explain`)
+- [x] B6b error analysis (`codelangtm errors`, out of fold)
+- [x] B7 report wrap-up (key findings, targets scorecard, section 7 in story order, docs audit)
+- [x] Repeated splits used for the final TM vs baselines comparison (5 seeds, corrected resampled t-test; B3)
+- [ ] Push `feat/tm-training`, open the PR, CI green, merge; then add the PR number to README / roadmap / PROGRESS
+- [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-09-28 — M3 branch B, B7: report wrap-up (M3 done, PR open)
+- Choices (start of step): key findings plus a targets scorecard at the top of the report; section 7 in story order; M3 recorded as done pending the merge.
+- Report: key findings (TM matches the baselines, rules are exactly the model, errors follow shared vocabulary, specialist clauses, caveats) and targets scorecard (macro-F1 met on repeated test only; latency not yet, 0.34 ms in Python; size met, 164 KB). Section 7 reordered: 7.1 training curves, 7.2 head-to-head, 7.3 resources, 7.4 inside the model, 7.5 errors; cross-references updated. Corrected earlier statements: the Python "sink" (did not replicate), "B5 will re-measure speed", the 0.08 ms figure, "snippets not reviewed yet", "the TM will be one more row", and the unqualified "fast (bitwise)" claim. 166 KB (seed mean) vs 164 KB (official model) made explicit. Limitations extended: choices made after seeing CV data, untuned setting, embedded languages, few errors.
+- Docs audit: README (a rule the model really learned, measured values beside the targets, M3 status), roadmap (B7 and the M3 exit criteria ticked with evidence; B5's unmeasured items moved to M4/M6 instead of being claimed; M3 follow-ups added to Stage B, M4 and M6), dataset card (the embedded-HTML finding), architecture, CHANGELOG.
+- Tests: 358 passing (docs links and anchors checked).
+
+### 2026-09-28 — M3 branch B, B6b: error analysis
+- Choices (start of step): CV out-of-fold only (test untouched); snippet references committed, code only in a local review file; compare with Naive Bayes and logistic regression with McNemar tests; hypothesis probes with verdict rules. Mid-step check-in (surprise: the Python sink did not replicate): probe the language that really collects errors, and measure embedded `<script>`/`<style>` code in HTML.
+- `errors.py` + `codelangtm errors` (~4 min): every training snippet predicted by the model of the other 4 folds, for TM 400 seeds 1-5, Naive Bayes and logistic regression. **Check:** all 35 per-fold scores equal the B3 run (differences ≤ 5e-7, the sidecar's rounding).
+- **Results:**
+  - Errors out of fold: TM 35.6 per seed (5.1%), Naive Bayes 26 (3.7%), logistic regression 34 (4.9%).
+  - Confusable pairs: JavaScript-HTML 6.4 per seed, C++-Java 5.4, Java-JavaScript 3.4, C++-Rust 3.2, SQL→Python 2.4. Pair confusion follows shared n-grams (Spearman ρ = 0.45, p = 0.017).
+  - 629 snippets always right, 51 unlucky, 16 hard; logistic regression misses all 16 hard ones, Naive Bayes 10.
+  - McNemar vs Naive Bayes: significant for seed 5 only (p = 0.017; others 0.08-0.14); seed majority vote 29 errors vs 26 (p = 0.63). vs logistic regression: p ≥ 0.42.
+  - The test-set Python sink does not replicate (Python gets 12% of errors, chance 14%). JavaScript collects 29% (H1 supported). H2 (little evidence), H3 (narrow wins), H4 (weak rejection), H6 (generic signatures) not supported. H5: brace n-gram rules pull C++/Java in. H7 supported: all HTML→JavaScript errors are 4 HTML windows that are 54-100% `<script>`/`<style>` (3 from one repo).
+- Fixed on the way: H1's first rule ignored chance (issues-and-fixes M11, changed openly after seeing data); H5 ordering made deterministic on ties.
+- Report section 7.5; concepts (out-of-fold, hard/unlucky error, error sink, McNemar, Mann-Whitney, Spearman, verdict rule, embedded code); roadmap B6b ticked; CLAUDE.md, architecture, README, CHANGELOG.
+- Tests: 358 passing (12 new in `tests/test_errors.py`: hand-built out-of-fold data with known answers for every analysis, embedded-share parsing, reports; with TMU, fold scores equal `evaluate_model` and the CLI end to end; plus 2 figure tests).
+
+### 2026-09-28 — M3 branch B, B6: clause inspector
+- Choices (start of step): summary `docs/clauses.md` + full `clauses.json`; official model plus a stability check against the other 4 seeds; include a formation replay.
+- `rules.py` + `codelangtm clauses` / `codelangtm explain` (details in the CHANGELOG). Statistics use the training set only; the command refuses a dataset whose hashes differ from the model's. Runtime about 1 min (the formation replay retrains 120 epochs).
+- **Checks:** every rule, evaluated from its literal list, fires exactly where `TMState.clause_outputs` says (all 3,200 clauses, all 696 training snippets). The formation replay ends at exactly the saved model.
+- **Results:**
+  - Signature n-grams match intuition: C++ `::`/`std`, Go tab-indented `{`/`:=`, HTML `">`/`</`, Rust `let`/`!(`/`fn `, Python `:`+newline/indentation, Java `;`+newline/`public`, JavaScript `const`/`export`. SQL is recognised mostly by exclusion (its broadest rule is 14 `NOT has(...)` parts).
+  - Clause length: median 5-7 literals, 41 empty, 35 exact duplicates. 173 clauses have more than 40 literals: specialists for a few training snippets with high weight (issues-and-fixes M10, input for M4's literal budget).
+  - Language overlap (Jaccard of "for" n-gram sets): 0.16-0.31; highest JavaScript-Rust 0.31, Python-Rust 0.28.
+  - Stability across seeds: top-10 signature overlap 20-62%, score correlation 0.49-0.85 (C++/HTML/Go most stable, SQL/JavaScript least). The broad picture repeats; exact top-10 lists do not.
+  - Formation: 59 of 80 signature n-grams settle within 10 epochs (median 5); the clauses keep changing (Jaccard with the final clauses 0.48 at epoch 20, 0.85 at epoch 80).
+- Fixed before commit: the first formation measures (raw agreement, first epoch seen) were uninformative (issues-and-fixes M9).
+- Report: section 7.4 (inspector, figures, one prediction traced), 7.5 (still to come); Reproduce section and header brought up to date (they predated TM training). README quickstart and status, CLAUDE.md, architecture, roadmap (B6 ticked, M5 items adjusted), concepts (rule, coverage/precision, signature n-gram, Jaccard, specialist clause, explanation, formation replay, correlation).
+- Tests: 343 passing (18 new in `tests/test_rules.py`: a hand-built model with known answers for naming, escaping, rule evaluation, statistics, summaries, signatures, overlap, stability, explanations summing to the class sums, JSON with every clause and the report; with TMU, formation replay reproducing the saved model and the CLI end to end; plus 2 figure tests).
+
+### 2026-09-28 — M3 branch B, B5: process-level resources
+- Choice (start of step): full protocol.
+- `resources.py` + `codelangtm resources`: every measurement in a fresh Python process doing one job (`python -m codelangtm.resources fit|predict`), 3 repeats, median kept. Fit: wall/CPU time, process memory before training and at its peak. Predict: load the saved model (TM: the JSON model file, NumPy only, no TMU; baselines: pickled pipeline), then every test snippet one at a time, 3 passes, binarize and predict timed separately (median, p95), plus one batch pass. Process memory from the OS: Windows `GetProcessMemoryInfo` (working set), `getrusage` elsewhere; includes C-extension memory that `tracemalloc` misses.
+- Models: Naive Bayes, logistic regression, TM 400 seed 4 (official), TM 100 seed 1 (its median-CV seed). 1 min 14 s in total.
+- **Results:**
+  - Training memory added is about 76 MB for every model: the binarizer's candidate table dominates (matches the M2 tracemalloc finding, issues-and-fixes M7). Training time: TM 400 7.7 s, TM 100 5.9 s, NB 0.35 s, LR 0.41 s.
+  - One snippet, median (p95): LR 0.089 (0.109), TM 100 0.199 (0.288), NB 0.215 (0.251), TM 400 0.343 (0.471) ms. Only LR meets < 0.1 ms per snippet in Python. The TM's cost is the classifier (0.28 ms): the dense NumPy matrix (500 x 3,200) is read for every snippet although clauses include ~12 literals each; NB pays scikit-learn's per-call input checks.
+  - Batch: 0.031-0.057 ms per snippet (TM 400: ~17,500 snippets/s).
+  - Binarize is identical code for all models yet measured 0.033-0.056 ms: the measurement noise floor on this machine.
+- Implication for M6: the C runtime should evaluate only included literals per clause (sparse); single-snippet latency is the number to beat.
+- Report: section 7.2 added (resources), section 6 points to it; concepts explains process memory, median/p95 and fresh processes.
+- Tests: 322 passing (7 new in `tests/test_resources.py`, figure and docs tests extended: current memory grows when 80 MB is touched, fit and predict jobs in fresh processes, failing job surfaces stderr, median-seed model choice, end-to-end CLI with a tiny TM, missing sidecar).
+
+### 2026-09-28 — M3 branch B, B4b: one-command training and the official model
+- Choice (start of step): both a `tm-train` command and a documented rule for which B3 model is official.
+- `codelangtm tm-train --setting tm_400 --seed 4`: trains one TM from `configs/tm.yaml` on all of train (no CV, no repeated splits; 7.9 s) and saves the model file; the test score is printed for information only.
+- `codelangtm tm-select`: the official model `models/tm.json` is the seed whose CV score is the median of the 5 (no test data). For `tm_400` the CV scores are 0.9461 (seed 5), 0.9488 (3), **0.9499 (4)**, 0.9505 (1), 0.9520 (2), so seed 4 (its test score, 0.954, played no part). The rule and all CV scores are stored in the model's metadata.
+- Check: retraining seed 4 with `tm-train` gives exactly B3's saved model (every clause and the vocabulary identical; test 0.953 both times). The official model is reproducible from the config in one command.
+- Tests: 314 passing (4 new: median rule incl. even counts and ties, selection copies the right model with metadata, `train_final` reproduces the protocol's model, CLI).
+
+### 2026-09-28 — M3 branch B, B3: TM vs baselines, full protocol
+- Choices (start of step): full protocol for both TMs over 5 seeds; save the final models. Session paused while the run finished and resumed afterwards.
+- `tm_results.py` + `codelangtm tm-results`: each TM setting x seed runs `baselines.evaluate_model`, the exact code used for the baselines (5 CV folds, one fit on all of train scored once on test, 10 repeated splits, resource measurements); Naive Bayes and logistic regression re-run beside them. Corrected resampled t-test (Nadeau & Bengio) on per-fold and per-split differences, the TM averaged over seeds; test/train ratios 0.25 (CV) and the measured one for the repeated splits. Final models saved to `models/<setting>_seed<k>.json`; a test reloads them and reproduces the reported test F1 exactly.
+- **Result (dataset v5, seeds 1-5, 24 min 36 s):**
+  - TM 400 (120 epochs): CV 0.949 ± 0.023, test 0.958 (seeds 0.947-0.966), repeated 0.966 ± 0.009. Naive Bayes 0.963 / 0.959 / 0.968; logistic regression 0.953 / 0.971 / 0.968.
+  - TM 400 − Naive Bayes: repeated −0.001 [−0.012, +0.010] p = 0.82; CV −0.013 [−0.056, +0.030] p = 0.44. No significant difference from either baseline.
+  - TM 100 (142 epochs): 0.933 / 0.946 / 0.949; significantly behind logistic regression on the repeated splits (−0.019 [−0.034, −0.004], p = 0.016).
+  - The seed spread is small for the 400-clause TM (std 0.002 CV, 0.007 test, 0.004 repeated).
+- Size and speed (this run, loaded machine): TM 400 model file 166 KB (3,200 clauses, 12.1 literals each, 45 empty), 0.081 ms/snippet end to end (TMU's own predict 0.131), fit 7.7 s; TM 100 34 KB, 0.060 ms. Naive Bayes 0.038 ms, 67 KB.
+- Error pattern for B6b: summed over 5 seeds, Python attracts snippets from other languages (Java → Python 8, C++ → Python 3, Rust → Python 3); also Rust → C++ 5, HTML → JavaScript 5.
+- Figures: `tm_comparison.png`, `tm_per_language.png` (colour scale starts just below the lowest score so differences between strong models stay visible; the legend is stacked so it is not cut off). Report section 7 restructured: 7.1 head-to-head, 7.2 curves, 7.3 still to come; concepts explains p-values and intervals.
+- Tests: 310 passing (8 new in `tests/test_tm_results.py`, figure and docs tests extended: the t-test equals scipy's paired t-test without correction and widens with it, hand-checked t, edge cases, protocol shapes, saved models reproduce the test score, significance rows, JSON/markdown, CLI).
+
+### 2026-09-27 — M3 branch B, B4: TM training curves (run before B3)
+- Choices (start of step): B4 before B3 so B3 uses a CV-chosen epoch count; 150 epochs; epoch rule = first epoch where the smoothed held-out curve (11-epoch centred moving average, mean over folds x seeds) is within 0.005 of its maximum. Significance test for B3 chosen: Nadeau-Bengio corrected resampled t-test; TM results go to `docs/tm-results.md`.
+- New: `TMConfig` + `configs/tm.yaml` (seeds 1-5, settings `tm_400` and `tm_100`, curve rule; a test keeps its features equal to the frozen baseline features); `curves.py` + `codelangtm tm-curve` (5 folds x 5 seeds x 150 epochs per setting; per epoch: held-out and train macro-F1, epoch time, included literals, non-empty clauses, include decisions changed); `docs/tm-curves.md` + `.json` (every raw run kept); figures `tm_curves.png`, `tm_clause_formation.png`; `codelangtm report --curves`.
+- **Result (CV only):** 400 clauses levels off at epoch 19 (held-out 0.946) and peaks at epoch 120 (smoothed 0.951; last 20 epochs 0.948); 100 clauses levels off at 44 (0.928) and peaks at 142 (0.933). Naive Bayes on the same folds 0.963. Training F1 reaches 0.99 by epoch 5 and 1.000 by about 20: the TM fits the training data completely.
+- **Epoch rule changed after seeing the curves (user decision, 2026-09-28):** from the plateau rule (19 / 44 epochs) to the smoothed peak (120 / 142 epochs): about 6× the training time for about 0.005 CV F1. Done before any test-set look; new config option `curves.epoch_rule: plateau | max`, both epochs reported in `tm-curves.md`. Recorded in the report because it makes the CV score at the chosen epoch slightly optimistic; the test set and repeated splits in B3 are the independent check.
+- **Surprise: B1's 0.962 was a lucky seed.** Seeds 1-5 give 0.945-0.950 each; seed 42 through the final code gives 0.962 again (one fold 0.991), so the code is consistent. Recorded as a correction in issues-and-fixes M8; the report now says the TM trails Naive Bayes by about 1.5 points on CV.
+- Clause formation (400 clauses): literals per non-empty clause 9.0 → 12.7; include decisions changed per epoch fall from ~29,000 (epoch 1) to ~3,000 (epoch 20) and ~56 (epoch 150).
+- Fixed during the step: the moving average first used a shrinking one-sided window at the curve's start (epoch 1 showed 0.875 instead of its real 0.664); it now shrinks symmetrically, and the curves were rerun (identical F1 values, same chosen epochs: training is deterministic). A test's expected epoch was wrong by hand arithmetic (the code was right).
+- Run time: 7 min 41 s for both settings (0.05 s/epoch for 400 clauses including copying the clauses out of TMU, 0.03 s for 100). The final rerun with `epoch_rule: max` gave identical F1 values but 0.16 / 0.11 s per epoch: the machine was busier, the same ±50%+ timing swings as before; B5 measures resources properly.
+- Tests: 299 passing (20 new: config parsing, smoothing and epoch rule, curve runs, determinism, no test/held-out text in any binarizer, JSON/markdown, CLI, curve figures).
+
+### 2026-09-27 — M3 branch B, B2: TM classifier and TMU-free model
+- Choices (asked at the start of the step): sparse JSON model file; one bundled file (vocabulary + clauses + metadata); simple NumPy matrix inference, with speed left to the C runtime (M6).
+- `TMLanguageClassifier` (`model.py`): scikit-learn estimator over the binary features.
+  - `fit` trains `epochs` epochs from scratch; `partial_fit` adds one epoch (for the B4 curves); `decision_function` returns TMU's class sums; `predict_tmu` calls TMU for comparison.
+  - Labels are encoded and checked (unknown labels rejected); TMU is imported only on training, without its pycuda traceback (E5).
+  - Defaults: N_c=400, T=100, s=5, weighted clauses, 50 epochs (B4 sets epochs), seed 1.
+- `TMState`: the trained model as arrays (clause → class, weight, included literal ids in CSR layout, empty clauses kept). One matrix product decides which clauses fire. `save_model` / `save_pipeline` / `load_model` write and read the one-file JSON format `codelangtm.tm/1` (documented in architecture); `TrainedModel.predict(texts)` goes from raw code to language without TMU.
+- Real-data check (fold 0, 20 epochs): predictions and class sums identical to TMU; pickle and JSON round trips identical; JSON model 159 KB (3,200 clauses, 36,474 included literals, 52 empty); NumPy predict 0.031 vs TMU 0.070 ms/snippet (single run).
+- Problems found and fixed:
+  - **Pickling stripped the live model** (Python 3.11+ `__getstate__` returns the live dict; W6). `Binarizer` had the same pattern.
+  - **TMU hangs forever with `seed=0`** (all-zero xorshift128+ state; E6). Seeds must now be >= 1.
+  - TMU's own NumPy deprecation warnings are filtered in pytest (for `tmu.*` modules only).
+- Tests: 279 passing (19 new in `tests/test_model.py`). They cover:
+  - hand-built clauses with known answers (empty clauses, negated literals, ties);
+  - NumPy vs TMU equality on a trained model (a mutation that lets empty clauses fire breaks it);
+  - same seed → same model; `partial_fit` × 2 equals `fit` with 2 epochs;
+  - pickling; JSON round trip and validation; pipeline + clone;
+  - quiet TMU import; install hint without TMU.
+
+### 2026-09-27 — Direction agreed, B3 setting chosen, concepts guide
+- Branch `feat/tm-training` created from the updated `main`; B1 findings committed.
+- Decisions (alignment questions):
+  - **Purpose:** portfolio piece first, convertible into a research write-up later.
+  - **Rigor from now on:** every TM number is a mean over 5 seeds with spread; paired significance test against Naive Bayes on the same folds; raw per-seed runs saved as JSON.
+  - **Accuracy vs readability:** balance both. Report the accurate TM (N_c=400, T=100, s=5; option A for B3) and, in M4, the smallest model within ~1 F1 point, with the curve between them.
+  - **Data:** stay on v5 through M3; Stage B (more data, stretch languages) after M3 and before M4 tuning.
+  - **End product:** CLI + zero-dependency C runtime, plus a web demo. The demo technology is decided later; the saved model format must stay portable and documented.
+  - **Check-ins:** at the start and end of each step.
+  - **Explanations:** new plain-language [docs/concepts.md](docs/concepts.md), linked from the README and the report.
+- Docs updated for these decisions: roadmap (Principles, Stage B timing, B2 portable format, B3 multi-seed + test, M4 smallest model, M6 web demo, M7 research write-up), README, report, CLAUDE.md, CONTRIBUTING, issues-and-fixes M8.
+
+### 2026-09-27 — M3 branch B, B1: TMU spike (throwaway scripts, not committed)
+- `feat/report` merged (PR #6); CI green, so TMU compiles on the Ubuntu runner and the figure tests pass there.
+- Read TMU 0.8.3's classifier and clause bank source first: prediction is `weights · clause outputs` per class; the incremental prediction cache resets on every training update, so predicting between epochs is safe.
+- Speed: 0.03-0.04 s per epoch on ~550 snippets (first epoch 0.06-0.12 s); TMU predict 0.07-0.09 ms/snippet (a Python loop per sample). The whole CV + test + 10 repeated splits protocol at 100 epochs is about a minute, so B3 keeps the full protocol.
+- Equivalence: a NumPy re-implementation matches TMU's class sums exactly when empty clauses output 0 (off by up to 21 otherwise); incremental and plain TMU prediction agree; the same seed gives identical runs.
+- Accuracy (5 CV folds, test not used): planned N_c=100/T=30/s=3.5 ends at 0.925-0.940 (3 seeds), Naive Bayes 0.963 on the same folds; N_c=400/T=100/s=5 reaches 0.962. Held-out F1 is noisy (±0.02 epoch to epoch), so B4's epoch rule needs smoothing. Details: issues-and-fixes M8; TMU facts: architecture, Model.
+- Found TMU's harmless pycuda traceback at import (issues-and-fixes E5).
 
 ### 2026-09-27 — M3 branch A, A3: `codelangtm report` and the written report
 - `codelangtm report [--results] [--ablations] [--out]` draws the 8 figures from the JSON sidecars into `docs/figures/` (committed). Missing sidecar, wrong schema or missing matplotlib: exit 1 with a clear message.
@@ -236,6 +363,12 @@ Record each run here: date, config, dataset version, macro-F1 (CV / test / wild)
 | 2026-09-24 | Ablations (`configs/ablations.yaml`, 11 settings, CV only) | v5 | LR best: M=500, bigrams only, 0.944 / - | M=1000 2+3: 0.931; delimiters off: 0.905; NB best n=4: 0.897; see [docs/ablations.md](docs/ablations.md) |
 | 2026-09-24 | Ablations + selection, word tokens, M=2000 (29 settings, CV only) | v5 | LR: class_balanced M=500 0.959, chi2 M=2000 0.964 / - | NB class_balanced M=500 0.960 (was 0.857); word tokens and larger M within noise |
 | 2026-09-25 | Baselines, frozen features (class_balanced, M=500, 2+3-grams, no delimiters) | v5 | NB 0.963 / 0.959; repeated 0.968 ± 0.009 (best by CV) | LR 0.953 / 0.971 (rep 0.968), SVM 0.946 / 0.964, RF 0.950 / 0.944, DT 0.843 / 0.832; 0.19 ms/snippet (was 0.31), classifier peak memory 1.4-4.3 MB, binarizer 72 MB |
+| 2026-09-28 | B6b error analysis, out of fold (train only) | v5 | - | errors: TM 35.6/seed (5.1%), NB 26, LR 34; seed majority 29; McNemar TM vs NB significant for 1 of 5 seeds; JavaScript collects 29% of TM errors; Python sink not replicated |
+| 2026-09-28 | B6 clause inspector, official model tm_400 seed 4 (train set only) | v5 | - | rules = model (3,200/3,200); median 5-7 literals, 173 clauses > 40 literals; overlap 0.16-0.31; seed score correlation 0.49-0.85; signatures settle by epoch 5 (median) |
+| 2026-09-28 | B5 process-level resources (fresh process per job, 3 repeats) | v5 | - | one snippet median: LR 0.089, TM100 0.199, NB 0.215, TM400 0.343 ms; batch 0.031-0.057 ms; training memory ~76 MB for all (binarizer); TM 400 fit 7.7 s, 164 KB |
+| 2026-09-28 | B3 TM vs baselines, full protocol, seeds 1-5 | v5 | TM 400: 0.949 / 0.958, repeated 0.966 ± 0.009; TM 100: 0.933 / 0.946, repeated 0.949 | NB 0.963 / 0.959 / 0.968; TM 400 − NB repeated −0.001 [−0.012, +0.010] p = 0.82; TM 100 − LR repeated −0.019, p = 0.016; TM 400 166 KB, 0.081 ms/snippet |
+| 2026-09-27 | B4 TM training curves, 5 folds x seeds 1-5, 150 epochs (CV only) | v5 | tm_400 (N_c=400/T=100/s=5): 0.951 at epoch 120 (levels off at 19: 0.946) / -; tm_100: 0.933 at epoch 142 (44: 0.928) / - | NB same folds 0.963; B1's 0.962 was seed 42 (lucky); 0.05 / 0.03 s/epoch |
+| 2026-09-27 | B1 spike: TMU, frozen features, 150 epochs (CV only) | v5 | N_c=100/T=30/s=3.5: 0.925-0.940 / -; N_c=400/T=100/s=5: 0.962 / - | last-20-epoch mean over 5 folds; NB same folds 0.963; 0.03-0.04 s/epoch; TMU predict 0.07-0.09 ms/snippet; N_c=400 clauses 400 KB dense / ~80 KB sparse |
 | 2026-09-25 | Same, after faster binarization | v5 | identical scores | 0.08-0.13 ms/snippet end-to-end (linear models / NB) on a loaded machine; binarize alone 5.4-6.0× faster than before (interleaved A/B); RF 0.75 |
 
 ## Targets

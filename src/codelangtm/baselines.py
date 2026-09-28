@@ -69,6 +69,7 @@ class ModelResult:
     peak_binarize_mb: float | None = None  # peak Python/NumPy heap: binarizer fit + transform
     peak_model_mb: float | None = None  # peak Python/NumPy heap: classifier fit (see measure_fit)
     vocab_kb: float | None = None  # size of the fitted vocabulary alone (JSON), part of size_kb
+    pipeline: object | None = field(default=None, repr=False)  # final fit, only if kept
 
     @property
     def throughput(self) -> float:
@@ -173,7 +174,13 @@ def evaluate_model(
     binarizer: Binarizer,
     languages: Sequence[str] = LANGUAGES,
     repeats: int = 0,
+    keep_pipeline: bool = False,
 ) -> ModelResult:
+    """CV on train, one fit on all of train scored on test, repeated splits, resources.
+
+    `keep_pipeline=True` returns the final fitted pipeline in `ModelResult.pipeline` (e.g. to
+    save a trained TM); it is never written to the reports.
+    """
     train, test = dataset["train"], dataset["test"]
     x_train = np.asarray([s.text for s in train], dtype=object)
     y_train = np.asarray([s.language for s in train])
@@ -230,6 +237,7 @@ def evaluate_model(
         peak_binarize_mb=peak_binarize,
         peak_model_mb=peak_model,
         vocab_kb=vocab_kb,
+        pipeline=pipe if keep_pipeline else None,
     )
 
 
