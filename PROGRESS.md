@@ -2,8 +2,8 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-09-28
-**Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7, PR #7 merged; a Linux-only CI failure after the merge fixed on `fix/linux-peak-memory`). Next: Stage B data, then M4
+**Last updated:** 2026-09-29
+**Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7, PR #7 merged; a Linux-only CI failure after the merge fixed in PR #8). Next: Stage B data (plan agreed 2026-09-29, see the done log), then M4
 **Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR #7 merged): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
 
 ## Milestone overview
@@ -11,7 +11,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | Stage A done | v5: 869 snippets, 196 repos, stable split; Stage B items deferred |
+| M1 Data pipeline | Stage A done, Stage B planned | v5: 869 snippets, 196 repos, stable split; Stage B (14 languages, 10,000+ snippets, embedded-language policy) plan agreed 2026-09-29 |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
 | M3 TM training | Done | Branch A merged (PR #6: report + figures); branch B merged (PR #7): B1-B7 (TM matches the baselines; resources; clause inspector; error analysis; report wrap-up) |
 | M4 Tuning & compression | Planned | |
@@ -38,20 +38,41 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
 - [x] B7 report wrap-up (key findings, targets scorecard, section 7 in story order, docs audit)
 - [x] Repeated splits used for the final TM vs baselines comparison (5 seeds, corrected resampled t-test; B3)
 - [x] Push `feat/tm-training`, PR #7 merged
-- [ ] CI fix after the merge: Linux peak memory below current (`fix/linux-peak-memory`, issues-and-fixes W7); merge and confirm CI green
-- [ ] After M3, before M4: Stage B (The Stack / CodeSearchNet loaders, stretch languages, embedded-language policy), wild set collected by hand (StackOverflow / blogs / docs), short-snippet evaluation (roadmap Future)
+- [x] CI fix after the merge: Linux peak memory below current (issues-and-fixes W7), PR #8 merged
+- [x] Housekeeping `chore/post-m3-docs`: stale docs after PRs #7 and #8 fixed
+- [ ] Stage B (after M3, before M4), plan in the 2026-09-29 done-log entry:
+  - [ ] B-S1 six stretch languages in the code (schema, extensions, label checks, collector)
+  - [ ] B-S2 embedded-language policy in `labels.py` (mostly-embedded HTML to a separate hard-examples file)
+  - [ ] B-S3 collect and build a ~3,000-snippet slice, audit it
+  - [ ] B-S4 check the slice (diagnose, quick baselines, thin languages)
+  - [ ] B-S5 full collection (10,000+), dataset card v6, ledger
+  - [ ] Rerun baselines and the TM protocol on v6 (14 languages and the original 8)
+- Not in Stage B (decided 2026-09-29): wild test set (after M4), short-snippet evaluation (Future), The Stack / CodeSearchNet loaders (only if the GitHub collector cannot reach the target)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
 
+### 2026-09-29 — Housekeeping after PRs #7 and #8, Stage B plan agreed (`chore/post-m3-docs`)
+- Audit of all markdown: stale lines fixed in PROGRESS (header, milestone table, unticked CI item, "PR open" wording), CHANGELOG (two `### Fixed` headings merged, PR #8 named, Stage B not yet listed because no code changed), README (M3 row names PR #8, M1 row shows Stage B as planned) and roadmap (M1 Stage B plan recorded). Checked and still true: report, dataset card, data-sources ledger, architecture, concepts, CONTRIBUTING.
+- The user rewrote some old commit messages on 2026-09-29 (interactive rebase, force-push): commit hashes before that date no longer exist, the docs reference PR numbers only.
+- **Stage B decisions (start-of-step check-in):**
+  - Sources: scale the GitHub collector first; The Stack / CodeSearchNet loaders only if it cannot reach the target.
+  - Languages: all six stretch languages (C, C#, TypeScript, Kotlin, PHP, Ruby) at once, 14 in total.
+  - Embedded code: drop mostly-embedded HTML (more than 50% of lines in `<script>`/`<style>`) from the main data, keep it in a separate hard-examples file that is reported on and never trained on.
+  - Scale: staged, a ~3,000-snippet slice first (about 215 per language), checked, then 10,000+.
+  - Wild set postponed to after M4; short-snippet evaluation stays in Future.
+  - Comparison: after Stage B, report the new dataset (v6) on all 14 languages and on the original 8; v5 results stay as history.
+  - Plan defaults (no objection raised): keep `.d.ts` excluded, keep the `.h` content rule and drop C++ features in `.c` files, keep at most 5 snippets per repo.
+  - Risks noted: model size (14 x 400 clauses is about 290 KB, M=500 may be too small a vocabulary for 14 languages, to be tested on CV only), thin languages (SQL, Kotlin, Ruby: document any shortfall instead of lowering quality), GitHub rate limits (collector caches and resumes).
+
 ### 2026-09-28 — CI fix after merging PR #7
 - CI on Ubuntu failed in `test_memory_is_measured_and_grows`: the peak memory (from `getrusage`, updated lazily by the Linux kernel) was below the current memory (from `/proc/self/status`). Fix: both values from the same `/proc/self/status` snapshot (`VmRSS`, `VmHWM`), peak never below current; a new test fakes the Linux inputs so it runs on every OS (issues-and-fixes W7). B5 numbers unaffected (measured on Windows).
 - Tests: 359 passing.
 
-### 2026-09-28 — M3 branch B, B7: report wrap-up (M3 done, PR open)
-- Choices (start of step): key findings plus a targets scorecard at the top of the report; section 7 in story order; M3 recorded as done pending the merge.
+### 2026-09-28 — M3 branch B, B7: report wrap-up (M3 done; PR #7 merged 2026-09-28)
+- Choices (start of step): key findings plus a targets scorecard at the top of the report; section 7 in story order; M3 recorded as done pending the merge (PR #7 merged afterwards).
 - Report: key findings (TM matches the baselines, rules are exactly the model, errors follow shared vocabulary, specialist clauses, caveats) and targets scorecard (macro-F1 met on repeated test only; latency not yet, 0.34 ms in Python; size met, 164 KB). Section 7 reordered: 7.1 training curves, 7.2 head-to-head, 7.3 resources, 7.4 inside the model, 7.5 errors; cross-references updated. Corrected earlier statements: the Python "sink" (did not replicate), "B5 will re-measure speed", the 0.08 ms figure, "snippets not reviewed yet", "the TM will be one more row", and the unqualified "fast (bitwise)" claim. 166 KB (seed mean) vs 164 KB (official model) made explicit. Limitations extended: choices made after seeing CV data, untuned setting, embedded languages, few errors.
 - Docs audit: README (a rule the model really learned, measured values beside the targets, M3 status), roadmap (B7 and the M3 exit criteria ticked with evidence; B5's unmeasured items moved to M4/M6 instead of being claimed; M3 follow-ups added to Stage B, M4 and M6), dataset card (the embedded-HTML finding), architecture, CHANGELOG.
 - Tests: 358 passing (docs links and anchors checked).

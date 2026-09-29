@@ -21,7 +21,15 @@ Ordered milestones, no fixed deadlines. The project is a portfolio piece built s
 
 Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch set added in Stage B: C, C#, TypeScript, Kotlin, PHP, Ruby, to stress confusable pairs (JS/TS, C/C++, Java/C#).
 
-**Status:** Stage A complete (dataset v5, 869 snippets, stable split, see [dataset-card.md](dataset-card.md)). Items marked *Stage B* are deferred: they are scheduled **after M3 and before M4 tuning** (decided 2026-09-27), so the TM is first compared on v5 and then tuned on the larger dataset.
+**Status:** Stage A complete (dataset v5, 869 snippets, stable split, see [dataset-card.md](dataset-card.md)). Stage B runs **after M3 and before M4 tuning** (decided 2026-09-27), so the TM is first compared on v5 and then tuned on the larger dataset. M3 is done; Stage B is next.
+
+**Stage B plan (agreed 2026-09-29):**
+- Sources: scale the GitHub collector first; The Stack / CodeSearchNet loaders only if it cannot reach the target.
+- Languages: all six stretch languages at once (14 in total).
+- Embedded code: HTML windows with more than 50% of lines in `<script>`/`<style>` leave the main data and go to a separate hard-examples file (reported on, never trained on).
+- Scale: staged, a ~3,000-snippet slice first, checked, then 10,000+.
+- Steps: B-S1 languages in code, B-S2 embedded-language policy, B-S3 collect and audit the slice, B-S4 check the slice, B-S5 full collection and dataset card v6, then rerun baselines and the TM on v6 (14 languages and the original 8).
+- Postponed: the wild test set (after M4). Kept in Future: short-snippet evaluation.
 
 - [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
 - [x] Collector: GitHub API, permissive licenses only (MIT / Apache-2.0 / BSD)
@@ -31,7 +39,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Label sanity check (extension vs content; drop mislabeled files, e.g. `.h` C vs C++; template-heavy SQL/HTML)
 - [x] Splits: group-by-repo train/test + 5-fold repo-grouped CV (stable hash-based per language since v5)
 - [x] Dataset audit: per-language stats, flags, manual sample review
-- [ ] *Stage B:* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
+- [ ] *Stage B (postponed to after M4, decided 2026-09-29):* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
 - [x] **Stage A:** target 1,000 snippets (~125/language); reached 869 in v4 (SQL limited by available permissive repos)
 - [ ] *Stage B:* scale to 10,000+ and add stretch languages
 - [ ] *Stage B:* embedded-language policy beyond the 20%-markup rule: HTML windows that are mostly `<script>`/`<style>` (B6b: all out-of-fold HTML→JavaScript errors) and SQL inside other languages; decide relabel, drop or keep as hard examples
