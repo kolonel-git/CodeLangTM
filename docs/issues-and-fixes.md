@@ -120,6 +120,18 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Data quality
 
+### D6. Adding six languages to the code (Stage B, B-S1)
+- **What changed:** C, C#, TypeScript, Kotlin, PHP and Ruby are known to the collector, the label check, the comment/string scanner, `data build` and `data audit`. Evaluation code still defaults to the 8 core languages (`LANGUAGES`) until the v6 dataset exists; `ALL_LANGUAGES` has all 14.
+- **Traps found and handled:**
+  1. `.ts` is also the extension of Qt translation files (XML) and video streams: a TypeScript red flag rejects `<?xml` and `<TS` lines.
+  2. A `.c` file can hold C++ (`namespace`, `class X`, `template<`, `std::`): red flag for C. Line-anchored, so a comment like ` * class of problems` passes (tested).
+  3. `.h` is C or C++: the existing content rule decides; the collector now samples `.h` for both languages, so a C header in a C++ repo is dropped as an extension mismatch and vice versa.
+  4. C# `using System` in a `.java` file, `import java.` in a `.cs` file: red flags in both directions.
+  5. `.jsx`/`.tsx` mix markup into code (the embedded-language problem of D5). Decision: keep them valid labels (v5 has 3 `.jsx` and 8 `.mjs` JavaScript snippets, so rebuilding v5 stays byte-identical) but do not sample them in new collections; `.mjs` is plain JavaScript and stays.
+  6. Generated and build-output files: `.g.cs`, `.designer.cs`, `.pb.cc`, `.pb.h`, `_pb.rb`, and `obj/` and `bin/` directories are skipped.
+- **Known limits (checked on the real slice in B-S3, not assumed away):** the scanner does not track C# verbatim strings (`@"..."`) or Ruby/PHP heredocs that span lines, so a window can still begin or end inside one; PHP templates that are mostly HTML are handled by the embedded-language policy (B-S2).
+- **Check:** rebuilding v5 from `data/raw/` with the new code gives byte-identical `train.jsonl`, `test.jsonl`, `folds.json` (same SHA-256 as `dataset.json`).
+
 ### D5. HTML windows that are really JavaScript
 - **Symptom:** found by confident learning (M3): HTML-labelled windows consisting of `<script>` code; model predicts JavaScript with p > 0.8.
 - **Root cause:** window lies inside an inline `<script>` block, and the tag check `<\s*[a-zA-Z]` was satisfied by comparison operators (`i < elements`).

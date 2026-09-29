@@ -9,8 +9,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import LANGUAGES
-from .data import Snippet, load_snippets, save_snippets
+from . import ALL_LANGUAGES
+from .data import Snippet, languages_present, load_snippets, save_snippets
 from .dedup import dedup
 from .labels import filter_labels
 from .splits import SPLIT_SALT, check_no_leakage, separate_wild, stable_split
@@ -40,7 +40,11 @@ class BuildReport:
             "files": self.files,
         }
 
-    def summary(self, languages: Sequence[str] = LANGUAGES) -> str:
+    def summary(self, languages: Sequence[str] | None = None) -> str:
+        if languages is None:  # every language that occurs in any split
+            languages = [
+                lang for lang in ALL_LANGUAGES if any(self.counts[s][lang] for s in SPLITS)
+            ]
         rows = [f"{'language':<12}{'train':>7}{'test':>7}{'wild':>7}"]
         for lang in languages:
             rows.append(f"{lang:<12}" + "".join(f"{self.counts[s][lang]:>7}" for s in SPLITS))
@@ -55,7 +59,7 @@ class BuildReport:
 
 
 def load_sources(
-    paths: Sequence[str | Path], languages: Sequence[str] = LANGUAGES
+    paths: Sequence[str | Path], languages: Sequence[str] = ALL_LANGUAGES
 ) -> list[Snippet]:
     """Load every .jsonl file (directories searched recursively, in sorted order)."""
     files: list[Path] = []
@@ -84,10 +88,13 @@ def build_dataset(
     test_size: float = 0.2,
     n_folds: int = 5,
     salt: str = SPLIT_SALT,
-    languages: Sequence[str] = LANGUAGES,
+    languages: Sequence[str] | None = None,
 ) -> BuildReport:
+    """Build train/test/wild + folds. `languages` restricts which labels are accepted (default:
+    all 14); the checks and the manifest cover the languages that actually occur."""
     report = BuildReport()
-    snippets = load_sources(sources, languages)
+    snippets = load_sources(sources, languages or ALL_LANGUAGES)
+    languages = languages or languages_present(snippets)
     report.loaded = len(snippets)
 
     snippets, report.label_dropped = filter_labels(snippets)

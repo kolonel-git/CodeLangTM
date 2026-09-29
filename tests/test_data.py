@@ -54,3 +54,28 @@ def test_load_rejects_unknown_language(tmp_path):
     save_snippets([make(language="cobol")], p)
     with pytest.raises(ValueError, match="unknown language"):
         list(load_snippets(p, languages=LANGUAGES))
+
+
+def test_language_sets_are_consistent():
+    from codelangtm import ALL_LANGUAGES, CORE_LANGUAGES, STRETCH_LANGUAGES
+
+    assert ALL_LANGUAGES == CORE_LANGUAGES + STRETCH_LANGUAGES
+    assert len(set(ALL_LANGUAGES)) == len(ALL_LANGUAGES) == 14
+    assert LANGUAGES == CORE_LANGUAGES  # evaluation defaults stay on the core 8 until v6
+
+
+def test_languages_present_keeps_project_order():
+    from codelangtm.data import languages_present
+
+    items = [make(language="ruby"), make(language="go"), make(language="python"), make()]
+    assert languages_present(items) == ("python", "go", "ruby")
+    assert languages_present([]) == ()
+
+
+def test_load_snippets_accepts_stretch_labels(tmp_path):
+    from codelangtm import ALL_LANGUAGES
+
+    save_snippets([make(language="kotlin", path="A.kt")], tmp_path / "k.jsonl")
+    assert len(list(load_snippets(tmp_path / "k.jsonl", ALL_LANGUAGES))) == 1
+    with pytest.raises(ValueError, match="unknown language"):
+        list(load_snippets(tmp_path / "k.jsonl", LANGUAGES))

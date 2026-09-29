@@ -10,7 +10,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import LANGUAGES, __version__
+from . import ALL_LANGUAGES, __version__
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -24,8 +24,8 @@ def _build_parser() -> argparse.ArgumentParser:
     sources = collect.add_subparsers(dest="source", required=True)
     gh = sources.add_parser("github", help="permissively licensed GitHub repos")
     gh.add_argument(
-        "--language", action="append", choices=LANGUAGES,
-        help="language to collect (repeatable; default: all core languages)",
+        "--language", action="append", choices=ALL_LANGUAGES,
+        help="language to collect (repeatable; default: all 14 languages)",
     )  # fmt: skip
     gh.add_argument("--repos", type=int, default=25, help="repos per language")
     gh.add_argument("--per-repo", type=int, default=5, help="max snippets per repo")
@@ -607,7 +607,7 @@ def _collect_github(args: argparse.Namespace) -> int:
         "seed": args.seed,
     }
     with client:
-        for language in args.language or LANGUAGES:
+        for language in args.language or ALL_LANGUAGES:
             snippets, report = github.collect_language(
                 client, language, args.repos, args.per_repo, args.min_stars, args.seed
             )

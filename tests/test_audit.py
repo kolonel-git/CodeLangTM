@@ -147,3 +147,10 @@ def test_cli_audit_end_to_end(tmp_path, capsys):
 
     assert main(["data", "audit", "--data", str(tmp_path / "nope")]) == 1
     assert "data build" in capsys.readouterr().err
+
+
+def test_audit_defaults_to_languages_present():
+    data = {"train": [snip("ruby", f"r/{i}", "lib/a.rb", i=i) for i in range(3)] + [snip()]}
+    stats = language_stats(data)
+    assert list(stats) == ["python", "ruby"]
+    assert set(pick_samples(data, 2)) == {"python", "ruby"}

@@ -43,9 +43,28 @@ _RED_FLAGS: dict[str, re.Pattern[str]] = {
         r"^\s*(#include\b|package\s+[\w.]+;|<\?php)|:\s*(string|number|boolean)\b\s*[,;)=]", re.M
     ),
     "cpp": re.compile(r"^\s*(def\s+\w+.*:\s*$|import\s+java\.|package\s+[\w.]+;|fn\s+\w+\()", re.M),
-    "java": re.compile(r"^\s*(#include\b|def\s+\w+.*:\s*$|fn\s+\w+\(|func\s+\w+\()", re.M),
+    "java": re.compile(
+        r"^\s*(#include\b|def\s+\w+.*:\s*$|fn\s+\w+\(|func\s+\w+\(|using\s+System\b)", re.M
+    ),
     "rust": re.compile(r"^\s*(#include\b|public\s+class\b|def\s+\w+.*:\s*$)", re.M),
     "go": re.compile(r"^\s*(#include\b|public\s+class\b|def\s+\w+.*:\s*$)", re.M),
+    # stretch set. A `.c` file with C++ constructs is C++ code in a C-looking file.
+    "c": re.compile(
+        r"^\s*(class\s+\w+|namespace\s+\w+|template\s*<|using\s+namespace\b"
+        r"|#include\s*<(iostream|vector|string|map|memory)>|def\s+\w+.*:\s*$|package\s+[\w.]+;)"
+        r"|\bstd::",
+        re.M,
+    ),
+    "csharp": re.compile(
+        r"^\s*(#include\b|package\s+[\w.]+;|import\s+java\.|def\s+\w+.*:\s*$|fn\s+\w+\()", re.M
+    ),
+    # `.ts` is also the extension of Qt translation files (XML) and video streams.
+    "typescript": re.compile(r"^\s*(#include\b|package\s+[\w.]+;|<\?php|<\?xml|<TS\b)", re.M),
+    "kotlin": re.compile(r"^\s*(#include\b|<\?php|def\s+\w+.*:\s*$|fn\s+\w+\()", re.M),
+    "php": re.compile(r"^\s*(#include\b|package\s+[\w.]+;|def\s+\w+.*:\s*$)", re.M),
+    "ruby": re.compile(
+        r"^\s*(package\s+[\w.]+;|public\s+class\b|<\?php|(int|void)\s+main\s*\()", re.M
+    ),
 }
 
 # A real HTML tag (`<div`, `</p`, `<my-el`) or `<!` (comment/doctype). The name must end in

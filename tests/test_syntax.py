@@ -106,3 +106,35 @@ def test_label_check_flags_cut_snippet():
     text = " * leftover comment\n */\nint main() { return 0; }\n"
     s = Snippet(text, "cpp", "github", "o/r", "c", "a.cpp", "MIT", 1, 3)
     assert "cut comment or string" in check_label(s).reasons
+
+
+# --- stretch set (Stage B, B-S1) ---------------------------------------------------------------
+
+
+def test_ruby_block_comment_and_hash_comment():
+    text = "x = 1\n=begin\nprose\n=end\n# it's a comment\ny = 'a'\n"
+    assert outside(text, "ruby") == [True, True, False, False, True, True, True]
+
+
+def test_php_hash_and_slash_comments_ignored_for_strings():
+    text = "# don't break\n// nor this: \"\necho 'x';\n"
+    assert all(outside(text, "php"))
+
+
+@pytest.mark.parametrize("language", ["csharp", "kotlin", "java"])
+def test_triple_quote_strings_span_lines(language):
+    text = 'var s = """\n/* not a comment */\n""";\nint y;\n'
+    assert outside(text, language) == [True, False, False, True, True]
+
+
+@pytest.mark.parametrize(
+    ("text", "language"),
+    [
+        ("more prose\n=end\nx = 1\n", "ruby"),
+        ("x = 1\n=begin\nnever closed\n", "ruby"),
+        ("fun f() {}\n/**\n * cut doc\n", "kotlin"),
+        ("class A {}\n/* cut\n", "csharp"),
+    ],
+)
+def test_stretch_is_cut_detects_split_comments(text, language):
+    assert is_cut(text, language)

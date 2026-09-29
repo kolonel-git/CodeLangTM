@@ -271,3 +271,42 @@ def test_cli_help_and_version_unchanged(capsys):
     with pytest.raises(SystemExit) as e:
         main(["--version"])
     assert e.value.code == 0
+
+
+def test_candidate_files_stretch_languages():
+    def blob(path):
+        return {"type": "blob", "path": path, "size": 1000}
+
+    tree = {
+        "tree": [
+            blob("src/a.c"),
+            blob("include/a.h"),
+            blob("src/b.cpp"),
+            blob("web/app.ts"),
+            blob("web/app.d.ts"),
+            blob("web/View.tsx"),
+            blob("web/View.jsx"),
+            blob("web/mod.mjs"),
+            blob("Models/Form.Designer.cs"),
+            blob("Models/Form.cs"),
+            blob("obj/Debug/x.cs"),
+            blob("bin/tool.cs"),
+            blob("proto/x.pb.cc"),
+            blob("proto/x.pb.h"),
+            blob("lib/a.rb"),
+            blob("lib/a_pb.rb"),
+        ]
+    }
+    assert gh.candidate_files(tree, "c") == ["include/a.h", "src/a.c"]
+    assert gh.candidate_files(tree, "cpp") == ["include/a.h", "src/b.cpp"]
+    assert gh.candidate_files(tree, "typescript") == ["web/app.ts"]  # no .d.ts, no .tsx
+    assert gh.candidate_files(tree, "javascript") == ["web/mod.mjs"]  # no .jsx
+    assert gh.candidate_files(tree, "csharp") == ["Models/Form.cs"]
+    assert gh.candidate_files(tree, "ruby") == ["lib/a.rb"]
+
+
+def test_every_language_can_be_searched():
+    from codelangtm import ALL_LANGUAGES
+
+    assert set(gh.SEARCH_LANGUAGE) == set(ALL_LANGUAGES)
+    assert gh.SEARCH_LANGUAGE["csharp"] == "C#"

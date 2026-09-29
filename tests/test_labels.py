@@ -146,3 +146,60 @@ def test_filter_labels_counts():
 )
 def test_clean_code_passes(language, path, text):
     assert check_label(snip(text, language, path)).ok
+
+
+# --- stretch set (Stage B, B-S1) ---------------------------------------------------------------
+
+CPP_IN_C = "#include <stdio.h>\nnamespace app {\nint f(int x) { return x; }\n}\n"
+
+
+@pytest.mark.parametrize(
+    ("language", "path", "text"),
+    [
+        ("c", "a.c", C),
+        ("c", "a.h", C),
+        ("csharp", "A.cs", "using System;\n\nnamespace App\n{\n    public class A { }\n}\n"),
+        ("typescript", "a.ts", "export function f(a: string): boolean {\n  return !!a;\n}\n"),
+        ("kotlin", "A.kt", "package app\n\nfun main() {\n    println(\"x\")\n}\n"),
+        ("php", "a.php", "<?php\nnamespace App;\n\nclass A {\n    public function f() {}\n}\n"),
+        ("ruby", "a.rb", "class A\n  def f(x)\n    x + 1\n  end\nend\n"),
+    ],
+)
+def test_stretch_clean_code_passes(language, path, text):
+    assert check_label(snip(text, language, path)).ok
+
+
+def test_extensions_map_to_every_stretch_language():
+    from codelangtm import ALL_LANGUAGES
+    from codelangtm.labels import EXTENSION_LANGUAGE
+
+    assert set(EXTENSION_LANGUAGE.values()) == set(ALL_LANGUAGES)
+    assert language_from_path("a.cs") == "csharp"
+    assert language_from_path("a.kt") == "kotlin"
+    assert language_from_path("a.rb") == "ruby"
+
+
+def test_c_file_with_cpp_constructs_dropped():
+    r = check_label(snip(CPP_IN_C, "c", "a.c"))
+    assert not r.ok
+    assert "content looks like another language" in r.reasons
+    assert not check_label(snip("int x = std::max(1, 2);\n", "c", "a.c")).ok
+
+
+def test_c_comment_mentioning_class_is_fine():
+    text = "/*\n * class of problems\n */\nint f(void) { return 1; }\n"
+    assert check_label(snip(text, "c", "a.c")).ok
+
+
+def test_qt_translation_file_is_not_typescript():
+    xml = '<?xml version="1.0" encoding="utf-8"?>\n<TS version="2.1">\n</TS>\n'
+    assert not check_label(snip(xml, "typescript", "a.ts")).ok
+
+
+def test_csharp_and_java_are_told_apart():
+    assert not check_label(snip("using System;\nclass A {}\n", "java", "A.java")).ok
+    assert not check_label(snip("import java.util.List;\nclass A {}\n", "csharp", "A.cs")).ok
+
+
+def test_stretch_wrong_extension_dropped():
+    assert not check_label(snip("class A\nend\n", "ruby", "a.py")).ok

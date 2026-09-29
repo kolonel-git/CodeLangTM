@@ -389,7 +389,7 @@ Why JavaScript? Each hypothesis had a pass/fail rule written before the run. The
 
 ```bash
 uv sync --extra tm --extra collect --extra viz
-uv run codelangtm collect github                                   # needs GITHUB_TOKEN; data/raw/
+uv run codelangtm collect github                                   # needs GITHUB_TOKEN; data/raw/ (all 14 languages; v5 used the 8 core, see the dataset card)
 uv run codelangtm data build                                       # data/processed/ (dataset v5)
 uv run codelangtm baselines --config configs/baselines.yaml        # docs/results.md + .json
 uv run codelangtm ablate                                           # docs/ablations.md + .json

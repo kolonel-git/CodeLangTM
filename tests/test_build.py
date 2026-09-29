@@ -128,3 +128,33 @@ def test_cli_data_build(raw, tmp_path, capsys):
 def _wild_file(raw):
     (raw / "wild").mkdir(exist_ok=True)
     return raw / "wild" / "python.jsonl"
+
+
+def kotlin_snippet(repo, i):
+    text = "".join(
+        f"fun f{repo[-1]}{i}x{j}(a: Int): Int {{\n    return a + {j}\n}}\n" for j in range(9)
+    )
+    return Snippet(
+        text, "kotlin", "github", repo, "sha", f"src/A{i}.kt", "MIT", 1, text.count("\n")
+    )
+
+
+def test_default_build_accepts_all_14_and_reports_only_languages_present(raw, tmp_path):
+    save_snippets(
+        [kotlin_snippet(f"kt-org/r{r}", i) for r in range(8) for i in range(2)],
+        raw / "github" / "kotlin.jsonl",
+    )
+    out = tmp_path / "out"
+    report = build_dataset([raw], out)  # no `languages`: nothing restricts the labels
+    assert report.counts["train"]["kotlin"] + report.counts["test"]["kotlin"] == 16
+    summary = report.summary()
+    assert "kotlin" in summary and "rust" not in summary  # absent languages are not listed
+    assert not any(w.startswith(("rust", "ruby", "c:")) for w in report.warnings)
+    manifest = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
+    assert manifest["languages"] == ["python", "go", "kotlin"]
+
+
+def test_restricted_build_rejects_other_labels(raw, tmp_path):
+    save_snippets([kotlin_snippet("kt-org/r0", 0)], raw / "github" / "kotlin.jsonl")
+    with pytest.raises(ValueError, match="unknown language"):
+        build(raw, tmp_path / "out")

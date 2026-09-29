@@ -13,7 +13,7 @@ Code snippet
 
 | Stage | Module | Command |
 | --- | --- | --- |
-| Snippet schema, JSONL I/O | `data.py` | |
+| Snippet schema, JSONL I/O, language sets (`CORE_LANGUAGES` 8, `STRETCH_LANGUAGES` 6, `ALL_LANGUAGES` 14) | `data.py`, `__init__.py` | |
 | Collection (GitHub, permissive licenses) | `github.py`, `windows.py`, `syntax.py` | `codelangtm collect github` |
 | Cleaning: label checks, dedup | `labels.py`, `dedup.py` | |
 | Dataset build: stable repo split, CV folds, manifest | `build.py`, `splits.py` | `codelangtm data build` |
