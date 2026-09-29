@@ -74,9 +74,9 @@ Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with fi
 | Milestone | Status |
 | --- | --- |
 | M0 Foundations | done |
-| M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)) |
+| M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)); Stage B planned: 14 languages, 10,000+ snippets, embedded-language policy |
 | M2 Features & baselines | done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
-| M3 TM training | done (PR #7): the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 164 KB model) ([report](docs/report.md), key findings and section 7); every clause readable as a rule and every prediction traceable ([clauses](docs/clauses.md)); errors studied out of fold ([errors](docs/errors.md)). Next: Stage B data, then M4 |
+| M3 TM training | done (PRs #7 and #8): the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 164 KB model) ([report](docs/report.md), key findings and section 7); every clause readable as a rule and every prediction traceable ([clauses](docs/clauses.md)); errors studied out of fold ([errors](docs/errors.md)). Next: Stage B data, then M4 |
 | M4 Tuning & compression | planned |
 | M5 Explainability | planned |
 | M6 Deployment & benchmarks | planned |

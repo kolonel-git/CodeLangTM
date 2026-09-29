@@ -41,8 +41,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Optional `viz` extra (matplotlib) for figures and the report; `docs/figures/` for generated plots.
 
 ### Fixed
-- `resources.memory_mb` on Linux: the peak now comes from the same `/proc/self/status` snapshot as the current value (`VmHWM`), since `getrusage`'s lazily updated peak could be below the current value and failed CI after PR #7; the peak is never reported below the current value.
+- `resources.memory_mb` on Linux: the peak now comes from the same `/proc/self/status` snapshot as the current value (`VmHWM`), since `getrusage`'s lazily updated peak could be below the current value and failed CI after PR #7 (fixed in PR #8); the peak is never reported below the current value.
 - Pickling a `Binarizer` or `TMLanguageClassifier` no longer modifies the original object (Python 3.11+ `__getstate__` returns the live dict).
+- HTML label check accepted comparisons (`i < x`) as tags; HTML windows that are mostly inline script/style are now dropped (embedded-language rule).
+- TMU crash on NumPy 2: `tm` extra pins `numpy<2`, `scipy<1.14`.
+- Windows splitting block comments, docstrings and multi-line strings (4.6% of Stage A v2 snippets).
 
 ### Changed
 - Report (M3 wrap-up): key findings and a targets scorecard up front; section 7 in story order (training curves, head-to-head, resources, inside the model, errors); statements from earlier steps corrected (the "Python sink", speed claims, pending reviews); limitations extended. README shows a rule the model really learned and measured values next to the targets.
@@ -53,8 +56,3 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - `Binarizer` is a scikit-learn transformer (refit per CV fold), with alphabetical tie-breaking, JSON save/load, a `use_delimiters` switch and set-based transform. When `n_features` is smaller than the delimiter list, delimiters are now truncated too.
 - `configs/baselines.yaml` now holds the feature config frozen for M3: `class_balanced` selection, M=500, 2+3-grams, no forced delimiters. Baseline CV macro-F1 rises from 0.917 to 0.963 (best model now Naive Bayes); latency 0.31 → 0.19 ms/snippet. Code defaults are unchanged.
 - Dependencies: removed unused `pandas`; declared `scipy` (used directly by `features.py`).
-
-### Fixed
-- HTML label check accepted comparisons (`i < x`) as tags; HTML windows that are mostly inline script/style are now dropped (embedded-language rule).
-- TMU crash on NumPy 2: `tm` extra pins `numpy<2`, `scipy<1.14`.
-- Windows splitting block comments, docstrings and multi-line strings (4.6% of Stage A v2 snippets).
