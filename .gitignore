@@ -17,6 +17,9 @@ data/processed/*
 !data/processed/.gitkeep
 data/cache/
 data/hard/
+data/slice/
+data/slice-hard/
+data/processed-slice/
 
 # Secrets
 .env
