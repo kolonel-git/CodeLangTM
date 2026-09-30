@@ -638,6 +638,7 @@ def _collect_github(args: argparse.Namespace) -> int:
                 **report.to_dict(),
                 "source": "github",
                 "collected_at": date.today().isoformat(),
+                "search_languages": list(github.search_qualifiers(language)),
                 "params": params,
             }
             (args.out / f"{language}.manifest.json").write_text(

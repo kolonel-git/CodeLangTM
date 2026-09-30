@@ -17,7 +17,7 @@ Datasets are gitignored (`data/`). This file is the provenance ledger: every sou
    uv run codelangtm collect github                                            # all 14 languages (Stage B)
    uv run codelangtm collect github --language python --language cpp ...      # Stage A: the 8 core ones only
    ```
-`--pages N` reads N result pages (100 repos each) per star band, for languages with few permissive repos (SQL); default 1.
+`--pages N` reads N result pages (100 repos each) per star band; default 1 (enough for every language so far). SQL is searched under four GitHub language names (`SQL`, `TSQL`, `PLpgSQL`, `PLSQL`), because GitHub files most repositories that are mainly `.sql` under a dialect name; the plain `SQL` class has only about 70 repositories with 10+ stars. The names searched are recorded in each manifest (`search_languages`).
 
 Outputs `data/raw/github/<language>.jsonl` (snippets) and `<language>.manifest.json` (repos, commit SHAs, licenses, drop counts). Downloads are cached in `data/cache/github/`, so interrupted runs resume. Add one summary row per run to the ledger below.
 

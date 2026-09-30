@@ -44,7 +44,8 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
   - [x] B-S1 six stretch languages in the code (`feat/stage-b-data`; issues-and-fixes D6)
   - [x] B-S2 embedded-language policy (window-level hard examples; issues-and-fixes D7)
   - [x] B-S3 collect and build a ~3,000-snippet slice, audit it (2,807 snippets; findings and fixes: issues-and-fixes D8)
-  - [ ] B-S3 follow-up: re-collect c and cpp (labels fixed), sql with `--pages 3`, ruby with `--min-stars 50` (decision pending)
+  - [x] B-S3 follow-up: c, cpp (labels fixed: 205/45 and 211/45) and ruby (standard star floor: unchanged 224/45) re-collected
+  - [ ] B-S3 follow-up: sql re-collected under four GitHub language names at the standard star floor (issues-and-fixes D8)
   - [ ] B-S4 check the slice (diagnose, quick baselines, thin languages)
   - [ ] B-S5 full collection (10,000+), dataset card v6, ledger
   - [ ] Rerun baselines and the TM protocol on v6 (14 languages and the original 8)
@@ -63,6 +64,11 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
 - Measured, no policy needed now: SQL-like lines make up 25% or more of 9 of 211 Python windows (4%) and of at most 1 window in every other non-SQL language; HTML tags make up over half the lines of 3 C#, 3 JavaScript, 1 Ruby and 1 Rust windows; Ruby and PHP heredocs cut by a window: about 2% of their windows; no C# verbatim-string cuts.
 - Hard examples: 96 HTML windows from 24 repos (median embedded share 0.81), 13 of them from one repo. Their repos are in train (84 windows) or test (13).
 - Test-file share (audit): Ruby 40%, Go 38%, PHP 35%, JavaScript 24%; as in Stage A (Go 40%) this is idiomatic, to be checked with the shortcut probe in B-S4.
+
+### 2026-09-30 — Stage B, B-S3 follow-up: reruns, and SQL's real cause
+- Reruns by the user (branch `feat/stage-b-slice`): `c` 205 snippets from 45 repos (19 dropped as C++/Objective-C content, 18 as `.h` files that are C++), `cpp` 211/45 (61 plain-C-looking `.h` dropped), `ruby` at `--min-stars 50` 224/45 (same as the star floor 10 run: the top-ranked repos coincide).
+- **SQL again 78 snippets from 21 repos with `--pages 3`: my pagination fix did not help.** Checked GitHub directly: the search class `SQL` holds only 71 repos with 10+ stars; most SQL repos are filed as `TSQL` (686 with 10-49 stars), `PLpgSQL` (645) or `PLSQL`. Fix: search all four names (same license and star rules); 135+ candidates at the standard floor of 50 stars, so SQL needs no lower floor any more. Manifest records `search_languages`. Tests 427 -> 430.
+- Still to do: user reruns SQL (default star floor), then I rebuild and re-audit the slice.
 
 ### 2026-09-30 — Stage B, B-S2: embedded-language policy (`feat/stage-b-data`)
 - Choices (start of step): hard examples are decided **per window, not per repository** (user: keep as much good data as possible). Threshold over 50% of lines inside `<script>`/`<style>` (HTML) or carrying HTML tags (PHP templates), agreed at the Stage B check-in.
