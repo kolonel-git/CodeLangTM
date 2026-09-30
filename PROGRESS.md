@@ -43,7 +43,8 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
 - [ ] Stage B (after M3, before M4), plan in the 2026-09-29 done-log entry:
   - [x] B-S1 six stretch languages in the code (`feat/stage-b-data`; issues-and-fixes D6)
   - [x] B-S2 embedded-language policy (window-level hard examples; issues-and-fixes D7)
-  - [ ] B-S3 collect and build a ~3,000-snippet slice, audit it
+  - [x] B-S3 collect and build a ~3,000-snippet slice, audit it (2,807 snippets; findings and fixes: issues-and-fixes D8)
+  - [ ] B-S3 follow-up: re-collect c and cpp (labels fixed), sql with `--pages 3`, ruby with `--min-stars 50` (decision pending)
   - [ ] B-S4 check the slice (diagnose, quick baselines, thin languages)
   - [ ] B-S5 full collection (10,000+), dataset card v6, ledger
   - [ ] Rerun baselines and the TM protocol on v6 (14 languages and the original 8)
@@ -53,6 +54,15 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-30 — Stage B, B-S3: the ~3,000-snippet slice collected, built and audited (`feat/stage-b-data`, PR #10 merged)
+- Choices (start of step): 45 repos per language, at most 5 snippets per repo, three collection runs by the user (core languages, common stretch languages, SQL and Ruby with `--min-stars 10`); slice in `data/slice/` (hard examples in `data/slice-hard/`, build in `data/processed-slice/`, all gitignored) so `data/processed` stays v5.
+- **Collected: 2,807 snippets** (train 2,251, test 556, hard examples 97: 96 HTML, 1 PHP). Per language (snippets/repos): python 211/45, cpp 210/45, java 210/45, javascript 197/45, rust 223/45, go 219/45, html 166/45, c 205/45, csharp 218/45, typescript 222/45, php 205/45, kotlin 219/45, ruby 224/45, **sql 78/21**. No repo above 6% of its language (SQL), 2-3% elsewhere; licenses MIT, Apache-2.0, BSD only.
+- Audit review by eye (first lines of the 70 samples of seven languages, full text of 5 C samples) plus measurements on all snippets (issues-and-fixes D8). **Findings:** (1) a C++ header (PowerToys, `constexpr`, `winrt::`) and an Objective-C header (yabai) were labelled C; (2) one repo was skipped because of an HTTP 429 without hints; (3) SQL reaches only 78 snippets because only page 1 of each search band was read; (4) Ruby was run with `--min-stars 10` (my suggestion) although 50 sufficed.
+- **Fixes (tests 408 -> 427, ruff clean):** C++ markers strengthened (`constexpr`, `nullptr`, casts, `enum class`, `::` outside comments, `<cstdio>`-style includes, access specifiers, `using X =`) and Objective-C markers for C, both also deciding `.h`; on the slice this removes 3 of 415 C/C++ snippets; a bare 429 now waits 60 s x attempt and retries; `--pages N` reads further search pages (default 1, so nothing else changes).
+- Measured, no policy needed now: SQL-like lines make up 25% or more of 9 of 211 Python windows (4%) and of at most 1 window in every other non-SQL language; HTML tags make up over half the lines of 3 C#, 3 JavaScript, 1 Ruby and 1 Rust windows; Ruby and PHP heredocs cut by a window: about 2% of their windows; no C# verbatim-string cuts.
+- Hard examples: 96 HTML windows from 24 repos (median embedded share 0.81), 13 of them from one repo. Their repos are in train (84 windows) or test (13).
+- Test-file share (audit): Ruby 40%, Go 38%, PHP 35%, JavaScript 24%; as in Stage A (Go 40%) this is idiomatic, to be checked with the shortcut probe in B-S4.
 
 ### 2026-09-30 — Stage B, B-S2: embedded-language policy (`feat/stage-b-data`)
 - Choices (start of step): hard examples are decided **per window, not per repository** (user: keep as much good data as possible). Threshold over 50% of lines inside `<script>`/`<style>` (HTML) or carrying HTML tags (PHP templates), agreed at the Stage B check-in.

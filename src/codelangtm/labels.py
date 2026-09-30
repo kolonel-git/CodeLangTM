@@ -34,7 +34,27 @@ EXTENSION_LANGUAGE = {
     ".rb": "ruby",
 }  # fmt: skip
 
-_CPP_MARKERS = re.compile(r"\bclass\s+\w+|\bnamespace\b|\btemplate\s*<|std::|#include\s*<iostream>")
+# Constructs that exist in C++ but not in C. Decides `.h` (C or C++) and flags C++ inside `.c`.
+# Comment lines are skipped for `::`, so prose like "// see Foo::bar" does not count; `extern "C"`
+# guards are not markers because C headers use them too.
+_CPP_MARKERS = re.compile(
+    r"""
+      \b(constexpr|nullptr|noexcept|typename|static_cast|dynamic_cast|reinterpret_cast|const_cast)\b
+    | \benum\s+(class|struct)\b
+    | ^\s*(class|namespace)\s+\w+
+    | ^\s*template\s*<
+    | ^\s*using\s+(namespace\b|\w+\s*=)
+    | ^\s*(public|private|protected)\s*:
+    | \#include\s*<(c[a-z]+|iostream|vector|string|map|set|memory|algorithm|utility|thread
+                   |mutex|functional|optional|array)>
+    | ^(?!\s*(//|\*|/\*)).*\b[A-Za-z_]\w*::[A-Za-z_~]
+    """,
+    re.X | re.M,
+)
+# Objective-C headers also end in `.h`.
+_OBJC_MARKERS = re.compile(
+    r"^\s*(@(interface|implementation|protocol|property|end)\b|#import\b)", re.M
+)
 
 # Strong evidence the text is a *different* language than labelled.
 _RED_FLAGS: dict[str, re.Pattern[str]] = {
@@ -49,12 +69,7 @@ _RED_FLAGS: dict[str, re.Pattern[str]] = {
     "rust": re.compile(r"^\s*(#include\b|public\s+class\b|def\s+\w+.*:\s*$)", re.M),
     "go": re.compile(r"^\s*(#include\b|public\s+class\b|def\s+\w+.*:\s*$)", re.M),
     # stretch set. A `.c` file with C++ constructs is C++ code in a C-looking file.
-    "c": re.compile(
-        r"^\s*(class\s+\w+|namespace\s+\w+|template\s*<|using\s+namespace\b"
-        r"|#include\s*<(iostream|vector|string|map|memory)>|def\s+\w+.*:\s*$|package\s+[\w.]+;)"
-        r"|\bstd::",
-        re.M,
-    ),
+    "c": re.compile(r"^\s*(def\s+\w+.*:\s*$|package\s+[\w.]+;)", re.M),
     "csharp": re.compile(
         r"^\s*(#include\b|package\s+[\w.]+;|import\s+java\.|def\s+\w+.*:\s*$|fn\s+\w+\()", re.M
     ),
@@ -182,7 +197,9 @@ def check_label(s: Snippet) -> LabelCheck:
     flag = _RED_FLAGS.get(s.language)
     if flag and flag.search(text):
         reasons.append("content looks like another language")
-    required = _REQUIRED.get(s.language)
+    elif s.language == "c" and (_CPP_MARKERS.search(text) or _OBJC_MARKERS.search(text)):
+        reasons.append("content looks like another language")
+    required =_REQUIRED.get(s.language)
     if required and not required.search(text):
         reasons.append("expected markers missing")
     elif s.language == "html":

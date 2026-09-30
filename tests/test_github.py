@@ -375,3 +375,75 @@ def test_cli_writes_hard_examples_outside_the_training_folder(tmp_path, monkeypa
     assert not list(out.glob("*hard*")) and [p.name for p in out.glob("*.jsonl")] == ["html.jsonl"]
     manifest = json.loads((out / "html.manifest.json").read_text(encoding="utf-8"))
     assert manifest["hard_snippets"] == len(list(load_snippets(hard / "html.jsonl")))
+
+
+def test_bare_429_backs_off_and_retries(tmp_path):
+    """A secondary rate limit sometimes arrives without Retry-After: wait, do not skip the repo."""
+    responses = [httpx.Response(429), httpx.Response(429), httpx.Response(200, json={"ok": 1})]
+    sleeps: list[float] = []
+    client = gh.GitHubClient(
+        token=TOKEN, cache_dir=tmp_path, sleep=sleeps.append,
+        transport=httpx.MockTransport(lambda req: responses.pop(0)),
+    )  # fmt: skip
+    assert client.get_json("/x") == {"ok": 1}
+    assert sleeps == [60.0, 120.0]
+
+
+def test_search_pages_read_further_pages_until_a_short_page(tmp_path):
+    seen_pages = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        q, page = request.url.params["q"], int(request.url.params.get("page", 1))
+        seen_pages.append((q.split("stars:")[1].split()[0], page))
+        n = 100 if page < 3 else 40  # every band has 240 results
+        items = [repo_item(f"o/{q.split('stars:')[1].split()[0]}-{page}-{i}") for i in range(n)]
+        return httpx.Response(200, json={"items": items})
+
+    def search(pages):
+        seen_pages.clear()
+        client = gh.GitHubClient(
+            token=TOKEN, cache_dir=tmp_path, sleep=lambda s: None,
+            transport=httpx.MockTransport(handler),
+        )  # fmt: skip
+        return gh.search_repos(client, "sql", limit=10_000, min_stars=10, pages=pages)
+
+    one = search(1)
+    assert {p for _, p in seen_pages} == {1} and len(one) == 4 * 100
+    three = search(3)
+    assert {p for _, p in seen_pages} == {1, 2, 3} and len(three) == 4 * 240
+    assert len({r.full_name for r in three}) == len(three)
+
+
+def test_search_stops_early_when_a_band_has_one_short_page(tmp_path):
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.params.get("page"))
+        return httpx.Response(200, json={"items": [repo_item("o/one")]})
+
+    client = gh.GitHubClient(
+        token=TOKEN, cache_dir=tmp_path, sleep=lambda s: None,
+        transport=httpx.MockTransport(handler),
+    )  # fmt: skip
+    gh.search_repos(client, "sql", limit=10, min_stars=10, pages=5)
+    assert len(calls) == 4 and set(calls) == {None}  # 4 bands, page 2 never requested
+
+
+def test_cli_has_pages_option_and_records_it(tmp_path, monkeypatch):
+    fake = make_fake()
+    real_client = gh.GitHubClient
+    monkeypatch.setattr(
+        gh, "GitHubClient",
+        lambda cache_dir: real_client(
+            token=TOKEN, cache_dir=cache_dir, transport=httpx.MockTransport(fake),
+            sleep=lambda s: None,
+        ),
+    )  # fmt: skip
+    out = tmp_path / "out"
+    assert main([
+        "collect", "github", "--language", "python", "--repos", "2", "--per-repo", "2",
+        "--pages", "2", "--out", str(out), "--hard-out", str(tmp_path / "hard"),
+        "--cache", str(tmp_path / "cache"),
+    ]) == 0  # fmt: skip
+    manifest = json.loads((out / "python.manifest.json").read_text(encoding="utf-8"))
+    assert manifest["params"]["pages"] == 2

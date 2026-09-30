@@ -120,6 +120,19 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Data quality
 
+### D8. Findings from the first Stage B slice (B-S3)
+- **Slice:** 45 repos per language, at most 5 snippets per repo, 2,807 snippets from 14 languages (details: [PROGRESS.md](../PROGRESS.md)). Built into `data/processed-slice/` and audited by eye plus measurements on every snippet.
+- **C labelled from C++ and Objective-C headers:** `.h` files are the weak spot. PowerToys' `InclusiveCrosshairs.h` (`constexpr`, `enum struct`, `winrt::Windows::...`) was labelled C because the first C++ markers were `class`/`namespace`/`template<`/`std::` only; yabai's `autorelease.h` is Objective-C. Fix: a larger set of C++-only constructs (shared by the `.h` decision and the C check; comment lines are skipped for `::`; `extern "C"` guards are not markers) plus Objective-C markers for C. On the slice it removes 3 of 415 C/C++ snippets (2 from C, 1 plain-C-looking header from a C++ repo). Checked with real cases in `tests/test_labels.py`, including C headers that must stay C (`extern "C"` guards, `Foo::bar` in comments, `class_id`, `int new`).
+- **Detector recall is limited by design:** 75% of the `.cpp` windows contain a C++-only marker; the rest are C-like code and stay C++ because of their extension.
+- **HTTP 429 without hints:** one Python repo was skipped (`HTTP 429`). GitHub's secondary rate limit does not always send `Retry-After`; a bare 429 now backs off 60 s x attempt and retries.
+- **SQL shortfall (78 snippets, 21 repos):** the collector read only page 1 (100 results) of each search band, so SQL never had more than about 21 usable permissive repos. New `--pages N` reads more pages; default 1 keeps everything else as it was.
+- **Ruby star floor:** Ruby was collected with `--min-stars 10` although it needs no such floor; a uniform bar (50) is cleaner, only SQL should deviate.
+- **Measured, no policy change:**
+  - SQL-like content inside other languages: 9 of 211 Python windows have 25% or more SQL-like lines (4%); at most 1 window in every other language.
+  - HTML tags on more than half the lines outside HTML: 3 C#, 3 JavaScript, 1 Ruby, 1 Rust window.
+  - Heredocs the scanner does not track: about 2% of Ruby and PHP windows begin or end inside one. No C# verbatim-string cuts.
+  - Hard HTML examples: 96 windows from 24 repos (median embedded share 0.81); 13 come from a single repository.
+
 ### D7. Embedded-language policy: hard examples instead of dropping (Stage B, B-S2)
 - **Problem:** the 20%-markup rule of D5 drops only windows that are almost all script. B6b found that 21 of 76 HTML training windows are still more than half `<script>`/`<style>`, and 4 of them cause every out-of-fold HTML → JavaScript error. Dropping them would hide a real weakness; keeping them in training teaches "HTML looks like JavaScript".
 - **Decision (user, 2026-09-29/30):** windows with more than 50% embedded code are set aside as **hard examples**, per window (not per repository, to keep as much good data as possible): reported on, never trained on. Applies to HTML (lines inside `<script>`/`<style>`, measured by `labels.embedded_share`, moved from `errors.py`) and to PHP (more than 50% of lines carry an HTML tag: templates). A window with almost no tags that is not embedded code is still dropped ("too little markup").
