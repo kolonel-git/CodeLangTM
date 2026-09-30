@@ -65,7 +65,9 @@ def test_splits_are_leak_free_and_complete(raw, tmp_path):
     assert all(len(ks) == 1 for ks in repo_folds.values())  # a repo never spans folds
 
     manifest = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
-    assert set(manifest["files"]) == {"train.jsonl", "test.jsonl", "wild.jsonl", "folds.json"}
+    assert set(manifest["files"]) == {
+        "train.jsonl", "test.jsonl", "wild.jsonl", "hard.jsonl", "folds.json"
+    }
     assert manifest["params"]["split"] == "stable-hash"
     assert manifest["params"]["salt"] == "codelangtm-v1"
 
@@ -158,3 +160,109 @@ def test_restricted_build_rejects_other_labels(raw, tmp_path):
     save_snippets([kotlin_snippet("kt-org/r0", 0)], raw / "github" / "kotlin.jsonl")
     with pytest.raises(ValueError, match="unknown language"):
         build(raw, tmp_path / "out")
+
+
+# --- hard examples (Stage B, B-S2) -------------------------------------------------------------
+
+
+def html_text(tag, script_lines):
+    markup = "".join(f'<p class="{tag}{i}">text {tag} {i}</p>\n' for i in range(4))
+    script = "".join(f"  var {tag}{i} = compute_{tag}({i}) + {i};\n" for i in range(script_lines))
+    return f"<div>\n{markup}<script>\n{script}</script>\n</div>\n"
+
+
+def html_snippet(repo, i, script_lines):
+    text = html_text(f"{repo[-1]}{i}", script_lines)
+    return Snippet(text, "html", "github", repo, "sha", f"web/p{i}.html", "MIT", 1,
+                   text.count("\n"))  # fmt: skip
+
+
+@pytest.fixture
+def hard_dir(tmp_path):
+    root = tmp_path / "hard"
+    root.mkdir()
+    # repo html-org/r0 has normal windows in `raw` (added below) and hard windows here;
+    # html-org/only has nothing but hard windows
+    hard = [html_snippet("html-org/r0", 50 + i, 30) for i in range(2)]
+    hard += [html_snippet("html-org/only", 60 + i, 30) for i in range(2)]
+    save_snippets(hard, root / "html.jsonl")
+    return root
+
+
+def add_html(raw):
+    items = [html_snippet(f"html-org/r{r}", i, 1) for r in range(8) for i in range(3)]
+    save_snippets(items, raw / "github" / "html.jsonl")
+
+
+def test_hard_examples_are_kept_apart_from_train_and_test(raw, hard_dir, tmp_path):
+    add_html(raw)
+    out = tmp_path / "out"
+    report = build_dataset([raw], out, hard_sources=[hard_dir])
+    hard = list(load_snippets(out / "hard.jsonl"))
+    assert len(hard) == 4 and report.hard["count"] == 4
+    assert report.hard["by_language"] == {"html": 4}
+    # r0 is a normal repo (train or test); "only" is in neither
+    assert set(report.hard["repo_in"]) <= {"train", "test", "neither"}
+    assert report.hard["repo_in"]["neither"] == 2
+    texts = {
+        s.text for name in ("train", "test", "wild") for s in load_snippets(out / f"{name}.jsonl")
+    }
+    assert not texts & {s.text for s in hard}
+    assert "hard examples (evaluation only): 4" in report.summary()
+    manifest = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
+    assert manifest["hard"]["count"] == 4 and "hard.jsonl" in manifest["files"]
+
+
+def test_hard_windows_never_change_train_test_or_folds(raw, hard_dir, tmp_path):
+    add_html(raw)
+    with_hard = build_dataset([raw], tmp_path / "a", hard_sources=[hard_dir])
+    without = build_dataset([raw], tmp_path / "b")
+    for name in ("train.jsonl", "test.jsonl", "wild.jsonl", "folds.json"):
+        assert with_hard.files[name] == without.files[name], name
+    assert without.hard["count"] == 0
+    assert list(load_snippets(tmp_path / "b" / "hard.jsonl")) == []
+
+
+def test_normal_window_in_hard_file_is_ignored_with_a_warning(raw, hard_dir, tmp_path):
+    add_html(raw)
+    normal = html_snippet("html-org/elsewhere", 0, 1)  # not mostly embedded
+    save_snippets([normal], hard_dir / "normal.jsonl")
+    report = build_dataset([raw], tmp_path / "out", hard_sources=[hard_dir])
+    assert report.hard["count"] == 4
+    assert any("hard example(s) ignored" in w for w in report.warnings)
+
+
+def test_duplicate_hard_windows_are_removed(raw, hard_dir, tmp_path):
+    add_html(raw)
+    save_snippets([html_snippet("html-org/r0", 50, 30)], hard_dir / "again.jsonl")  # copy of one
+    report = build_dataset([raw], tmp_path / "out", hard_sources=[hard_dir])
+    assert report.hard["count"] == 4
+
+
+def test_hard_file_with_wrong_label_is_rejected(raw, tmp_path):
+    root = tmp_path / "hard"
+    root.mkdir()
+    save_snippets([html_snippet("x/y", 0, 30)], root / "h.jsonl")
+    with pytest.raises(ValueError, match="unknown language"):
+        build_dataset([raw], tmp_path / "out", languages=LANGS, hard_sources=[root])
+
+
+def test_cli_build_finds_data_hard_by_default(raw, hard_dir, tmp_path, monkeypatch, capsys):
+    add_html(raw)
+    monkeypatch.chdir(tmp_path)  # `data/hard` is resolved against the working directory
+    (tmp_path / "data").mkdir()
+    hard_dir.rename(tmp_path / "data" / "hard")
+    out = tmp_path / "out"
+    assert main(["data", "build", "--source", str(raw), "--out", str(out)]) == 0
+    assert "hard examples (evaluation only): 4" in capsys.readouterr().out
+    assert main(["data", "build", "--source", str(raw), "--out", str(out),
+                 "--hard-source", str(tmp_path / "nowhere")]) == 1  # fmt: skip
+
+
+def test_hard_windows_among_the_main_sources_are_moved_to_hard(raw, tmp_path):
+    add_html(raw)
+    save_snippets([html_snippet("html-org/r0", 70, 30)], raw / "github" / "html_extra.jsonl")
+    report = build_dataset([raw], tmp_path / "out")
+    assert report.hard["count"] == 1 and not report.label_dropped
+    total = sum(report.counts[s]["html"] for s in ("train", "test"))
+    assert total == 24  # the 24 normal windows; the hard one is in neither split

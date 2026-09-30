@@ -32,7 +32,7 @@ Code snippet
 | Error analysis (out-of-fold CV predictions, TM vs baselines) | `errors.py` | `codelangtm errors` |
 | C export | `export_c.py` | stub (M6) |
 
-Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`, `tm-curves.md`, `tm-results.md`, `resources.md`, `clauses.md`, `errors.md`), each with a JSON sidecar (`results.json`, `ablations.json`, `tm-curves.json`, `tm-results.json`, `resources.json`, `clauses.json`, `errors.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes) → embedded in the hand-written [report.md](report.md).
+Data flow: `data/raw/` (collected, gitignored) → `data/processed/` (train/test/wild, `hard.jsonl` for evaluation-only hard examples, `folds.json`, `dataset.json`) → generated reports in `docs/` (`results.md`, `ablations.md`, `tm-curves.md`, `tm-results.md`, `resources.md`, `clauses.md`, `errors.md`), each with a JSON sidecar (`results.json`, `ablations.json`, `tm-curves.json`, `tm-results.json`, `resources.json`, `clauses.json`, `errors.json`: same runs, machine-readable, read by the figure code) → `docs/figures/*.png` (`figures.py`: matplotlib imported only when drawing, fixed style and font, PNGs without metadata so redrawing the same sidecar gives identical bytes) → embedded in the hand-written [report.md](report.md).
 
 ## Features
 `Binarizer` (scikit-learn transformer; refit inside every CV fold):

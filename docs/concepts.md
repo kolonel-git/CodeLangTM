@@ -94,6 +94,7 @@ A classifier cannot read text directly; it needs numbers. Here every snippet bec
 - **Spearman correlation:** like Pearson correlation, but computed on ranks, so it asks "does more of one go with more of the other?" without assuming a straight-line relation.
 - **Verdict rule:** the pass/fail criterion for a hypothesis, written down before looking at the result, so the data cannot quietly move the goalposts. Any rule changed afterwards is reported as changed.
 - **Embedded code:** one language inside another's file, like JavaScript inside an HTML `<script>` block. Whether such a snippet counts as HTML or JavaScript is a labelling decision, not something a model can get right by itself.
+- **Hard example (embedded-language policy):** from Stage B, an HTML window with more than half its lines inside `<script>`/`<style>` (or a PHP window with more than half its lines carrying HTML tags) is not trained on and not thrown away: it goes to a separate `hard.jsonl` file that is used only to *report* how the model copes with such windows. Only that window is set aside, not its repository, so the repository's normal windows stay in the dataset.
 - **Corrected resampled t-test (Nadeau & Bengio):** the test used here. A normal paired t-test assumes the repeated splits are independent, but they share most of their training data, which makes it too confident. The correction widens the uncertainty to account for that overlap.
 
 ## Speed and size

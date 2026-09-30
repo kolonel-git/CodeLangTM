@@ -366,11 +366,11 @@ Why JavaScript? Each hypothesis had a pass/fail rule written before the run. The
 
   ![HTML snippets mistaken for JavaScript](figures/errors_embedded.png)
 
-  This rests on 4 snippets, 3 of them from one repository. The honest reading: these windows are arguably JavaScript. Whether they should be labelled HTML is the embedded-language policy planned for Stage B, not something the model can fix.
+  This rests on 4 snippets, 3 of them from one repository. The honest reading: these windows are arguably JavaScript. Whether they should be labelled HTML is a labelling policy, not something the model can fix; Stage B settles it (windows over 50% embedded code become evaluation-only hard examples, applied from dataset v6; not yet in the numbers of this report).
 
 **What this means for the next steps.**
 
-- **Stage B data:** an explicit embedded-language policy for HTML (and for SQL inside other languages), and more repositories per language to dilute single-repository quirks.
+- **Stage B data:** an explicit embedded-language policy for HTML and PHP templates (decided, built in `labels.py` and `data build`; SQL inside other languages is not covered), and more repositories per language to dilute single-repository quirks.
 - **M4 tuning:** check whether a literal budget or more clauses narrows JavaScript's broad brace-pattern rules. Report errors out of fold, not only on the small test set.
 
 ## 8. Limitations
@@ -382,7 +382,7 @@ Why JavaScript? Each hypothesis had a pass/fail rule written before the run. The
 - **Unstable timings:** timings come from a single, busy machine.
 - **Choices made after seeing CV data:** the TM's epoch rule (section 7.1) and one error-analysis verdict rule (section 7.5) were changed after seeing CV results, never test results. Both changes are marked where they apply, and the test set and the repeated splits remain the independent check.
 - **One TM setting, not tuned:** the 400-clause setting came from a small probe, and T, s and the clause count are not tuned yet (M4). A tuned TM might do better; a smaller one might match it.
-- **Embedded languages are not resolved:** some HTML windows are mostly `<script>` code (section 7.5), and whether they count as HTML is a labelling policy still to be set (Stage B).
+- **Embedded languages are not resolved:** some HTML windows are mostly `<script>` code (section 7.5), and the Stage B policy (over 50% embedded code: evaluation-only hard examples) is implemented but applies only to dataset v6, so every number in this report still includes them.
 - **Few errors to learn from:** the error analysis rests on about 36 out-of-fold errors per seed. Patterns involving a handful of snippets, often from one repository, are reported as such.
 
 ## 9. Reproduce

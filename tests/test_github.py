@@ -248,7 +248,7 @@ def test_cli_collect_end_to_end_without_leaking_token(tmp_path, monkeypatch, cap
     out = tmp_path / "out"
     code = main([
         "collect", "github", "--language", "python", "--repos", "2", "--per-repo", "2",
-        "--out", str(out), "--cache", str(tmp_path / "cache"),
+        "--out", str(out), "--hard-out", str(tmp_path / "hard"), "--cache", str(tmp_path / "cache"),
     ])  # fmt: skip
     assert code == 0
 
@@ -310,3 +310,68 @@ def test_every_language_can_be_searched():
 
     assert set(gh.SEARCH_LANGUAGE) == set(ALL_LANGUAGES)
     assert gh.SEARCH_LANGUAGE["csharp"] == "C#"
+
+
+# --- embedded-language policy: hard examples (Stage B, B-S2) ------------------------------------
+
+
+def mixed_html(tag: str) -> str:
+    """Two markup blocks around one long script: some windows are markup, some are script."""
+    markup = "".join(f'<p class="{tag}{i}">text {tag} {i}</p>\n' for i in range(40))
+    script = "".join(f"  var {tag}{i} = compute_{tag}({i}) + {i};\n" for i in range(60))
+    return f"<div>\n{markup}</div>\n<script>\n{script}</script>\n<div>\n{markup}</div>\n"
+
+
+def html_fake():
+    fake = make_fake()
+    fake.files = {
+        "a/one": {f"web/p{i}.html": mixed_html(f"one{i}") for i in range(4)},
+        "a/two": {f"web/q{i}.html": mixed_html(f"two{i}") for i in range(4)},
+    }
+    fake.repos = [repo_item("a/one"), repo_item("a/two", stars=70)]
+    return fake
+
+
+def test_mostly_embedded_windows_are_set_aside_not_dropped(tmp_path):
+    from codelangtm.labels import check_label, embedded_share
+
+    with client_for(html_fake(), tmp_path) as client:
+        kept, report = gh.collect_language(client, "html", n_repos=2, per_repo=3)
+    assert kept and report.hard_snippets
+    assert all(embedded_share(s.text) <= 0.5 and check_label(s).ok for s in kept)
+    assert all(embedded_share(s.text) > 0.5 and check_label(s).hard for s in report.hard_snippets)
+    assert "mostly embedded script/style" not in report.dropped  # counted apart, not as a drop
+    assert {s.repo for s in report.hard_snippets} <= {s.repo for s in kept}
+    per_file = Counter((s.repo, s.path) for s in report.hard_snippets)
+    assert max(per_file.values()) == 1  # at most one hard window per file
+    assert report.to_dict()["hard_snippets"] == len(report.hard_snippets)
+    assert "hard examples set aside" in report.summary()
+    texts = {s.text for s in kept}
+    assert not any(s.text in texts for s in report.hard_snippets)
+
+
+def test_hard_windows_do_not_use_up_the_per_repo_quota(tmp_path):
+    with client_for(html_fake(), tmp_path) as client:
+        kept, report = gh.collect_language(client, "html", n_repos=2, per_repo=2)
+    assert Counter(s.repo for s in kept) == {"a/one": 2, "a/two": 2}
+
+
+def test_cli_writes_hard_examples_outside_the_training_folder(tmp_path, monkeypatch):
+    fake = html_fake()
+    real_client = gh.GitHubClient
+    monkeypatch.setattr(
+        gh, "GitHubClient",
+        lambda cache_dir: real_client(
+            token=TOKEN, cache_dir=cache_dir, transport=httpx.MockTransport(fake),
+            sleep=lambda s: None,
+        ),
+    )  # fmt: skip
+    out, hard = tmp_path / "raw", tmp_path / "hard"
+    assert main([
+        "collect", "github", "--language", "html", "--repos", "2", "--per-repo", "2",
+        "--out", str(out), "--hard-out", str(hard), "--cache", str(tmp_path / "cache"),
+    ]) == 0  # fmt: skip
+    assert list(load_snippets(hard / "html.jsonl"))
+    assert not list(out.glob("*hard*")) and [p.name for p in out.glob("*.jsonl")] == ["html.jsonl"]
+    manifest = json.loads((out / "html.manifest.json").read_text(encoding="utf-8"))
+    assert manifest["hard_snippets"] == len(list(load_snippets(hard / "html.jsonl")))

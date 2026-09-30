@@ -118,7 +118,8 @@ def test_mostly_script_html_dropped():
 
 def test_html_with_some_markup_kept():
     text = "<div id=\"x\">\n<script>\n" + SCRIPT_ONLY + "</script>\n</div>\n"  # 4 of 9 lines
-    assert check_label(snip(text, "html", "a.html")).ok
+    check = check_label(snip(text, "html", "a.html"))  # 7 of 9 lines are inside <script>: hard
+    assert not check.ok and check.hard
 
 
 def test_wild_skips_extension_check():
@@ -203,3 +204,76 @@ def test_csharp_and_java_are_told_apart():
 
 def test_stretch_wrong_extension_dropped():
     assert not check_label(snip("class A\nend\n", "ruby", "a.py")).ok
+
+
+# --- embedded-language policy (Stage B, B-S2) --------------------------------------------------
+
+MARKUP = "".join(f'<p class="c{i}">line {i}</p>\n' for i in range(10))
+JS = "".join(f"  var v{i} = compute({i}) + {i};\n" for i in range(10))
+
+
+def test_embedded_share_lives_in_labels():
+    from codelangtm.labels import embedded_share
+
+    assert embedded_share("<div>\n<script>\nvar a;\n</script>\n<p>") == 3 / 5
+    assert embedded_share("var a;\nb();\n</script>\n<div>") == 3 / 4  # window starts inside
+
+
+def test_html_over_half_embedded_is_hard():
+    text = MARKUP + "<script>\n" + JS * 2 + "</script>\n"  # 22 of 32 lines inside
+    check = check_label(snip(text, "html", "a.html"))
+    assert not check.ok and check.hard
+    assert check.reasons == ("mostly embedded script/style",)
+
+
+def test_html_at_most_half_embedded_is_kept():
+    text = MARKUP * 2 + "<script>\n" + JS + "</script>\n"  # 12 of 32 lines inside
+    check = check_label(snip(text, "html", "a.html"))
+    assert check.ok and not check.hard
+
+
+def test_exactly_half_is_kept_over_half_is_not():
+    just_over = "<p>a</p>\n<script>\nx();\n</script>\n"  # 3 of 4 lines inside
+    exactly = "<p>a</p>\n<p>b</p>\n<script>x();\n</script>\n"  # 2 of 4 inside
+    assert check_label(snip(exactly, "html", "a.html")).ok
+    assert check_label(snip(just_over, "html", "a.html")).hard
+
+
+def test_sparse_markup_without_embedded_code_is_dropped_not_hard():
+    text = "<p>x</p>\n" + "plain prose line\n" * 30
+    check = check_label(snip(text, "html", "a.html"))
+    assert not check.ok and not check.hard
+    assert check.reasons == ("too little markup",)
+
+
+def test_hard_only_when_embedded_is_the_only_reason():
+    text = "{% block a %}\n" * 8 + "<script>\n" + JS + "</script>\n"  # template-heavy AND embedded
+    check = check_label(snip(text, "html", "a.html"))
+    assert not check.ok and not check.hard
+    assert "template-heavy" in check.reasons
+    assert not check_label(snip(MARKUP + JS, "html", "a.js")).hard  # extension mismatch
+
+
+def test_ok_snippet_is_not_hard():
+    assert not check_label(snip(PY, "python", "a.py")).hard
+
+
+def test_php_template_is_hard_php_code_is_not():
+    template = "<?php get_header(); ?>\n" + MARKUP + "<?php get_footer(); ?>\n"
+    check = check_label(snip(template, "php", "a.php"))
+    assert check.hard and check.reasons == ("mostly embedded markup",)
+    methods = "".join(f"  public function f{i}() {{ return {i}; }}\n" for i in range(12))
+    code = "<?php\nclass A {\n" + methods + "}\n"
+    assert check_label(snip(code, "php", "a.php")).ok
+    some = code + "echo '<div>' . $x . '</div>';\n"  # PHP that prints a little HTML
+    assert check_label(snip(some, "php", "a.php")).ok
+
+
+def test_filter_labels_routes_hard_examples_when_asked():
+    hard_text = "<p>a</p>\n<script>\n" + JS + "</script>\n"
+    items = [snip(PY, "python", "a.py"), snip(hard_text, "html", "a.html")]
+    kept, dropped = filter_labels(items)  # default: dropped like any other failure
+    assert kept == [items[0]] and dropped["mostly embedded script/style"] == 1
+    hard: list = []
+    kept, dropped = filter_labels(items, hard)  # with a list: set aside, not dropped
+    assert kept == [items[0]] and hard == [items[1]] and not dropped

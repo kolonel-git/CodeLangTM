@@ -33,6 +33,11 @@ def _build_parser() -> argparse.ArgumentParser:
     gh.add_argument("--seed", type=int, default=0)
     gh.add_argument("--out", type=Path, default=Path("data/raw/github"))
     gh.add_argument("--cache", type=Path, default=Path("data/cache/github"))
+    gh.add_argument(
+        "--hard-out", type=Path, default=Path("data/hard/github"),
+        help="where mostly-embedded windows (hard examples) go; never under --out, so "
+        "`data build` cannot train on them",
+    )  # fmt: skip
 
     data = sub.add_parser("data", help="dataset tools")
     data_sub = data.add_subparsers(dest="data_command", required=True)
@@ -40,6 +45,11 @@ def _build_parser() -> argparse.ArgumentParser:
     build.add_argument(
         "--source", action="append", type=Path,
         help="directory (searched recursively) or .jsonl file; repeatable (default: data/raw)",
+    )  # fmt: skip
+    build.add_argument(
+        "--hard-source", action="append", type=Path,
+        help="directory or .jsonl file of hard examples (mostly-embedded windows, evaluation "
+        "only); repeatable (default: data/hard if it exists)",
     )  # fmt: skip
     build.add_argument("--out", type=Path, default=Path("data/processed"))
     build.add_argument("--test-size", type=float, default=0.2)
@@ -573,7 +583,10 @@ def _data_build(args: argparse.Namespace) -> int:
 
     try:
         report = build_dataset(
-            args.source or [Path("data/raw")], args.out, args.test_size, args.folds, args.salt
+            args.source or [Path("data/raw")], args.out, args.test_size, args.folds, args.salt,
+            hard_sources=args.hard_source
+            if args.hard_source is not None
+            else ([Path("data/hard")] if Path("data/hard").exists() else []),
         )
     except (FileNotFoundError, ValueError) as e:
         print(f"data build failed: {e}", file=sys.stderr)
@@ -612,6 +625,8 @@ def _collect_github(args: argparse.Namespace) -> int:
                 client, language, args.repos, args.per_repo, args.min_stars, args.seed
             )
             save_snippets(snippets, args.out / f"{language}.jsonl")
+            args.hard_out.mkdir(parents=True, exist_ok=True)
+            save_snippets(report.hard_snippets, args.hard_out / f"{language}.jsonl")
             manifest = {
                 **report.to_dict(),
                 "source": "github",

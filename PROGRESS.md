@@ -2,7 +2,7 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-09-29
+**Last updated:** 2026-09-30
 **Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7, PR #7 merged; a Linux-only CI failure after the merge fixed in PR #8). Next: Stage B data (plan agreed 2026-09-29, see the done log), then M4
 **Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR #7 merged): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
 
@@ -42,7 +42,7 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
 - [x] Housekeeping `chore/post-m3-docs`: stale docs after PRs #7 and #8 fixed
 - [ ] Stage B (after M3, before M4), plan in the 2026-09-29 done-log entry:
   - [x] B-S1 six stretch languages in the code (`feat/stage-b-data`; issues-and-fixes D6)
-  - [ ] B-S2 embedded-language policy in `labels.py` (mostly-embedded HTML to a separate hard-examples file)
+  - [x] B-S2 embedded-language policy (window-level hard examples; issues-and-fixes D7)
   - [ ] B-S3 collect and build a ~3,000-snippet slice, audit it
   - [ ] B-S4 check the slice (diagnose, quick baselines, thin languages)
   - [ ] B-S5 full collection (10,000+), dataset card v6, ledger
@@ -53,6 +53,15 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
 - None.
 
 ## Done log
+
+### 2026-09-30 — Stage B, B-S2: embedded-language policy (`feat/stage-b-data`)
+- Choices (start of step): hard examples are decided **per window, not per repository** (user: keep as much good data as possible). Threshold over 50% of lines inside `<script>`/`<style>` (HTML) or carrying HTML tags (PHP templates), agreed at the Stage B check-in.
+- Measured on the v5 raw data before choosing the rule's effect: 25 of 100 HTML windows exceed 50% (0.3: 34, 0.4: 30, 0.6: 20, 0.7: 14). With the policy, v5 raw would give HTML 75 (55 train, 20 test) and 25 hard windows (17 from repos in train, 4 from test repos, 4 from repos with no normal window); the other 7 languages are unchanged.
+- Code: `labels.py` (`embedded_share` moved here from `errors.py`, `LabelCheck.hard`, HTML and PHP rules, "too little markup" for sparse non-embedded HTML, `filter_labels(..., hard=)`); collector (3 window tries per file so mixed files still give good windows, one hard window per file, hard windows from used repos only, deduplicated, `--hard-out data/hard/github`); `data build` (reads `data/hard/` by default or `--hard-source`, writes `hard.jsonl`, manifest `hard` block with counts per language and where the repo sits, warns about hard-file entries that are no longer hard, moves hard windows found in raw files too).
+- **Checks:** hard windows never change train, test, wild or folds (identical hashes with and without them); hard files are outside `data/raw/`, so training cannot pick them up by accident.
+- Decision needed later: `data/processed/` still holds v5 (models and reports check its hashes). Slice and v6 builds go to other folders (`--out data/processed-slice`, ...).
+- Tests: 408 passing, ruff clean (19 new: the rule at 50% exactly, sparse markup, hard only when embedded is the sole reason, PHP templates vs code, collector sets windows aside and keeps the quota, CLI keeps hard files out of `--out`, build keeps hard apart and leaves splits identical, ignores normal windows in the hard file, removes duplicate hard windows, moves hard windows from raw files).
+- Not covered by the policy: SQL inside other languages and JavaScript dominated by HTML templates (to be measured on the slice audit).
 
 ### 2026-09-29 — Stage B, B-S1: six stretch languages in the code (`feat/stage-b-data`)
 - Choices (start of step): `.tsx`/`.jsx` not sampled in new collections (recommended option taken). Refinement made openly while coding: `.mjs` stays (plain JavaScript, not markup-in-code), and `.jsx`/`.tsx` stay valid *labels* because v5 contains 3 `.jsx` and 8 `.mjs` snippets and rebuilding v5 must stay byte-identical.

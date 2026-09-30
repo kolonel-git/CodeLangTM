@@ -27,6 +27,8 @@ Selection rules: MIT / Apache-2.0 / BSD licenses only; no forks or archived repo
 ```bash
 uv run codelangtm data build   # reads data/raw/ recursively, writes data/processed/
 ```
+Mostly-embedded windows ("hard examples", see [issues-and-fixes](issues-and-fixes.md) D7) are written by the collector to `data/hard/github/<language>.jsonl` (`--hard-out`), never under `data/raw/`, and `data build` reads `data/hard/` if it exists (`--hard-source` to change). They end up in `data/processed/hard.jsonl`, are never part of train, test or the folds, and are used only to report how a model copes with them. Hard windows found in a raw file (as in v5) are moved there too.
+
 Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). The split is a stable hash-based per-language repo split (`--salt`, default `codelangtm-v1`): re-collecting one language does not move other languages' test repos.
 
 ## Auditing the dataset
