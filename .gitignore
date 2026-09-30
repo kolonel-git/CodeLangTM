@@ -20,6 +20,9 @@ data/hard/
 data/slice/
 data/slice-hard/
 data/processed-slice/
+data/full/
+data/full-hard/
+data/processed-v6/
 
 # Secrets
 .env
