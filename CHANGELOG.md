@@ -5,6 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Language selection for experiments (Stage B, B-S4): `languages:` in the baselines and ablations YAML configs and `--languages auto|core|all|python,go` on `baselines`, `ablate` and `diagnose`. `auto` (default) evaluates every language in the data, `core` the original 8 on the same CV folds (each snippet keeps its fold), `all` the 14; a requested language without data is an error, and the list is recorded in every report and JSON sidecar (`meta.languages`). `curves`, `tm-results`, `tm-train` and `errors` use `auto`. Helpers `resolve_languages`, `restrict_dataset`, `parse_language_spec` (`data.py`) and `load_evaluation_data` (`baselines.py`).
 - `collect github` searches SQL under its four GitHub language names (`SQL`, `TSQL`, `PLpgSQL`, `PLSQL`): the plain `SQL` class holds only about 70 repositories with 10+ stars. The manifest records `search_languages`.
 - `collect github --pages N`: read N result pages (100 repos each) per star band; default 1 (unchanged). Recorded in the manifest.
 - Stage B, B-S2, embedded-language policy: HTML windows with more than 50% of lines inside `<script>`/`<style>` and PHP windows with more than 50% HTML-tag lines are set aside per window as evaluation-only **hard examples** instead of being dropped or trained on. The collector writes them to `data/hard/github/` (`--hard-out`) and tries up to 3 windows per file; `data build` reads `data/hard/` (`--hard-source`), writes `hard.jsonl` and a `hard` block in `dataset.json`, and never lets them change train, test or folds. `labels.check_label(...).hard`, `filter_labels(..., hard=)`.
@@ -45,6 +46,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 - Optional `viz` extra (matplotlib) for figures and the report; `docs/figures/` for generated plots.
 
 ### Fixed
+- Evaluation commands on data with more languages than the 8 core ones no longer report only those 8: `evaluate_model` refuses a dataset that has languages outside the evaluation list, and every command now derives its languages from the data (`auto`). Results on the 8-language v5 data are unchanged (scores, folds, confusion matrices and repeated splits identical; config hash unchanged for `languages: auto`).
 - Collector: an HTTP 429 without `Retry-After` or rate-limit headers (secondary rate limit) is retried after 60 s x attempt instead of skipping the repository.
 - C label check: C++ constructs (`constexpr`, `nullptr`, casts, `enum class`, `::` outside comments, `<cstdio>`-style includes, access specifiers, `using X =`) and Objective-C markers (`@interface`, `#import`) now mark a `.c`/`.h` file as not C; the same C++ markers decide whether a `.h` is C++.
 - `resources.memory_mb` on Linux: the peak now comes from the same `/proc/self/status` snapshot as the current value (`VmHWM`), since `getrusage`'s lazily updated peak could be below the current value and failed CI after PR #7 (fixed in PR #8); the peak is never reported below the current value.

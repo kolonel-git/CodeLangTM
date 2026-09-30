@@ -11,6 +11,7 @@ from datetime import date
 from pathlib import Path
 
 from . import ALL_LANGUAGES, __version__
+from .data import LANGUAGE_SPEC_HELP
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -225,14 +226,24 @@ def _build_parser() -> argparse.ArgumentParser:
     diag.add_argument("--features", type=int, default=500)
     diag.add_argument("--top", type=int, default=15, help="features shown per language")
     diag.add_argument("--seed", type=int, default=0)
+    for command in (base, abl, diag):
+        command.add_argument(
+            "--languages",
+            help=f"which languages to evaluate: {LANGUAGE_SPEC_HELP}, e.g. python,go "
+            "(default: the config's `languages`, else auto). Every report records the list",
+        )
     return parser
 
 
 def _diagnose(args: argparse.Namespace) -> int:
+    from .data import parse_language_spec
     from .diagnostics import run_diagnostics
 
     try:
-        result = run_diagnostics(args.data, args.out, args.features, args.seed, args.top)
+        spec = parse_language_spec(args.languages) if args.languages else None
+        result = run_diagnostics(
+            args.data, args.out, args.features, args.seed, args.top, languages=spec
+        )
     except (FileNotFoundError, ValueError) as e:
         print(f"diagnose failed: {e}", file=sys.stderr)
         return 1
@@ -507,13 +518,15 @@ def _ablate(args: argparse.Namespace) -> int:
     from . import ablations as ab
     from .baselines import sidecar_path, write_json
     from .config import load_ablation_config
+    from .data import parse_language_spec
 
     def progress(i: int, n: int, features: object) -> None:
         print(f"[{i + 1}/{n}] {ab.describe(features)}", flush=True)
 
     try:
         cfg = ab.select_studies(load_ablation_config(args.config), args.study)
-        runs, meta = ab.run_ablations(cfg, progress=progress)
+        spec = parse_language_spec(args.languages) if args.languages else None
+        runs, meta = ab.run_ablations(cfg, languages=spec, progress=progress)
     except (FileNotFoundError, ValueError) as e:
         print(f"ablate failed: {e}", file=sys.stderr)
         return 1
@@ -522,6 +535,7 @@ def _ablate(args: argparse.Namespace) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(ab.render_ablations_md(cfg, runs, meta), encoding="utf-8")
     sidecar = write_json(ab.ablations_json(cfg, runs, meta), sidecar_path(out))
+    print(f"\nlanguages ({len(meta['languages'])}): {', '.join(meta['languages'])}")
     print()
     print(ab.summary_table(cfg, runs))
     print(f"\nwrote {out} and {sidecar}")
@@ -543,13 +557,14 @@ def _baselines(args: argparse.Namespace) -> int:
     overrides = {
         "data": args.data, "models": args.model, "n_features": args.features,
         "seed": args.seed, "repeats": args.repeats, "out": args.out,
+        "languages": args.languages,
     }  # fmt: skip
     try:
         cfg = load_baselines_config(args.config) if args.config else BaselinesConfig()
         cfg = cfg.with_overrides(**overrides)
         results, meta = run_baselines(
             cfg.data, cfg.models, seed=cfg.seed, repeats=cfg.repeats,
-            binarizer=cfg.features.binarizer(),
+            binarizer=cfg.features.binarizer(), languages=cfg.languages,
         )  # fmt: skip
     except (FileNotFoundError, ValueError) as e:
         print(f"baselines failed: {e}", file=sys.stderr)
@@ -562,6 +577,7 @@ def _baselines(args: argparse.Namespace) -> int:
     cfg.out.parent.mkdir(parents=True, exist_ok=True)
     cfg.out.write_text(render_results_md(results, meta), encoding="utf-8")
     sidecar = write_json(results_json(results, meta), sidecar_path(cfg.out))
+    print(f"languages ({len(meta['languages'])}): {', '.join(meta['languages'])}\n")
     print(summary_table(results))
     print(f"\nbest by CV: {best_by_cv(results).name}\nwrote {cfg.out} and {sidecar}")
     return 0

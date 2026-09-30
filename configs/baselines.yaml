@@ -1,12 +1,16 @@
 # M2 classical baselines. Regenerates docs/results.md:
 #   uv run codelangtm baselines --config configs/baselines.yaml
-# CLI flags (--model, --features, --seed, --repeats, --data, --out) override values here.
+# CLI flags (--model, --features, --seed, --repeats, --data, --out, --languages) override values here.
 
 data: data/processed
 out: docs/results.md
 seed: 0          # model seeds (decision tree, SVM, random forest)
 repeats: 10      # extra repo-level splits for the repeated test score (0 = off)
 models: [naive_bayes, decision_tree, logistic_regression, linear_svm, random_forest]
+# Which languages to evaluate: auto (every language in the data), core (the original 8),
+# all (14) or a list such as [python, go]. A language without data is an error, and every
+# report records the list it used.
+languages: auto
 
 # FROZEN feature config for M3 (chosen from docs/ablations.md, CV only; see PROGRESS.md):
 #   class_balanced is at the top of the fold-noise band (LR 0.953-0.959, NB 0.960-0.963) and gives

@@ -28,7 +28,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - Languages: all six stretch languages at once (14 in total).
 - Embedded code: HTML windows with more than 50% of lines in `<script>`/`<style>` leave the main data and go to a separate hard-examples file (reported on, never trained on).
 - Scale: staged, a ~3,000-snippet slice first, checked, then 10,000+.
-- Steps: B-S1 languages in code (done), B-S2 embedded-language policy (done), B-S3 collect and audit the slice (done: 2,807 snippets, see [issues-and-fixes](issues-and-fixes.md) D8), B-S4 check the slice, B-S5 full collection and dataset card v6, then rerun baselines and the TM on v6 (14 languages and the original 8).
+- Steps: B-S1 languages in code (done), B-S2 embedded-language policy (done), B-S3 collect and audit the slice (done: 2,909 snippets, see [issues-and-fixes](issues-and-fixes.md) D8), B-S4 check the slice with models (done: [issues-and-fixes](issues-and-fixes.md) D9, M12), B-S4 check the slice, B-S5 full collection and dataset card v6, then rerun baselines and the TM on v6 (14 languages and the original 8).
 - Postponed: the wild test set (after M4). Kept in Future: short-snippet evaluation.
 
 - [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
@@ -42,6 +42,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] *Stage B (postponed to after M4, decided 2026-09-29):* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
 - [x] **Stage A:** target 1,000 snippets (~125/language); reached 869 in v4 (SQL limited by available permissive repos)
 - [ ] *Stage B:* scale to 10,000+ and add stretch languages (B-S1, done: the six stretch languages are supported by the collector, label checks and scanner; the collection itself is B-S3/B-S5)
+- [ ] *Stage B (found in B-S4):* rerun the feature ablations (`codelangtm ablate`, CV only) on the wider data before the TM is tuned: the frozen M=500 was chosen on 8 languages, and the best baseline on 14 languages reaches 0.919, not 0.96 ([issues-and-fixes](issues-and-fixes.md) D9)
 - [x] *Stage B (B-S2, done in code; takes effect with dataset v6):* embedded-language policy: HTML windows with more than 50% of lines inside `<script>`/`<style>` and PHP windows with more than 50% HTML-tag lines are set aside per window as evaluation-only hard examples (`hard.jsonl`), never trained on. SQL inside other languages is not covered (to be measured on the slice)
 - [x] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
 

@@ -23,14 +23,13 @@ from scipy import stats
 from sklearn.pipeline import Pipeline
 
 from . import LANGUAGES
-from .audit import load_dataset
 from .baselines import (
     SPLIT_SALT,
     ModelResult,
     _macro_f1,
     dataset_meta,
     evaluate_model,
-    load_folds,
+    load_evaluation_data,
     make_models,
     result_dict,
 )
@@ -141,7 +140,7 @@ def _tmu_latency_ms(pipe: object, texts: Sequence[str]) -> float:
 def run_tm_results(
     cfg: TMConfig,
     settings: Sequence[str] | None = None,
-    languages: Sequence[str] = LANGUAGES,
+    languages: str | Sequence[str] | None = None,
     models_dir: str | Path | None = "models",
     progress: Callable[[str], None] | None = None,
 ) -> tuple[list[ModelResult], list[TMEntry], dict]:
@@ -149,11 +148,11 @@ def run_tm_results(
     say = progress or (lambda _m: None)
     chosen = [cfg.setting(n) for n in settings] if settings else list(cfg.settings)
     data_dir = Path(cfg.data)
-    dataset = load_dataset(data_dir)
-    folds = load_folds(data_dir)
+    dataset, folds, languages = load_evaluation_data(data_dir, languages)
     binarizer = cfg.features.binarizer()
     meta = {
         **dataset_meta(data_dir, dataset, folds),
+        "languages": list(languages),
         "config_hash": config_hash(cfg),
         "seeds": list(cfg.seeds),
         "repeats": cfg.repeats,
@@ -271,8 +270,7 @@ def train_final(cfg: TMConfig, setting: str, seed: int, out: str | Path) -> dict
     Returns a summary; the test score is printed for information only, not used for choices."""
     s = cfg.setting(setting)
     data_dir = Path(cfg.data)
-    dataset = load_dataset(data_dir)
-    folds = load_folds(data_dir)
+    dataset, folds, _ = load_evaluation_data(data_dir)
     meta = dataset_meta(data_dir, dataset, folds)
     train, test = dataset["train"], dataset["test"]
     binarizer = cfg.features.binarizer()
@@ -345,7 +343,8 @@ def aggregate(entry: TMEntry, languages: Sequence[str]) -> dict:
     return out
 
 
-def tm_results_json(cfg: TMConfig, baselines, entries, meta, languages=LANGUAGES) -> dict:
+def tm_results_json(cfg: TMConfig, baselines, entries, meta, languages=None) -> dict:
+    languages = languages or meta.get("languages") or LANGUAGES
     tm = {}
     for e in entries:
         tm[e.setting] = {
