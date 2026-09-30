@@ -277,3 +277,56 @@ def test_filter_labels_routes_hard_examples_when_asked():
     hard: list = []
     kept, dropped = filter_labels(items, hard)  # with a list: set aside, not dropped
     assert kept == [items[0]] and hard == [items[1]] and not dropped
+
+
+# --- C vs C++ vs Objective-C headers (found on the Stage B slice) -------------------------------
+
+WINRT_H = (
+    "#pragma once\n#include \"pch.h\"\n\n"
+    "constexpr int DEFAULT_RADIUS = 20;\n"
+    "const winrt::Windows::UI::Color COLOR = winrt::Windows::UI::ColorHelper::FromArgb(1);\n"
+)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        WINRT_H,
+        "enum struct Orientation : int {\n    Both = 0,\n};\n",
+        "enum class Mode { A, B };\n",
+        "auto p = static_cast<int*>(q);\nvoid* v = nullptr;\n",
+        "void f() noexcept;\n",
+        "#include <cstdint>\nint x;\n",
+        "struct S {\npublic:\n    int a;\n};\n",
+        "using Ptr = int*;\n",
+        "int a = ns::value;\n",
+    ],
+)
+def test_header_with_cpp_constructs_is_cpp_not_c(text):
+    assert language_from_path("x.h", text) == "cpp"
+    assert not check_label(snip(text, "c", "x.h")).ok
+    assert check_label(snip(text, "cpp", "x.h")).ok
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "#ifndef X_H\n#define X_H\n#ifdef __cplusplus\nextern \"C\" {\n#endif\nint f(void);\n"
+        "#ifdef __cplusplus\n}\n#endif\n#endif\n",  # C headers use extern "C" guards
+        "/* see Foo::bar for the C++ side */\nint f(void);\n",
+        "// Foo::bar is the C++ name\nint g(void);\n",
+        "#include <stdint.h>\n#include <string.h>\nstatic int class_id = 0;\nint h(int new);\n",
+        'printf("a");\n',
+    ],
+)
+def test_plain_c_headers_stay_c(text):
+    assert language_from_path("x.h", text) == "c"
+    assert check_label(snip(text, "c", "x.h")).ok
+    assert not check_label(snip(text, "cpp", "x.h")).ok
+
+
+def test_objective_c_header_is_not_c():
+    m = "#import <Foundation/Foundation.h>\n@interface Foo : NSObject\n@property int x;\n@end\n"
+    r = check_label(snip(m, "c", "x.h"))
+    assert not r.ok and "content looks like another language" in r.reasons
+    assert not check_label(snip("@implementation Foo\n@end\n", "c", "x.c")).ok

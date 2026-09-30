@@ -28,7 +28,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - Languages: all six stretch languages at once (14 in total).
 - Embedded code: HTML windows with more than 50% of lines in `<script>`/`<style>` leave the main data and go to a separate hard-examples file (reported on, never trained on).
 - Scale: staged, a ~3,000-snippet slice first, checked, then 10,000+.
-- Steps: B-S1 languages in code, B-S2 embedded-language policy, B-S3 collect and audit the slice, B-S4 check the slice, B-S5 full collection and dataset card v6, then rerun baselines and the TM on v6 (14 languages and the original 8).
+- Steps: B-S1 languages in code (done), B-S2 embedded-language policy (done), B-S3 collect and audit the slice (done: 2,807 snippets, see [issues-and-fixes](issues-and-fixes.md) D8), B-S4 check the slice, B-S5 full collection and dataset card v6, then rerun baselines and the TM on v6 (14 languages and the original 8).
 - Postponed: the wild test set (after M4). Kept in Future: short-snippet evaluation.
 
 - [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))

@@ -30,6 +30,11 @@ def _build_parser() -> argparse.ArgumentParser:
     gh.add_argument("--repos", type=int, default=25, help="repos per language")
     gh.add_argument("--per-repo", type=int, default=5, help="max snippets per repo")
     gh.add_argument("--min-stars", type=int, default=50)
+    gh.add_argument(
+        "--pages", type=int, default=1,
+        help="search result pages (100 repos each) read per star band; raise it for languages "
+        "with few permissive repos (default 1, the setting used for dataset v5)",
+    )  # fmt: skip
     gh.add_argument("--seed", type=int, default=0)
     gh.add_argument("--out", type=Path, default=Path("data/raw/github"))
     gh.add_argument("--cache", type=Path, default=Path("data/cache/github"))
@@ -617,12 +622,14 @@ def _collect_github(args: argparse.Namespace) -> int:
         "repos": args.repos,
         "per_repo": args.per_repo,
         "min_stars": args.min_stars,
+        "pages": args.pages,
         "seed": args.seed,
     }
     with client:
         for language in args.language or ALL_LANGUAGES:
             snippets, report = github.collect_language(
-                client, language, args.repos, args.per_repo, args.min_stars, args.seed
+                client, language, args.repos, args.per_repo, args.min_stars, args.seed,
+                pages=args.pages,
             )
             save_snippets(snippets, args.out / f"{language}.jsonl")
             args.hard_out.mkdir(parents=True, exist_ok=True)

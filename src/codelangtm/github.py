@@ -121,6 +121,8 @@ def _retry_wait(r: httpx.Response, attempt: int) -> float | None:
         if r.headers.get("X-RateLimit-Remaining") == "0":
             reset = float(r.headers.get("X-RateLimit-Reset", "0"))
             return max(reset - time.time(), 0.0) + 1.0
+        if r.status_code == 429:
+            return 60.0 * (attempt + 1)  # secondary rate limit without hints: back off
         return None  # plain 403 = permission problem; retrying will not help
     if r.status_code >= 500:
         return 2.0**attempt
@@ -225,21 +227,33 @@ def search_repos(
     limit: int,
     min_stars: int = 50,
     search_delay: float = 2.0,
+    pages: int = 1,
 ) -> list[Repo]:
-    """Permissively licensed, non-fork, non-archived repos, round-robin across star bands."""
+    """Permissively licensed, non-fork, non-archived repos, round-robin across star bands.
+
+    `pages` > 1 reads further result pages of every band (100 repos each; GitHub serves at most
+    1,000 per query): needed for languages with few permissive repos, such as SQL."""
     qualifier = SEARCH_LANGUAGE[language]
     per_band: list[list[Repo]] = []
     for band in star_buckets(min_stars):
         q = f'language:"{qualifier}" stars:{band} fork:false archived:false'
-        data = client.get_json("/search/repositories", {"q": q, "per_page": 100})
-        client.sleep(search_delay)  # search API allows 30 requests/minute
         repos = []
-        for item in data.get("items", []):
-            spdx = (item.get("license") or {}).get("spdx_id") or ""
-            if spdx.lower() in ALLOWED_LICENSES:
-                repos.append(
-                    Repo(item["full_name"], spdx, item["default_branch"], item["stargazers_count"])
-                )
+        for page in range(1, pages + 1):
+            params = {"q": q, "per_page": 100, **({"page": page} if page > 1 else {})}
+            data = client.get_json("/search/repositories", params)
+            client.sleep(search_delay)  # search API allows 30 requests/minute
+            items = data.get("items", [])
+            for item in items:
+                spdx = (item.get("license") or {}).get("spdx_id") or ""
+                if spdx.lower() in ALLOWED_LICENSES:
+                    repos.append(
+                        Repo(
+                            item["full_name"], spdx, item["default_branch"],
+                            item["stargazers_count"],
+                        )  # fmt: skip
+                    )
+            if len(items) < 100:  # last page of this band
+                break
         per_band.append(repos)
 
     out: list[Repo] = []
@@ -333,6 +347,7 @@ def collect_language(
     min_stars: int = 50,
     seed: int = 0,
     search_delay: float = 2.0,
+    pages: int = 1,
 ) -> tuple[list[Snippet], CollectReport]:
     if language not in SEARCH_LANGUAGE:
         raise ValueError(f"unsupported language: {language!r}")
@@ -341,7 +356,9 @@ def collect_language(
     snippets: list[Snippet] = []
     commits: dict[str, tuple[str, Repo]] = {}
 
-    for repo in search_repos(client, language, n_repos * 3, min_stars, search_delay):
+    for repo in search_repos(
+        client, language, n_repos * 3, min_stars, search_delay, pages
+    ):
         if len(commits) >= n_repos:
             break
         try:
