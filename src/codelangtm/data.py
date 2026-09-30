@@ -7,7 +7,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from . import LANGUAGES
+from . import ALL_LANGUAGES, LANGUAGES
 
 SOURCES = ("github", "the-stack", "codesearchnet", "wild")
 
@@ -46,6 +46,12 @@ class Snippet:
         return self.end_line - self.start_line + 1
 
 
+def languages_present(snippets: Iterable[Snippet]) -> tuple[str, ...]:
+    """The languages that occur in `snippets`, in the project's fixed order (core, then stretch)."""
+    seen = {s.language for s in snippets}
+    return tuple(lang for lang in ALL_LANGUAGES if lang in seen)
+
+
 def save_snippets(snippets: Iterable[Snippet], path: str | Path) -> int:
     n = 0
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -67,4 +73,11 @@ def load_snippets(path: str | Path, languages: tuple[str, ...] | None = None) ->
             yield s
 
 
-__all__ = ["LANGUAGES", "SOURCES", "Snippet", "load_snippets", "save_snippets"]
+__all__ = [
+    "LANGUAGES",
+    "SOURCES",
+    "Snippet",
+    "languages_present",
+    "load_snippets",
+    "save_snippets",
+]

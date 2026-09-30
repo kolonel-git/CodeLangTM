@@ -12,7 +12,6 @@ other languages fall into Python, each with a verdict rule stated before looking
 
 from __future__ import annotations
 
-import re
 import statistics
 from collections import Counter
 from collections.abc import Callable, Sequence
@@ -27,6 +26,7 @@ from . import LANGUAGES
 from .audit import load_dataset
 from .baselines import load_folds, make_models
 from .config import TMConfig, config_hash
+from .labels import embedded_share
 from .rules import _code, extract_rules, short_rule, show_term
 
 ERRORS_SCHEMA = "codelangtm.errors/1"
@@ -391,33 +391,6 @@ def sink_probes(oof: dict, sink: str, signature_df: dict | None = None) -> dict:
 def _sums(oof: dict, seed: str, i: int) -> list[int]:
     f, g = oof["tm_votes_for"][seed][i], oof["tm_votes_against"][seed][i]
     return [a - b for a, b in zip(f, g, strict=True)]
-
-
-EMBED_OPEN = re.compile(r"<(script|style)\b", re.IGNORECASE)
-EMBED_CLOSE = re.compile(r"</(script|style)\s*>", re.IGNORECASE)
-
-
-def embedded_share(text: str) -> float:
-    """Share of an HTML snippet's non-blank lines that sit inside <script> or <style> blocks.
-
-    A window can start inside a block: if a closing tag comes before any opening tag, the
-    lines before it count as inside. Tag lines themselves count as inside."""
-    lines = [line for line in text.splitlines() if line.strip()]
-    if not lines:
-        return 0.0
-    first_open = next((i for i, line in enumerate(lines) if EMBED_OPEN.search(line)), None)
-    first_close = next((i for i, line in enumerate(lines) if EMBED_CLOSE.search(line)), None)
-    inside = first_close is not None and (first_open is None or first_close < first_open)
-    count = 0
-    for line in lines:
-        opened, closed = EMBED_OPEN.search(line), EMBED_CLOSE.search(line)
-        if inside or opened:
-            count += 1
-        if closed and (not opened or closed.start() > opened.start()):
-            inside = False
-        elif opened:
-            inside = True
-    return count / len(lines)
 
 
 def embedded_probe(oof: dict, texts: dict[int, str], host: str = "html",

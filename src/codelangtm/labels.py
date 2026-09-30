@@ -43,9 +43,28 @@ _RED_FLAGS: dict[str, re.Pattern[str]] = {
         r"^\s*(#include\b|package\s+[\w.]+;|<\?php)|:\s*(string|number|boolean)\b\s*[,;)=]", re.M
     ),
     "cpp": re.compile(r"^\s*(def\s+\w+.*:\s*$|import\s+java\.|package\s+[\w.]+;|fn\s+\w+\()", re.M),
-    "java": re.compile(r"^\s*(#include\b|def\s+\w+.*:\s*$|fn\s+\w+\(|func\s+\w+\()", re.M),
+    "java": re.compile(
+        r"^\s*(#include\b|def\s+\w+.*:\s*$|fn\s+\w+\(|func\s+\w+\(|using\s+System\b)", re.M
+    ),
     "rust": re.compile(r"^\s*(#include\b|public\s+class\b|def\s+\w+.*:\s*$)", re.M),
     "go": re.compile(r"^\s*(#include\b|public\s+class\b|def\s+\w+.*:\s*$)", re.M),
+    # stretch set. A `.c` file with C++ constructs is C++ code in a C-looking file.
+    "c": re.compile(
+        r"^\s*(class\s+\w+|namespace\s+\w+|template\s*<|using\s+namespace\b"
+        r"|#include\s*<(iostream|vector|string|map|memory)>|def\s+\w+.*:\s*$|package\s+[\w.]+;)"
+        r"|\bstd::",
+        re.M,
+    ),
+    "csharp": re.compile(
+        r"^\s*(#include\b|package\s+[\w.]+;|import\s+java\.|def\s+\w+.*:\s*$|fn\s+\w+\()", re.M
+    ),
+    # `.ts` is also the extension of Qt translation files (XML) and video streams.
+    "typescript": re.compile(r"^\s*(#include\b|package\s+[\w.]+;|<\?php|<\?xml|<TS\b)", re.M),
+    "kotlin": re.compile(r"^\s*(#include\b|<\?php|def\s+\w+.*:\s*$|fn\s+\w+\()", re.M),
+    "php": re.compile(r"^\s*(#include\b|package\s+[\w.]+;|def\s+\w+.*:\s*$)", re.M),
+    "ruby": re.compile(
+        r"^\s*(package\s+[\w.]+;|public\s+class\b|<\?php|(int|void)\s+main\s*\()", re.M
+    ),
 }
 
 # A real HTML tag (`<div`, `</p`, `<my-el`) or `<!` (comment/doctype). The name must end in
@@ -53,8 +72,20 @@ _RED_FLAGS: dict[str, re.Pattern[str]] = {
 # so comparisons like `i < elements` or `a<b` do not count as tags.
 HTML_TAG = re.compile(r"(?<![\w)\]])</?[a-zA-Z][\w-]*(?:[\s>/]|$)|<!", re.M)
 
-# HTML windows that are mostly inline <script>/<style> code are really JavaScript/CSS.
+# Embedded-language policy (Stage B). A window that is mostly code of another language inside
+# a host language is not dropped and not trained on: it is a "hard example" kept in its own file.
+#   html: more than half the lines sit inside <script>/<style> blocks (really JavaScript/CSS);
+#   php:  more than half the lines carry an HTML tag (a template that happens to contain PHP).
+MAX_EMBEDDED_SHARE = 0.50
+EMBEDDED_HTML = "mostly embedded script/style"
+EMBEDDED_PHP = "mostly embedded markup"
+EMBEDDED_REASONS = frozenset({EMBEDDED_HTML, EMBEDDED_PHP})
+# An HTML window with almost no tags that is not embedded code is just text: dropped for good.
 MIN_MARKUP_SHARE = 0.20
+SPARSE_MARKUP = "too little markup"
+
+EMBED_OPEN = re.compile(r"<(script|style)\b", re.IGNORECASE)
+EMBED_CLOSE = re.compile(r"</(script|style)\s*>", re.IGNORECASE)
 
 # Content that must appear for the label to be believable.
 _REQUIRED: dict[str, re.Pattern[str]] = {
@@ -90,10 +121,38 @@ def markup_share(text: str) -> float:
     return sum(bool(HTML_TAG.search(ln)) for ln in lines) / len(lines) if lines else 0.0
 
 
+def embedded_share(text: str) -> float:
+    """Share of an HTML snippet's non-blank lines that sit inside <script> or <style> blocks.
+
+    A window can start inside a block: if a closing tag comes before any opening tag, the
+    lines before it count as inside. Tag lines themselves count as inside."""
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return 0.0
+    first_open = next((i for i, line in enumerate(lines) if EMBED_OPEN.search(line)), None)
+    first_close = next((i for i, line in enumerate(lines) if EMBED_CLOSE.search(line)), None)
+    inside = first_close is not None and (first_open is None or first_close < first_open)
+    count = 0
+    for line in lines:
+        opened, closed = EMBED_OPEN.search(line), EMBED_CLOSE.search(line)
+        if inside or opened:
+            count += 1
+        if closed and (not opened or closed.start() > opened.start()):
+            inside = False
+        elif opened:
+            inside = True
+    return count / len(lines)
+
+
 @dataclass(frozen=True)
 class LabelCheck:
     ok: bool
     reasons: tuple[str, ...] = ()
+
+    @property
+    def hard(self) -> bool:
+        """Rejected only because it is mostly embedded code: a hard example, not garbage."""
+        return bool(self.reasons) and set(self.reasons) <= EMBEDDED_REASONS
 
 
 def language_from_path(path: str, text: str = "") -> str | None:
@@ -126,8 +185,13 @@ def check_label(s: Snippet) -> LabelCheck:
     required = _REQUIRED.get(s.language)
     if required and not required.search(text):
         reasons.append("expected markers missing")
-    elif s.language == "html" and markup_share(text) < MIN_MARKUP_SHARE:
-        reasons.append("mostly embedded script/style")
+    elif s.language == "html":
+        if embedded_share(text) > MAX_EMBEDDED_SHARE:
+            reasons.append(EMBEDDED_HTML)
+        elif markup_share(text) < MIN_MARKUP_SHARE:
+            reasons.append(SPARSE_MARKUP)
+    elif s.language == "php" and markup_share(text) > MAX_EMBEDDED_SHARE:
+        reasons.append(EMBEDDED_PHP)
     if is_cut(text, s.language):
         reasons.append("cut comment or string")
     if s.language in TEMPLATE_LANGUAGES:
@@ -137,14 +201,20 @@ def check_label(s: Snippet) -> LabelCheck:
     return LabelCheck(not reasons, tuple(reasons))
 
 
-def filter_labels(snippets: Iterable[Snippet]) -> tuple[list[Snippet], Counter[str]]:
-    """Keep snippets whose labels pass; count why the rest were dropped."""
+def filter_labels(
+    snippets: Iterable[Snippet], hard: list[Snippet] | None = None
+) -> tuple[list[Snippet], Counter[str]]:
+    """Keep snippets whose labels pass; count why the rest were dropped.
+
+    With a `hard` list, mostly-embedded snippets are appended to it instead of being dropped."""
     kept: list[Snippet] = []
     dropped: Counter[str] = Counter()
     for s in snippets:
         result = check_label(s)
         if result.ok:
             kept.append(s)
+        elif hard is not None and result.hard:
+            hard.append(s)
         else:
             dropped.update(result.reasons)
     return kept, dropped

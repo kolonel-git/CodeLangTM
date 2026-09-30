@@ -14,9 +14,12 @@ Datasets are gitignored (`data/`). This file is the provenance ledger: every sou
    ```bash
    uv sync --extra tm --extra collect
    uv run codelangtm collect github --language python --repos 2 --per-repo 2   # smoke test
-   uv run codelangtm collect github                                            # Stage A: 8 languages
+   uv run codelangtm collect github                                            # all 14 languages (Stage B)
+   uv run codelangtm collect github --language python --language cpp ...      # Stage A: the 8 core ones only
    ```
 Outputs `data/raw/github/<language>.jsonl` (snippets) and `<language>.manifest.json` (repos, commit SHAs, licenses, drop counts). Downloads are cached in `data/cache/github/`, so interrupted runs resume. Add one summary row per run to the ledger below.
+
+Languages: the 8 core ones (python, cpp, java, javascript, rust, go, sql, html) and 6 stretch ones (c, csharp, typescript, kotlin, php, ruby). `.h` headers are sampled for both c and cpp and get their label from their content; `.jsx` and `.tsx` are not sampled (markup inside code), `.d.ts` and generated files (`.g.cs`, `.designer.cs`, `.pb.cc`, `_pb.rb`, ...) are skipped.
 
 Selection rules: MIT / Apache-2.0 / BSD licenses only; no forks or archived repos; repos spread across star bands (50-199, 200-999, 1000-4999, 5000+); vendored, generated, minified, tiny (< 400 B) and huge (> 200 KB) files skipped; one random 20-50 line window per file; every snippet passes the label check and dedup.
 
@@ -24,6 +27,8 @@ Selection rules: MIT / Apache-2.0 / BSD licenses only; no forks or archived repo
 ```bash
 uv run codelangtm data build   # reads data/raw/ recursively, writes data/processed/
 ```
+Mostly-embedded windows ("hard examples", see [issues-and-fixes](issues-and-fixes.md) D7) are written by the collector to `data/hard/github/<language>.jsonl` (`--hard-out`), never under `data/raw/`, and `data build` reads `data/hard/` if it exists (`--hard-source` to change). They end up in `data/processed/hard.jsonl`, are never part of train, test or the folds, and are used only to report how a model copes with them. Hard windows found in a raw file (as in v5) are moved there too.
+
 Wild snippets go in `data/raw/wild/*.jsonl` with `source: "wild"`. Outputs `train.jsonl`, `test.jsonl`, `wild.jsonl`, `folds.json` (CV fold per train snippet) and `dataset.json` (counts, drop reasons, parameters, SHA-256 of each file). The split is a stable hash-based per-language repo split (`--salt`, default `codelangtm-v1`): re-collecting one language does not move other languages' test repos.
 
 ## Auditing the dataset

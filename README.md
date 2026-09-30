@@ -48,7 +48,7 @@ uv run pytest
 Reproduce the pipeline (needs a read-only `GITHUB_TOKEN`, see [docs/data-sources.md](docs/data-sources.md)):
 
 ```bash
-uv run codelangtm collect github                                  # data/raw/
+uv run codelangtm collect github                                  # data/raw/ (all 14 languages; v5 used the 8 core)
 uv run codelangtm data build                                      # data/processed/
 uv run codelangtm baselines --config configs/baselines.yaml       # docs/results.md + .json
 uv run codelangtm ablate                                          # docs/ablations.md + .json

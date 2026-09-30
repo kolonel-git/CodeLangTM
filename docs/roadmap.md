@@ -41,8 +41,8 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Dataset audit: per-language stats, flags, manual sample review
 - [ ] *Stage B (postponed to after M4, decided 2026-09-29):* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
 - [x] **Stage A:** target 1,000 snippets (~125/language); reached 869 in v4 (SQL limited by available permissive repos)
-- [ ] *Stage B:* scale to 10,000+ and add stretch languages
-- [ ] *Stage B:* embedded-language policy beyond the 20%-markup rule: HTML windows that are mostly `<script>`/`<style>` (B6b: all out-of-fold HTML→JavaScript errors) and SQL inside other languages; decide relabel, drop or keep as hard examples
+- [ ] *Stage B:* scale to 10,000+ and add stretch languages (B-S1, done: the six stretch languages are supported by the collector, label checks and scanner; the collection itself is B-S3/B-S5)
+- [x] *Stage B (B-S2, done in code; takes effect with dataset v6):* embedded-language policy: HTML windows with more than 50% of lines inside `<script>`/`<style>` and PHP windows with more than 50% HTML-tag lines are set aside per window as evaluation-only hard examples (`hard.jsonl`), never trained on. SQL inside other languages is not covered (to be measured on the slice)
 - [x] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
 
 **Exit:** `codelangtm data build` reproduces the dataset from configs; no repo appears in both train and test; every row has a license.

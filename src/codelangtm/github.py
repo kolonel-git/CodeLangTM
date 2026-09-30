@@ -43,17 +43,33 @@ SEARCH_LANGUAGE = {
     "go": "Go",
     "sql": "SQL",
     "html": "HTML",
+    # stretch set
+    "c": "C",
+    "csharp": "C#",
+    "typescript": "TypeScript",
+    "kotlin": "Kotlin",
+    "php": "PHP",
+    "ruby": "Ruby",
 }
 
 SKIP_DIRS = frozenset({
     "vendor", "vendored", "node_modules", "third_party", "third-party", "thirdparty",
     "external", "deps", "dist", "build", "target", "out", "site-packages",
-    "__pycache__", "generated", "gen", ".git",
+    "__pycache__", "generated", "gen", ".git", "obj", "bin",
 })  # fmt: skip
-SKIP_SUFFIXES = (".min.js", ".min.css", ".pb.go", "_pb2.py", ".generated.cs", ".d.ts")
+SKIP_SUFFIXES = (
+    ".min.js", ".min.css", ".pb.go", "_pb2.py", ".generated.cs", ".d.ts",
+    ".g.cs", ".designer.cs", ".pb.cc", ".pb.h", "_pb.rb",
+)  # fmt: skip
+# Extensions the label check accepts but the collector does not sample: JSX/TSX mix markup into
+# the code (the embedded-language problem again), so they are left out of new collections.
+COLLECT_SKIP_EXTENSIONS = frozenset({".jsx", ".tsx"})
+# Headers are a large part of real C and C++; `language_from_path` decides each one by content.
+COLLECT_EXTRA_EXTENSIONS = {"c": frozenset({".h"}), "cpp": frozenset({".h"})}
 MIN_FILE_BYTES = 400
 MAX_FILE_BYTES = 200_000
 FILES_PER_SNIPPET = 3  # fetch budget per repo = per_repo * this
+WINDOW_TRIES = 3  # windows tried per file before giving up on it
 
 
 @dataclass(frozen=True)
@@ -73,11 +89,13 @@ class CollectReport:
     dropped: Counter[str] = field(default_factory=Counter)
     duplicates_removed: int = 0
     snippets: int = 0
+    hard_snippets: list[Snippet] = field(default_factory=list)  # mostly-embedded windows
 
     def to_dict(self) -> dict:
         return {
             "language": self.language,
             "snippets": self.snippets,
+            "hard_snippets": len(self.hard_snippets),
             "repos": self.repos,
             "repos_skipped": self.repos_skipped,
             "files_fetched": self.files_fetched,
@@ -90,7 +108,8 @@ class CollectReport:
         return (
             f"{self.language}: {self.snippets} snippets from {len(self.repos)} repos "
             f"({self.repos_skipped} repos skipped, {self.files_fetched} files fetched, "
-            f"{self.duplicates_removed} duplicates removed; dropped: {top})"
+            f"{self.duplicates_removed} duplicates removed; dropped: {top}; "
+            f"{len(self.hard_snippets)} hard examples set aside)"
         )
 
 
@@ -238,6 +257,7 @@ def search_repos(
 def candidate_files(tree: dict, language: str) -> list[str]:
     """Paths worth sampling: right extension, sane size, not vendored/generated/minified."""
     exts = {ext for ext, lang in EXTENSION_LANGUAGE.items() if lang == language}
+    exts = (exts - COLLECT_SKIP_EXTENSIONS) | COLLECT_EXTRA_EXTENSIONS.get(language, frozenset())
     out = []
     for entry in tree.get("tree", []):
         if entry.get("type") != "blob":
@@ -280,16 +300,26 @@ def collect_repo(
         if not windows:
             report.dropped["no usable window"] += 1
             continue
-        w = rng.choice(windows)
-        snippet = Snippet(
-            w.text, language, "github", repo.full_name, sha, path, repo.license,
-            w.start_line, w.end_line,
-        )  # fmt: skip
-        check = check_label(snippet)
-        if not check.ok:
-            report.dropped.update(check.reasons)
-            continue
-        out.append(snippet)
+        # Up to WINDOW_TRIES random windows per file: the first that passes goes to the dataset
+        # (one per file). A mostly-embedded window is kept aside as a hard example (at most one
+        # per file) and the next window is tried, so a mixed file still yields its good part.
+        rng.shuffle(windows)
+        hard_from_file = False
+        for w in windows[:WINDOW_TRIES]:
+            snippet = Snippet(
+                w.text, language, "github", repo.full_name, sha, path, repo.license,
+                w.start_line, w.end_line,
+            )  # fmt: skip
+            check = check_label(snippet)
+            if check.ok:
+                out.append(snippet)
+                break
+            if check.hard:
+                if not hard_from_file:
+                    report.hard_snippets.append(snippet)
+                    hard_from_file = True
+            else:
+                report.dropped.update(check.reasons)
         if len(out) >= per_repo:
             break
     return sha, out
@@ -329,6 +359,13 @@ def collect_language(
     kept, stats = dedup(snippets)
     report.duplicates_removed = stats.exact_removed + stats.near_removed
     report.snippets = len(kept)
+    # hard examples: from repos that gave usable data, deduplicated among themselves and
+    # against the kept snippets (a hard window is never a copy of a training snippet)
+    used = set(commits)
+    hard = [s for s in report.hard_snippets if s.repo in used]
+    hard_set = set(hard)
+    hard_kept, _ = dedup([*kept, *hard])
+    report.hard_snippets = [s for s in hard_kept if s in hard_set]
     per_repo_kept = Counter(s.repo for s in kept)
     report.repos = [
         {

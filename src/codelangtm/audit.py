@@ -12,8 +12,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
-from . import LANGUAGES
-from .data import Snippet, load_snippets
+from .data import Snippet, languages_present, load_snippets
 from .windows import _is_comment
 
 SPLITS = ("train", "test", "wild")
@@ -83,8 +82,9 @@ def load_dataset(data_dir: str | Path) -> dict[str, list[Snippet]]:
 
 
 def language_stats(
-    dataset: dict[str, list[Snippet]], languages: Sequence[str] = LANGUAGES
+    dataset: dict[str, list[Snippet]], languages: Sequence[str] | None = None
 ) -> dict[str, LanguageStats]:
+    languages = languages or languages_present(s for part in dataset.values() for s in part)
     out: dict[str, LanguageStats] = {}
     for lang in languages:
         items = [(split, s) for split, part in dataset.items() for s in part if s.language == lang]
@@ -140,8 +140,9 @@ def pick_samples(
     dataset: dict[str, list[Snippet]],
     n: int,
     seed: int = 0,
-    languages: Sequence[str] = LANGUAGES,
+    languages: Sequence[str] | None = None,
 ) -> dict[str, list[tuple[str, Snippet]]]:
+    languages = languages or languages_present(s for part in dataset.values() for s in part)
     rng = random.Random(seed)
     out = {}
     for lang in languages:
@@ -245,7 +246,7 @@ def run_audit(
     out: str | Path,
     n_samples: int = 10,
     seed: int = 0,
-    languages: Sequence[str] = LANGUAGES,
+    languages: Sequence[str] | None = None,
 ) -> tuple[dict[str, LanguageStats], list[str]]:
     dataset = load_dataset(data_dir)
     stats = language_stats(dataset, languages)

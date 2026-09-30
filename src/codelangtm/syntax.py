@@ -29,6 +29,11 @@ SYNTAX: dict[str, Syntax] = {
     "typescript": Syntax(("//",), _C_BLOCK, ('"', "'"), ("`",)),
     "go": Syntax(("//",), _C_BLOCK, ('"', "'"), ("`",)),
     "rust": Syntax(("//",), _C_BLOCK, ('"', "'")),
+    # C# verbatim strings (@"...") and Ruby/PHP heredocs can span lines but are not tracked
+    "csharp": Syntax(("//",), _C_BLOCK, ('"', "'"), ('"""',)),
+    "kotlin": Syntax(("//",), _C_BLOCK, ('"', "'"), ('"""',)),
+    "php": Syntax(("//", "#"), _C_BLOCK, ('"', "'")),
+    "ruby": Syntax(("#",), (("=begin", "=end"),), ('"', "'", "`")),
     "sql": Syntax(("--",), _C_BLOCK, ("'", '"')),
     "html": Syntax((), (("<!--", "-->"),)),  # quotes in HTML text are prose, not strings
 }
