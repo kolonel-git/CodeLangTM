@@ -125,6 +125,14 @@ v3/v4 audit: no flags; largest single repo <= 6% of any language; median windows
 
 ## Data quality
 
+### D10. The full v6 collection (B-S5): search drift, the JavaScript/TypeScript ceiling, and a rejected hypothesis
+- **Search drift breaks reproducibility.** The full run used the same seed and the same search settings as the slice a few hours earlier, yet only 1,000 of the 2,909 slice snippets reappear in v6: GitHub's search ranking changed in between, so different repos came first. Re-running the collection commands does not reproduce a dataset. Fix planned before the v6 experiments: `collect from-manifest`, refetching the exact repo, commit, path and line range listed in the manifests (they already hold repo and commit; the snippet files hold path and lines).
+- **Target missed by 10%:** 8,993 snippets instead of 10,000+. Every language reached 140 repos, but 305 repos gave fewer than 5 usable windows (no usable window 1,393 times). Accepted and stated in the card rather than redefined.
+- **The 14-language gap is two pairs, and more data does not close it.** Logistic regression on v6: JavaScript F1 0.70, TypeScript 0.75, C 0.84, C++ 0.85, every other language 0.97-1.00; Java/C#, still weak on the slice, are 0.98/0.99 with three times the data. Tripling the data moved the 14-language score only from 0.919 (slice) to 0.923 (v6).
+- **Why JavaScript/TypeScript cannot be fully separated:** about a third of TypeScript windows contain no TypeScript-specific syntax (66% do, by an approximate pattern), against 5% of JavaScript windows. The label is the file extension, so these windows are correctly labelled but undecidable from their text. For C/C++, 10% of C++ windows contain no C++-only construct.
+- **Hypothesis rejected:** I suggested that M=500 features is too few for 14 languages. On the slice, M=1000 gains +0.008 +/- 0.009 (within fold noise) and M=2000 nothing more; the gain is in C++, not JavaScript/TypeScript. Word tokens do not help either (+0.001).
+- **Consequence:** the 96% target, set for 8 languages, is out of reach on 14 languages for every model as long as the pair is scored as two classes. How to report this is an open point of the [analysis plan](analysis-plan-v6.md) (section 2), to be fixed before the TM runs on v6.
+
 ### D9. Model check of the Stage B slice (B-S4)
 - **Setup:** 2,909 snippets, 14 languages, 2,331 training snippets; `diagnose` (confident learning + shortcut probe) and the five baselines with the v5 protocol, on all 14 languages and on the original 8 (`--languages core`, same folds). Details and numbers: [PROGRESS.md](../PROGRESS.md).
 - **No shortcut features** were found; the test-file share of Ruby, Go and PHP (35-40%) does not show up among the top features.

@@ -5,6 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Docs: dataset card for the Stage B dataset v6 (`docs/dataset-card-v6.md`: 8,993 snippets, 14 languages, 1,960 repos), a draft analysis plan for the v6 experiments (`docs/analysis-plan-v6.md`), the independent review's flags as roadmap tasks, ledger rows for the slice and v6, and concepts (analysis plan, equivalence test, ambiguity ceiling, bootstrap over repositories, search drift).
 - Language selection for experiments (Stage B, B-S4): `languages:` in the baselines and ablations YAML configs and `--languages auto|core|all|python,go` on `baselines`, `ablate` and `diagnose`. `auto` (default) evaluates every language in the data, `core` the original 8 on the same CV folds (each snippet keeps its fold), `all` the 14; a requested language without data is an error, and the list is recorded in every report and JSON sidecar (`meta.languages`). `curves`, `tm-results`, `tm-train` and `errors` use `auto`. Helpers `resolve_languages`, `restrict_dataset`, `parse_language_spec` (`data.py`) and `load_evaluation_data` (`baselines.py`).
 - `collect github` searches SQL under its four GitHub language names (`SQL`, `TSQL`, `PLpgSQL`, `PLSQL`): the plain `SQL` class holds only about 70 repositories with 10+ stars. The manifest records `search_languages`.
 - `collect github --pages N`: read N result pages (100 repos each) per star band; default 1 (unchanged). Recorded in the manifest.

@@ -1,5 +1,7 @@
 # Dataset card: CodeLangTM Stage A (v5)
 
+> v5 is the dataset behind every report published so far. The Stage B dataset (v6, 14 languages, 8,993 snippets) is described in [dataset-card-v6.md](dataset-card-v6.md).
+
 Real-world source code windows labelled with their programming language, built to train and evaluate an interpretable Tsetlin Machine language identifier. Structure follows *Datasheets for Datasets* (Gebru et al.). How problems found along the way were fixed: [issues-and-fixes.md](issues-and-fixes.md).
 
 ## At a glance
