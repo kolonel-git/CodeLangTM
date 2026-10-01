@@ -2,7 +2,7 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-09-30
+**Last updated:** 2026-10-01
 **Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7, PR #7 merged; a Linux-only CI failure after the merge fixed in PR #8). Next: Stage B data (plan agreed 2026-09-29, see the done log), then M4
 **Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR #7 merged): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
 
@@ -11,7 +11,7 @@ Living tracker. Update after every work session. Planning detail lives in [docs/
 | Milestone | Status | Notes |
 | --- | --- | --- |
 | M0 Foundations | Done | Scaffold, CI, docs, roadmap |
-| M1 Data pipeline | Stage A done, Stage B planned | v5: 869 snippets, 196 repos, stable split; Stage B (14 languages, 10,000+ snippets, embedded-language policy) plan agreed 2026-09-29 |
+| M1 Data pipeline | Stage A done, Stage B collected | v5: 869 snippets, 196 repos, stable split; Stage B v6: 8,993 snippets, 14 languages, 1,960 repos ([card](docs/dataset-card-v6.md)); analysis plan in draft |
 | M2 Features & baselines | Done | Parts 1 and 2 merged (PR #5: configs, ablations, frozen features, resource metrics, faster binarization) |
 | M3 TM training | Done | Branch A merged (PR #6: report + figures); branch B merged (PR #7): B1-B7 (TM matches the baselines; resources; clause inspector; error analysis; report wrap-up) |
 | M4 Tuning & compression | Planned | |
@@ -44,10 +44,14 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
   - [x] B-S1 six stretch languages in the code (`feat/stage-b-data`; issues-and-fixes D6)
   - [x] B-S2 embedded-language policy (window-level hard examples; issues-and-fixes D7)
   - [x] B-S3 collect and build a ~3,000-snippet slice, audit it (2,807 snippets; findings and fixes: issues-and-fixes D8)
-  - [ ] B-S3 follow-up: re-collect c and cpp (labels fixed), sql with `--pages 3`, ruby with `--min-stars 50` (decision pending)
-  - [ ] B-S4 check the slice (diagnose, quick baselines, thin languages)
-  - [ ] B-S5 full collection (10,000+), dataset card v6, ledger
-  - [ ] Rerun baselines and the TM protocol on v6 (14 languages and the original 8)
+  - [x] B-S3 follow-up: c, cpp (labels fixed: 205/45 and 211/45) and ruby (standard star floor: unchanged 224/45) re-collected
+  - [x] B-S3 follow-up: sql re-collected under four GitHub language names at the standard star floor: 179 snippets from 45 repos (issues-and-fixes D8). **Slice final: 2,909 snippets, audit flags none**
+  - [x] B-S4 check the slice: language handling (option C), diagnose, shortcut probe, baselines on 14 languages and on the original 8 (issues-and-fixes M12, D9)
+  - [x] B-S5 full collection: **v6, 8,993 snippets** (target 10,000+ missed by 10%), [dataset card v6](docs/dataset-card-v6.md), ledger; baselines and diagnose on v6; ablations on the slice (issues-and-fixes D10)
+  - [x] Independent review of the study (2026-09-30): flags recorded in the [roadmap](docs/roadmap.md) (Review flags)
+  - [ ] Freeze the [v6 analysis plan](docs/analysis-plan-v6.md) (draft written 2026-10-01; open points marked [decide])
+  - [ ] `collect from-manifest` (exact refetch; v6 is not reproducible from search)
+  - [ ] Ablations on v6 (CV only), then baselines and the TM protocol on v6 under the plan (14 languages and the original 8)
 - Not in Stage B (decided 2026-09-29): wild test set (after M4), short-snippet evaluation (Future), The Stack / CodeSearchNet loaders (only if the GitHub collector cannot reach the target)
 
 ## Blockers / open questions
@@ -63,6 +67,35 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
 - Measured, no policy needed now: SQL-like lines make up 25% or more of 9 of 211 Python windows (4%) and of at most 1 window in every other non-SQL language; HTML tags make up over half the lines of 3 C#, 3 JavaScript, 1 Ruby and 1 Rust windows; Ruby and PHP heredocs cut by a window: about 2% of their windows; no C# verbatim-string cuts.
 - Hard examples: 96 HTML windows from 24 repos (median embedded share 0.81), 13 of them from one repo. Their repos are in train (84 windows) or test (13).
 - Test-file share (audit): Ruby 40%, Go 38%, PHP 35%, JavaScript 24%; as in Stage A (Go 40%) this is idiomatic, to be checked with the shortcut probe in B-S4.
+
+### 2026-10-01 — Stage B, B-S5: the full v6 collection, an independent review, and a draft analysis plan (`feat/stage-b-languages`)
+- Choices (start of step): 140 repos per language, at most 5 snippets per repo, `--pages 4`, the 50-star floor for every language; feature ablations on the slice in parallel (14 languages, CV only).
+- **Collected (user, three runs): 8,993 snippets from 1,960 repos (140 per language), plus 216 hard examples** (HTML 177, PHP 39). The 10,000+ target is missed by 10%: repos gave 4.6 snippets on average (1,655 gave 5, 95 gave 1). Train 7,202 / test 1,791 (1,568 / 392 repos, no overlap). Per language 466 (HTML) to 690 (Rust); largest repo 1% of its language (v5: up to 6%); no repo under two languages; 93 repos skipped (HTML 46, SQL 29). Details: [dataset-card-v6.md](docs/dataset-card-v6.md).
+- **Not a superset of the slice:** only 1,000 of 2,909 slice snippets reappear. I had said the first 45 repos per language would repeat; GitHub's search order drifts, so the full run is a fresh sample. Consequence: v6 is not reproducible from the collection commands (issues-and-fixes D10).
+- Audit: one flag (Ruby 44% test files). JavaScript/TypeScript: 66% of TypeScript windows contain TypeScript-style syntax, 5% of JavaScript windows do (approximate pattern). C/C++: 90% of C++ windows contain a C++-only construct, 0% of C windows. SQL dialect markers: PL/pgSQL 158, T-SQL 120, MySQL 46, PL/SQL 31, none 211.
+- **Ablations on the slice (14 languages, CV):** the frozen features (class-balanced, M=500, delimiters off) give logistic regression 0.919, Naive Bayes 0.906; the old frequency selection only 0.867 / 0.789. Class-balanced M=1000 vs M=500: +0.008 +/- 0.009 (logistic regression; within noise), M=2000 vs M=1000: -0.000. **My hypothesis (M=500 is too small for 14 languages) is not supported:** more vocabulary helps C++ (0.84 -> 0.89) but not JavaScript (0.68 -> 0.69) or TypeScript (0.74 -> 0.76).
+- **Baselines on v6** (CV / test / repeated test; the v6 test set is now scored once): 14 languages: logistic regression 0.923 / 0.927 / 0.924, random forest 0.923 / 0.930 / 0.925, linear SVM 0.908 / 0.910 / 0.914, Naive Bayes 0.904 / 0.911 / 0.903, decision tree 0.812 / 0.831 / 0.825. Original 8: logistic regression 0.978 / 0.989 / 0.974, random forest 0.974, linear SVM 0.972, Naive Bayes 0.958 (v5: Naive Bayes 0.963, logistic regression 0.953). Logistic regression per language (14): JavaScript 0.70, TypeScript 0.75, C 0.84, C++ 0.85, all others 0.97-1.00 (Java 0.98, C# 0.99: more data solved that pair); test confusions JavaScript -> TypeScript 31, TypeScript -> JavaScript 30, C -> C++ 20, C++ -> C 17.
+- **Diagnose on v6:** 390 of 7,202 candidates (5.4%): JavaScript/TypeScript 223, C/C++ 45; shortcut suspects none (Ruby's test files do not leak).
+- **Independent review** (asked by the user, 2026-09-30): critical flags are an unmeasured interpretability claim, "no significant difference" read as equivalence, decisions made after seeing data, no generalization test beyond GitHub windows, no external baseline; major flags: reproducibility, the JavaScript/TypeScript task definition, the hard-example effect on HTML, per-language uncertainty, targets set for 8 languages. Recorded as tasks in the [roadmap](docs/roadmap.md) (Review flags).
+- **Draft analysis plan** for the v6 experiments: [analysis-plan-v6.md](docs/analysis-plan-v6.md); open points marked [decide], to be settled before any TM run on v6. New concepts: analysis plan, equivalence test, ambiguity ceiling, bootstrap over repositories, search drift.
+- Tests unchanged (451; this step changed no code).
+
+### 2026-09-30 — Stage B, B-S4: language handling and the first model check on the slice (`feat/stage-b-slice`)
+- Choices (start of step): language handling **option C**: a `languages:` setting in the YAML configs plus `--languages auto|core|all|python,go` on `baselines`, `ablate` and `diagnose` (default `auto` = every language in the data). A requested language without data is an error; every report records the list. Slice checks run into `data/processed-slice/` (gitignored), not into `docs/`.
+- **Found while reading the code (issues-and-fixes M12):** my earlier statement that evaluation would stop on wider data was wrong: it would have reported 8 of 14 languages without saying so. Fixed: `evaluate_model` refuses datasets with unlisted languages, all experiment commands take their languages from the data (`auto`). **Regression check:** `baselines --config configs/baselines.yaml` on v5 gives identical scores, folds, confusion matrices and repeated splits as the published `docs/results.json`, and the same config hash. Tests 430 -> 451 (21 new in `tests/test_languages.py`).
+- **Diagnose on the slice (2,331 training snippets, 14 languages):** 109 label-issue candidates (4.7%): TypeScript -> JavaScript 35, JavaScript -> TypeScript 34, C++ -> C 9, C -> C++ 6, PHP -> JavaScript 4, the rest at most 2 each. **Shortcut suspects: none** (test-file idioms of Ruby, Go and PHP are not among the top features). The 40 candidates the review file lists: JS -> TS 16 (6 with real TS-like syntax such as Flow `import type`, 10 without), TS -> JS 8 (7 with real TypeScript syntax the model missed, 1 without any), 11 C/C++ mixes (C-like code in `.cc`/`.cpp` files, C++-like code in `.c`/`.h` files). Reading: these are hard windows whose labels come from the file extension, not wrong labels.
+- **Baselines, 5 models, same protocol as v5** (CV / test / repeated test): on **14 languages** logistic regression 0.919 +/- 0.004 / 0.919 / 0.919 +/- 0.005 (best), random forest 0.913 / 0.904 / 0.913, Naive Bayes 0.906 / 0.902 / 0.909, linear SVM 0.905 / 0.909 / 0.906, decision tree 0.763 / 0.773 / 0.765. On the **original 8 languages** of the same data (`--languages core`, same folds): logistic regression 0.970 / 0.978 / 0.972, linear SVM 0.969 / 0.971 / 0.971, random forest 0.962 / 0.972 / 0.963, Naive Bayes 0.955 / 0.969 / 0.963. For reference v5 (8 languages, 869 snippets): Naive Bayes 0.963 / 0.959 / 0.968, logistic regression 0.953 / 0.971 / 0.968; the slice snippets differ, so this is a comparison of data sizes, not an identical test.
+- **What it says:**
+  1. More data helps the original 8 (logistic regression CV 0.953 -> 0.970).
+  2. The 14-language score is 5 points lower, and the loss sits in three look-alike pairs. Logistic regression per-language F1: JavaScript 0.70 (0.95 in the 8-language run), TypeScript 0.79, C++ 0.85 (0.98), C 0.87, Java 0.91 (0.96), C# 0.93, Kotlin 0.93; Python, Rust, Go, SQL, HTML, PHP, Ruby 0.97-1.00. Test confusions: TypeScript -> JavaScript 10, JavaScript -> TypeScript 8, C++ -> C 5, C# -> Java 4, C -> C++ 3.
+  3. **The 96% target is not reached with the frozen features on 14 languages** (best 0.919). One untested cause: with class-balanced selection the fixed vocabulary of M=500 gives each language about 36 features instead of about 62. The feature ablation (M, n-grams, selection) has to be redone on the wider data, CV only, before the TM is tuned.
+- Slice checks are complete; decisions for B-S5 (full collection) are in the check-in below the hand-over.
+
+### 2026-09-30 — Stage B, B-S3 follow-up: reruns, and SQL's real cause
+- Reruns by the user (branch `feat/stage-b-slice`): `c` 205 snippets from 45 repos (19 dropped as C++/Objective-C content, 18 as `.h` files that are C++), `cpp` 211/45 (61 plain-C-looking `.h` dropped), `ruby` at `--min-stars 50` 224/45 (same as the star floor 10 run: the top-ranked repos coincide).
+- **SQL again 78 snippets from 21 repos with `--pages 3`: my pagination fix did not help.** Checked GitHub directly: the search class `SQL` holds only 71 repos with 10+ stars; most SQL repos are filed as `TSQL` (686 with 10-49 stars), `PLpgSQL` (645) or `PLSQL`. Fix: search all four names (same license and star rules); 135+ candidates at the standard floor of 50 stars, so SQL needs no lower floor any more. Manifest records `search_languages`. Tests 427 -> 430.
+- **SQL rerun (standard star floor, four names): 179 snippets from 45 repos** (11 repos skipped; dropped: template-heavy 52, no usable window 40, expected markers missing 29, minified or data 16). Slice rebuilt and re-audited: **2,909 snippets (train 2,331, test 578), 97 hard examples, audit flags: none**; SQL top repo share 3%, test-file share 12%, comment ratio 7%.
+- SQL by eye and by measurement: dialect markers in 37 windows T-SQL, 39 PL/pgSQL, 11 PL/SQL, 7 MySQL, 87 with none (generic); 12 windows carry template lines (at most 29% of lines each, below the 30% cut); 19 of 179 (11%) are dominated by INSERT/VALUES rows (the v5 finding M5, to be watched by the diagnose step); some `.sql` files are Oracle SQL*Plus scripts (`define`, `PROMPT`, `Rem`).
 
 ### 2026-09-30 — Stage B, B-S2: embedded-language policy (`feat/stage-b-data`)
 - Choices (start of step): hard examples are decided **per window, not per repository** (user: keep as much good data as possible). Threshold over 50% of lines inside `<script>`/`<style>` (HTML) or carrying HTML tags (PHP templates), agreed at the Stage B check-in.

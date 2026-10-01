@@ -22,9 +22,8 @@ from scipy import stats
 from sklearn.base import clone
 from sklearn.metrics import f1_score
 
-from . import LANGUAGES
-from .audit import load_dataset
-from .baselines import load_folds, make_models
+from . import ALL_LANGUAGES
+from .baselines import load_evaluation_data, make_models
 from .config import TMConfig, config_hash
 from .labels import embedded_share
 from .rules import _code, extract_rules, short_rule, show_term
@@ -57,10 +56,8 @@ def run_out_of_fold(
 
     say = progress or (lambda _: None)
     data_dir = Path(cfg.data)
-    train = load_dataset(data_dir)["train"]
-    folds = load_folds(data_dir)
-    if len(folds) != len(train):
-        raise ValueError("folds.json does not match train.jsonl; rebuild the dataset")
+    dataset, folds, _ = load_evaluation_data(data_dir)
+    train = dataset["train"]
     texts = [s.text for s in train]
     y = np.asarray([s.language for s in train])
     n = len(train)
@@ -446,8 +443,8 @@ def signature_document_frequency(signatures: dict, vocabulary: Sequence[str],
 
 def analyse(oof: dict, tm_results: dict | None = None, overlap: dict | None = None,
             signature_df: dict | None = None, texts: dict[int, str] | None = None,
-            languages: Sequence[str] = LANGUAGES) -> dict:  # fmt: skip
-    langs = [g for g in languages if g in oof["classes"]]
+            languages: Sequence[str] | None = None) -> dict:  # fmt: skip
+    langs = [g for g in (languages or ALL_LANGUAGES) if g in oof["classes"]]
     flows = inflow(oof)
     chance = 1 / (len(oof["classes"]) - 1)
     planned = None

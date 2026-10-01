@@ -19,7 +19,7 @@ Code snippet
 | Dataset build: stable repo split, CV folds, manifest | `build.py`, `splits.py` | `codelangtm data build` |
 | Dataset audit | `audit.py` | `codelangtm data audit` |
 | Features | `features.py` | |
-| Experiment configs (YAML) | `config.py`, `configs/*.yaml` | |
+| Experiment configs (YAML), language selection (`languages`: auto / core / all / list) | `config.py`, `data.py` (`resolve_languages`, `restrict_dataset`), `configs/*.yaml` | `--languages` on `baselines`, `ablate`, `diagnose` |
 | Classical baselines | `baselines.py` | `codelangtm baselines` |
 | Feature ablations | `ablations.py` | `codelangtm ablate` |
 | Label-issue and shortcut checks | `diagnostics.py` | `codelangtm diagnose` |

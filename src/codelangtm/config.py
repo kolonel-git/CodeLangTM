@@ -16,6 +16,7 @@ from typing import Any
 
 import yaml
 
+from .data import parse_language_spec
 from .features import SELECTIONS, Binarizer
 
 
@@ -47,6 +48,7 @@ class BaselinesConfig:
     seed: int = 0
     repeats: int = 10
     features: FeatureConfig = field(default_factory=FeatureConfig)
+    languages: str | tuple[str, ...] = "auto"  # auto | core | all | explicit names
 
     def with_overrides(self, **overrides: Any) -> BaselinesConfig:
         """Apply CLI overrides; `None` means "not given". `n_features` targets the feature block."""
@@ -56,6 +58,8 @@ class BaselinesConfig:
             cfg = replace(cfg, features=replace(cfg.features, n_features=given.pop("n_features")))
         if "models" in given:
             given["models"] = tuple(given["models"])
+        if "languages" in given:
+            given["languages"] = _language_spec("config.languages", given["languages"])
         return replace(cfg, **given)
 
 
@@ -63,6 +67,18 @@ def _check_keys(section: str, raw: dict, allowed: set[str]) -> None:
     unknown = set(raw) - allowed
     if unknown:
         raise ValueError(f"{section}: unknown key(s) {sorted(unknown)}; allowed: {sorted(allowed)}")
+
+
+def _language_spec(where: str, value: Any) -> str | tuple[str, ...]:
+    """`auto`, `core`, `all`, a comma-separated string or a list of language names."""
+    try:
+        if isinstance(value, str):
+            return parse_language_spec(value)
+        if isinstance(value, list | tuple) and value and all(isinstance(v, str) for v in value):
+            return tuple(value)
+    except ValueError as e:
+        raise ValueError(f"{where}: {e}") from e
+    raise ValueError(f"{where}: expected auto, core, all or a list of language names")
 
 
 def _int(section: str, key: str, value: Any, minimum: int) -> int:
@@ -120,6 +136,8 @@ def parse_baselines(raw: dict | None) -> BaselinesConfig:
         cfg = replace(cfg, seed=_int("config", "seed", raw["seed"], 0))
     if "repeats" in raw:
         cfg = replace(cfg, repeats=_int("config", "repeats", raw["repeats"], 0))
+    if "languages" in raw:
+        cfg = replace(cfg, languages=_language_spec("config.languages", raw["languages"]))
     return cfg
 
 
@@ -140,6 +158,7 @@ class AblationConfig:
     models: tuple[str, ...] = ("logistic_regression", "naive_bayes")
     base: FeatureConfig = field(default_factory=FeatureConfig)
     studies: tuple[Study, ...] = ()
+    languages: str | tuple[str, ...] = "auto"
 
     def feature_settings(self) -> list[FeatureConfig]:
         """Unique settings across all studies (base first), in first-seen order."""
@@ -184,6 +203,8 @@ def parse_ablations(raw: dict | None) -> AblationConfig:
         if not (isinstance(models, list) and models and all(isinstance(m, str) for m in models)):
             raise ValueError("config.models: expected a non-empty list of model names")
         cfg = replace(cfg, models=tuple(models))
+    if "languages" in raw:
+        cfg = replace(cfg, languages=_language_spec("config.languages", raw["languages"]))
     studies = raw.get("studies")
     if not isinstance(studies, dict) or not studies:
         raise ValueError("config.studies: expected a mapping of study name -> varied options")
@@ -354,5 +375,8 @@ def config_dict(cfg: Any) -> dict:
 
 def config_hash(cfg: Any) -> str:
     """Short SHA-256 of the effective settings; identical settings give identical hashes."""
-    blob = json.dumps(config_dict(cfg), sort_keys=True).encode("utf-8")
+    settings = config_dict(cfg)
+    if settings.get("languages") == "auto":  # the default: hashes of older runs stay valid
+        settings.pop("languages")
+    blob = json.dumps(settings, sort_keys=True).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()[:12]

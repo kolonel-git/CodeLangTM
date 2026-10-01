@@ -8,7 +8,7 @@ Tsetlin Machine (TMU) classifier that identifies a snippet's programming languag
 - `uv run ruff check .` — lint
 - `uv run codelangtm --version` — CLI
 - `uv run codelangtm collect github` / `data build` / `data audit` — dataset pipeline (see docs/data-sources.md); 14 languages (`ALL_LANGUAGES`), evaluation defaults still the 8 core (`LANGUAGES`) until v6; mostly-embedded windows go to `data/hard/` and `hard.jsonl` (evaluation only, never trained on)
-- `uv run codelangtm baselines --config configs/baselines.yaml` — classical baselines → docs/results.md + results.json (flags override the YAML)
+- `uv run codelangtm baselines --config configs/baselines.yaml` — classical baselines → docs/results.md + results.json (flags override the YAML); `--languages auto|core|all|python,go` (also on `diagnose` and `ablate`, or `languages:` in the YAML): default `auto` = every language in the data, `core` = the original 8 on the same folds; a language without data is an error, the list is recorded in every report
 - `uv run codelangtm diagnose` — confident-learning label issues + shortcut probe → data/processed/diagnostics.md
 - `uv run codelangtm ablate [--study NAME]` — feature ablations from configs/ablations.yaml → docs/ablations.md + ablations.json (CV only)
 - `uv run codelangtm tm-curve [--setting NAME]` — TM training curves on CV folds from configs/tm.yaml → docs/tm-curves.md + tm-curves.json (recommends `epochs`)

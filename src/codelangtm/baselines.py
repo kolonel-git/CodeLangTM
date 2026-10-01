@@ -31,6 +31,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 from . import LANGUAGES
 from .audit import load_dataset
+from .data import languages_present, resolve_languages, restrict_dataset
 from .features import Binarizer
 from .splits import SPLIT_SALT, check_no_leakage, stable_split
 
@@ -166,6 +167,33 @@ def load_folds(data_dir: str | Path) -> np.ndarray:
     return np.asarray(data["folds"])
 
 
+def load_evaluation_data(
+    data_dir: str | Path, languages: str | Sequence[str] | None = None
+) -> tuple[dict[str, list], np.ndarray, tuple[str, ...]]:
+    """(dataset, folds, languages) for an experiment. `languages` is a spec for
+    `resolve_languages` (None = every language in the data); the dataset and the CV folds are
+    restricted to the chosen languages, each snippet keeping its original fold."""
+    dataset = load_dataset(data_dir)
+    folds = load_folds(data_dir)
+    if len(folds) != len(dataset["train"]):
+        raise ValueError("folds.json does not match train.jsonl; rebuild the dataset")
+    present = languages_present(s for part in dataset.values() for s in part)
+    chosen = resolve_languages(languages, present)
+    dataset, folds = restrict_dataset(dataset, folds, chosen)
+    return dataset, folds, chosen
+
+
+def check_languages_covered(dataset: dict[str, list], languages: Sequence[str]) -> None:
+    """Refuse to score a dataset that has languages the report would silently leave out."""
+    extra = {s.language for part in dataset.values() for s in part} - set(languages)
+    if extra:
+        raise ValueError(
+            f"the dataset has language(s) {sorted(extra)} that are not in the evaluation list "
+            f"{list(languages)}; pass --languages (auto, core, all or a list) so that reports "
+            "cover exactly the languages you mean"
+        )
+
+
 def evaluate_model(
     name: str,
     model: object,
@@ -186,6 +214,7 @@ def evaluate_model(
     y_train = np.asarray([s.language for s in train])
     if len(folds) != len(train):
         raise ValueError("folds.json does not match train.jsonl; rebuild the dataset")
+    check_languages_covered(dataset, languages)
 
     cv = []
     for k in sorted(set(folds.tolist())):
@@ -246,14 +275,14 @@ def run_baselines(
     models: Sequence[str] | None = None,
     n_features: int = 500,
     seed: int = 0,
-    languages: Sequence[str] = LANGUAGES,
+    languages: str | Sequence[str] | None = None,
     repeats: int = 10,
     binarizer: Binarizer | None = None,
 ) -> tuple[list[ModelResult], dict]:
-    """`binarizer` (unfitted) sets all feature options; if omitted, `Binarizer(n_features)`."""
+    """`binarizer` (unfitted) sets all feature options; if omitted, `Binarizer(n_features)`.
+    `languages`: see `resolve_languages` (default: every language in the data)."""
     data_dir = Path(data_dir)
-    dataset = load_dataset(data_dir)
-    folds = load_folds(data_dir)
+    dataset, folds, languages = load_evaluation_data(data_dir, languages)
     available = make_models(seed)
     unknown = set(models or ()) - set(available)
     if unknown:
@@ -265,6 +294,7 @@ def run_baselines(
     ]
     meta = {
         **dataset_meta(data_dir, dataset, folds),
+        "languages": list(languages),
         "n_features": binarizer.n_features,
         "features": {**binarizer.get_params(), "ngram_sizes": list(binarizer.ngram_sizes)},
         "seed": seed,
@@ -371,9 +401,10 @@ def result_dict(r: ModelResult) -> dict:
 
 
 def results_json(
-    results: Sequence[ModelResult], meta: dict, languages: Sequence[str] = LANGUAGES
+    results: Sequence[ModelResult], meta: dict, languages: Sequence[str] | None = None
 ) -> dict:
     """Machine-readable twin of `render_results_md`: same runs, numbers kept to 6 decimals."""
+    languages = languages or meta.get("languages") or LANGUAGES
     return {
         "schema": RESULTS_SCHEMA,
         "meta": meta,
@@ -456,8 +487,9 @@ def _config_text(meta: dict) -> str:
 
 
 def render_results_md(
-    results: Sequence[ModelResult], meta: dict, languages: Sequence[str] = LANGUAGES
+    results: Sequence[ModelResult], meta: dict, languages: Sequence[str] | None = None
 ) -> str:
+    languages = languages or meta.get("languages") or LANGUAGES
     best = best_by_cv(results)
     files = ", ".join(f"`{k}` {v}" for k, v in meta["dataset_files"].items()) or "n/a"
     md = [
@@ -471,6 +503,7 @@ def render_results_md(
         f"- Config: {_config_text(meta)}",
         f"- Dataset: `{meta['data_dir']}` (train {meta['n_train']}, test {meta['n_test']}, "
         f"wild {meta['n_wild']}); SHA-256 prefixes: {files}",
+        f"- Languages ({len(languages)}): {', '.join(languages)}",
         f"- Features: {_features_text(meta)}, refit inside every fold",
         f"- Split: {_split_text(meta.get('split', {}))}",
         f"- Protocol: {meta['n_folds']}-fold repo-grouped CV on train (model selection), then "

@@ -17,9 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import LANGUAGES
-from .audit import load_dataset
-from .baselines import _macro_f1, dataset_meta, load_folds
+from .baselines import _macro_f1, dataset_meta, load_evaluation_data
 from .config import CurveConfig, TMConfig, TMSetting, config_dict, config_hash
 from .model import TMLanguageClassifier
 
@@ -93,17 +91,14 @@ def train_curve(setting: TMSetting, seed: int, fold: int, x_train: np.ndarray, y
 def run_curves(
     cfg: TMConfig,
     settings: Sequence[str] | None = None,
-    languages: Sequence[str] = LANGUAGES,
+    languages: str | Sequence[str] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> tuple[dict[str, list[CurveRun]], dict]:
     """Curves for the named settings (default: all), every fold x seed."""
     chosen = [cfg.setting(n) for n in settings] if settings else list(cfg.settings)
     data_dir = Path(cfg.data)
-    dataset = load_dataset(data_dir)
-    folds = load_folds(data_dir)
+    dataset, folds, languages = load_evaluation_data(data_dir, languages)
     train = dataset["train"]
-    if len(folds) != len(train):
-        raise ValueError("folds.json does not match train.jsonl; rebuild the dataset")
     texts = np.asarray([s.text for s in train], dtype=object)
     labels = np.asarray([s.language for s in train])
     classes = sorted(set(labels))
@@ -133,6 +128,7 @@ def run_curves(
         tmu_version = "unknown"
     meta = {
         **dataset_meta(data_dir, dataset, folds),
+        "languages": list(languages),
         "config_hash": config_hash(cfg),
         "seeds": list(cfg.seeds),
         "tmu": tmu_version,

@@ -20,8 +20,8 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 
-from .audit import _fence, load_dataset, permalink
-from .baselines import load_folds, make_models
+from .audit import _fence, permalink
+from .baselines import load_evaluation_data, make_models
 from .data import Snippet
 from .features import Binarizer
 
@@ -170,7 +170,8 @@ def render_diagnostics(
         "",
         f"Generated {meta['generated']} from `{meta['data_dir']}` (train only, "
         f"{len(train)} snippets), logistic regression, M={meta['n_features']}, seed "
-        f"{meta['seed']}. Regenerating overwrites this file.",
+        f"{meta['seed']}, {len(meta['languages'])} languages "
+        f"({', '.join(meta['languages'])}). Regenerating overwrites this file.",
         "",
         "## 1. Label-issue candidates (confident learning)",
         "",
@@ -257,12 +258,11 @@ def run_diagnostics(
     n_features: int = 500,
     seed: int = 0,
     top_k: int = 15,
+    languages: str | Sequence[str] | None = None,
 ) -> Diagnostics:
     data_dir = Path(data_dir)
-    train = load_dataset(data_dir)["train"]
-    folds = load_folds(data_dir)
-    if len(folds) != len(train):
-        raise ValueError("folds.json does not match train.jsonl; rebuild the dataset")
+    dataset, folds, languages = load_evaluation_data(data_dir, languages)
+    train = dataset["train"]
     probs, classes = oof_probabilities(train, folds, n_features, seed)
     joint, issues = confident_learning(train, probs, classes)
     probe = shortcut_probe(train, n_features, seed, top_k)
@@ -271,6 +271,7 @@ def run_diagnostics(
         "data_dir": str(data_dir),
         "n_features": n_features,
         "seed": seed,
+        "languages": list(languages),
     }
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -17,7 +17,7 @@ Datasets are gitignored (`data/`). This file is the provenance ledger: every sou
    uv run codelangtm collect github                                            # all 14 languages (Stage B)
    uv run codelangtm collect github --language python --language cpp ...      # Stage A: the 8 core ones only
    ```
-`--pages N` reads N result pages (100 repos each) per star band, for languages with few permissive repos (SQL); default 1.
+`--pages N` reads N result pages (100 repos each) per star band; default 1 (enough for every language so far). SQL is searched under four GitHub language names (`SQL`, `TSQL`, `PLpgSQL`, `PLSQL`), because GitHub files most repositories that are mainly `.sql` under a dialect name; the plain `SQL` class has only about 70 repositories with 10+ stars. The names searched are recorded in each manifest (`search_languages`).
 
 Outputs `data/raw/github/<language>.jsonl` (snippets) and `<language>.manifest.json` (repos, commit SHAs, licenses, drop counts). Downloads are cached in `data/cache/github/`, so interrupted runs resume. Add one summary row per run to the ledger below.
 
@@ -56,6 +56,9 @@ Prints per-language stats and quality flags (dominant repo > 10%, test files > 4
 | --- | --- | --- | --- | --- | --- | --- |
 | GitHub (Stage A v4) | https://github.com (search API) | MIT / Apache-2.0 / BSD per repo | python, cpp, java, javascript, rust, go, html | 792 from 175 repos | 2026-09-24 | 25 repos × <= 5 snippets, >= 50 stars; HTML re-collected for v4; repo list + commit SHAs in `data/raw/github/<lang>.manifest.json` |
 | GitHub (Stage A v4, SQL) | https://github.com (search API) | MIT / Apache-2.0 per repo | sql | 77 from 21 repos | 2026-09-24 | `--min-stars 10` (too few permissive SQL repos above 50 stars) |
+
+| GitHub (Stage B slice) | https://github.com (search API) | MIT / Apache-2.0 / BSD per repo | 14 languages | 2,909 from 630 repos | 2026-09-30 | 45 repos x <= 5 snippets, >= 50 stars (SQL first with 10, then four language names at 50); check slice only, `data/slice/` |
+| GitHub (Stage B v6) | https://github.com (search API) | MIT / Apache-2.0 / BSD per repo | 14 languages | 8,993 from 1,960 repos (+ 216 hard examples) | 2026-09-30 | 140 repos x <= 5 snippets, >= 50 stars for every language, `--pages 4`; manifests in `data/full/github/<lang>.manifest.json`; [dataset-card-v6.md](dataset-card-v6.md) |
 
 Dataset v5 uses the same v4 snippets; only the split changed (stable hash split), so there is no new collection row.
 

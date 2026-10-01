@@ -405,7 +405,7 @@ def test_search_pages_read_further_pages_until_a_short_page(tmp_path):
             token=TOKEN, cache_dir=tmp_path, sleep=lambda s: None,
             transport=httpx.MockTransport(handler),
         )  # fmt: skip
-        return gh.search_repos(client, "sql", limit=10_000, min_stars=10, pages=pages)
+        return gh.search_repos(client, "python", limit=10_000, min_stars=10, pages=pages)
 
     one = search(1)
     assert {p for _, p in seen_pages} == {1} and len(one) == 4 * 100
@@ -425,7 +425,7 @@ def test_search_stops_early_when_a_band_has_one_short_page(tmp_path):
         token=TOKEN, cache_dir=tmp_path, sleep=lambda s: None,
         transport=httpx.MockTransport(handler),
     )  # fmt: skip
-    gh.search_repos(client, "sql", limit=10, min_stars=10, pages=5)
+    gh.search_repos(client, "python", limit=10, min_stars=10, pages=5)
     assert len(calls) == 4 and set(calls) == {None}  # 4 bands, page 2 never requested
 
 
@@ -447,3 +447,51 @@ def test_cli_has_pages_option_and_records_it(tmp_path, monkeypatch):
     ]) == 0  # fmt: skip
     manifest = json.loads((out / "python.manifest.json").read_text(encoding="utf-8"))
     assert manifest["params"]["pages"] == 2
+
+
+def test_search_qualifiers_sql_uses_all_dialect_names():
+    assert gh.search_qualifiers("csharp") == ("C#",)
+    assert gh.search_qualifiers("sql") == ("SQL", "TSQL", "PLpgSQL", "PLSQL")
+    for language in gh.SEARCH_LANGUAGE:
+        assert all(isinstance(q, str) and q for q in gh.search_qualifiers(language))
+
+
+def test_sql_search_covers_every_name_and_band_and_merges_duplicates(tmp_path):
+    queries = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        q = request.url.params["q"]
+        queries.append(q)
+        name = q.split('language:"')[1].split('"')[0]
+        items = [repo_item("o/shared"), repo_item(f"o/{name}-{len(queries)}")]
+        return httpx.Response(200, json={"items": items})
+
+    client = gh.GitHubClient(
+        token=TOKEN, cache_dir=tmp_path, sleep=lambda s: None,
+        transport=httpx.MockTransport(handler),
+    )  # fmt: skip
+    repos = gh.search_repos(client, "sql", limit=1000, min_stars=10)
+    names = {q.split('language:"')[1].split('"')[0] for q in queries}
+    assert names == {"SQL", "TSQL", "PLpgSQL", "PLSQL"}
+    assert len(queries) == 4 * 4  # four names x four star bands (min_stars 10)
+    assert [r.full_name for r in repos].count("o/shared") == 1  # the same repo under 16 queries
+    assert {r.full_name.split("-")[0] for r in repos} >= {"o/TSQL", "o/PLpgSQL", "o/PLSQL", "o/SQL"}
+
+
+def test_manifest_records_the_search_languages(tmp_path, monkeypatch):
+    fake = make_fake()
+    real_client = gh.GitHubClient
+    monkeypatch.setattr(
+        gh, "GitHubClient",
+        lambda cache_dir: real_client(
+            token=TOKEN, cache_dir=cache_dir, transport=httpx.MockTransport(fake),
+            sleep=lambda s: None,
+        ),
+    )  # fmt: skip
+    out = tmp_path / "out"
+    assert main([
+        "collect", "github", "--language", "python", "--repos", "1", "--per-repo", "1",
+        "--out", str(out), "--hard-out", str(tmp_path / "hard"), "--cache", str(tmp_path / "c"),
+    ]) == 0  # fmt: skip
+    manifest = json.loads((out / "python.manifest.json").read_text(encoding="utf-8"))
+    assert manifest["search_languages"] == ["Python"]

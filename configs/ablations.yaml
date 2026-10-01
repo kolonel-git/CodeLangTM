@@ -8,6 +8,7 @@ data: data/processed
 out: docs/ablations.md
 seed: 0
 models: [logistic_regression, naive_bayes]   # first model drives the per-language tables
+languages: auto   # auto | core | all | [list]; see configs/baselines.yaml
 
 base:                    # current baseline features (configs/baselines.yaml)
   n_features: 500

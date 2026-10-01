@@ -28,7 +28,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - Languages: all six stretch languages at once (14 in total).
 - Embedded code: HTML windows with more than 50% of lines in `<script>`/`<style>` leave the main data and go to a separate hard-examples file (reported on, never trained on).
 - Scale: staged, a ~3,000-snippet slice first, checked, then 10,000+.
-- Steps: B-S1 languages in code (done), B-S2 embedded-language policy (done), B-S3 collect and audit the slice (done: 2,807 snippets, see [issues-and-fixes](issues-and-fixes.md) D8), B-S4 check the slice, B-S5 full collection and dataset card v6, then rerun baselines and the TM on v6 (14 languages and the original 8).
+- Steps: B-S1 languages in code (done), B-S2 embedded-language policy (done), B-S3 collect and audit the slice (done: 2,909 snippets, see [issues-and-fixes](issues-and-fixes.md) D8), B-S4 check the slice with models (done: [issues-and-fixes](issues-and-fixes.md) D9, M12), B-S5 full collection (done: v6, 8,993 snippets, [dataset-card-v6.md](dataset-card-v6.md), D10), B-S4 check the slice, B-S5 full collection and dataset card v6, then rerun baselines and the TM on v6 (14 languages and the original 8).
 - Postponed: the wild test set (after M4). Kept in Future: short-snippet evaluation.
 
 - [x] Define snippet record schema: `text`, `language`, `repo`, `commit`, `path`, `license`, `source`, `start_line`, `end_line` (see [data-sources.md](data-sources.md))
@@ -42,6 +42,7 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [ ] *Stage B (postponed to after M4, decided 2026-09-29):* wild test set from unseen sources (StackOverflow, blogs, official docs); license/attribution logged
 - [x] **Stage A:** target 1,000 snippets (~125/language); reached 869 in v4 (SQL limited by available permissive repos)
 - [ ] *Stage B:* scale to 10,000+ and add stretch languages (B-S1, done: the six stretch languages are supported by the collector, label checks and scanner; the collection itself is B-S3/B-S5)
+- [ ] *Stage B (found in B-S4):* rerun the feature ablations (`codelangtm ablate`, CV only) on the wider data before the TM is tuned: the frozen M=500 was chosen on 8 languages, and the best baseline on 14 languages reaches 0.919, not 0.96 ([issues-and-fixes](issues-and-fixes.md) D9)
 - [x] *Stage B (B-S2, done in code; takes effect with dataset v6):* embedded-language policy: HTML windows with more than 50% of lines inside `<script>`/`<style>` and PHP windows with more than 50% HTML-tag lines are set aside per window as evaluation-only hard examples (`hard.jsonl`), never trained on. SQL inside other languages is not covered (to be measured on the slice)
 - [x] Dataset card `docs/dataset-card.md`: counts, class balance, length distribution, known biases
 
@@ -97,6 +98,25 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Reported as measured, including where the TM loses: slower to train (~20×), one-snippet latency 0.34 ms in Python against the 0.1 ms target, a significant loss for the 100-clause setting, errors 35.6 per seed out of fold against Naive Bayes' 26 ([report](report.md) sections 7.2, 7.3, 7.5)
 - [x] Every learned clause inspectable: [clauses.md](clauses.md) + `clauses.json` (all 3,200, checked against the model)
 - [x] Any prediction traceable: `codelangtm explain`
+
+## Review flags (independent review, 2026-09-30)
+A blind review of the study at the end of Stage B collection. Each flag is a task; the [v6 analysis plan](analysis-plan-v6.md) covers the ones marked *plan*.
+
+Critical:
+- [ ] **Interpretability is claimed, not measured.** Define measures (explanation size for 90% of the vote margin, rule length, faithfulness) and report them for the TM *and* logistic regression, whose top weights are rules too (*plan* section 8; before M4 tuning).
+- [ ] **"No significant difference" is not equivalence.** Use an equivalence test with a margin fixed in advance; restate the v5 claim as "within about 1.2 points" ([report](report.md)) (*plan* section 6).
+- [ ] **Choices made after seeing data.** Freeze the analysis plan before any TM run on v6; log later changes as amendments (*plan*).
+- [ ] **No generalization beyond 20-50 line GitHub windows.** Short-snippet evaluation cut from the test repos (*plan* section 7) and a small wild set before the demo makes claims.
+- [ ] **No external baseline.** Guesslang (or GitHub Linguist's classifier) on the same test set (*plan* section 7).
+
+Major:
+- [ ] **Dataset not reproducible from commands** (search drift, [issues-and-fixes](issues-and-fixes.md) D10): `collect from-manifest`; the M1 exit criterion ("data build reproduces the dataset from configs") is not met for v6 until then.
+- [ ] **JavaScript/TypeScript task definition:** decide the framing (14 classes plus a pair-merged view and an ambiguity ceiling, recommended) (*plan* section 2).
+- [ ] **Hard examples make HTML easier:** report HTML with and without the policy; score hard examples only from test repos (41 of 216) (*plan* section 7).
+- [ ] **Uncertainty per language:** bootstrap over test repositories (*plan* section 6).
+- [ ] **Targets were set for 8 languages:** decide the 14-language targets before the results (*plan* section 3).
+
+Moderate: SQL is a mix of dialects (report errors per dialect); Ruby's 44% test files (no leak found so far; recheck after features change); popularity bias (50+ stars only); latency claims stay tied to the M6 benchmark.
 
 ## M4 — Tuning & compression
 **Goal:** best accuracy per byte and per rule. Runs on the Stage B dataset (after M3).

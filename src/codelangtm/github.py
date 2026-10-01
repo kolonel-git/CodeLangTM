@@ -15,7 +15,7 @@ import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from itertools import zip_longest
+from itertools import product, zip_longest
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
@@ -33,15 +33,18 @@ RAW = "https://raw.githubusercontent.com"
 
 ALLOWED_LICENSES = frozenset({"mit", "apache-2.0", "bsd-2-clause", "bsd-3-clause"})
 
-# Our label -> GitHub search `language:` qualifier.
-SEARCH_LANGUAGE = {
+# Our label -> GitHub search `language:` qualifier(s). GitHub files most repositories that are
+# mainly `.sql` under a dialect name (T-SQL, PL/pgSQL, PL/SQL); the plain "SQL" class holds only
+# about 70 repositories with 10+ stars, so SQL is searched under all four names (`.sql` files
+# from any of them are labelled sql; the extension check still applies to every file).
+SEARCH_LANGUAGE: dict[str, str | tuple[str, ...]] = {
     "python": "Python",
     "cpp": "C++",
     "java": "Java",
     "javascript": "JavaScript",
     "rust": "Rust",
     "go": "Go",
-    "sql": "SQL",
+    "sql": ("SQL", "TSQL", "PLpgSQL", "PLSQL"),
     "html": "HTML",
     # stretch set
     "c": "C",
@@ -221,6 +224,12 @@ def star_buckets(min_stars: int) -> list[str]:
     return [*bands, f">={edges[-1]}"]
 
 
+def search_qualifiers(language: str) -> tuple[str, ...]:
+    """GitHub `language:` names searched for one of our labels (usually just one)."""
+    names = SEARCH_LANGUAGE[language]
+    return (names,) if isinstance(names, str) else names
+
+
 def search_repos(
     client: GitHubClient,
     language: str,
@@ -233,9 +242,8 @@ def search_repos(
 
     `pages` > 1 reads further result pages of every band (100 repos each; GitHub serves at most
     1,000 per query): needed for languages with few permissive repos, such as SQL."""
-    qualifier = SEARCH_LANGUAGE[language]
-    per_band: list[list[Repo]] = []
-    for band in star_buckets(min_stars):
+    per_band: list[list[Repo]] = []  # one list per (search language, star band)
+    for qualifier, band in product(search_qualifiers(language), star_buckets(min_stars)):
         q = f'language:"{qualifier}" stars:{band} fork:false archived:false'
         repos = []
         for page in range(1, pages + 1):

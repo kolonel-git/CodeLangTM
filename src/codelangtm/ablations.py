@@ -18,8 +18,7 @@ from sklearn.base import clone
 from sklearn.metrics import f1_score
 
 from . import LANGUAGES
-from .audit import load_dataset
-from .baselines import _macro_f1, dataset_meta, load_folds, make_models
+from .baselines import _macro_f1, dataset_meta, load_evaluation_data, make_models
 from .config import AblationConfig, FeatureConfig, Study, config_dict, config_hash
 
 
@@ -114,7 +113,9 @@ def select_studies(cfg: AblationConfig, names: Sequence[str] | None) -> Ablation
 
 
 def run_ablations(
-    cfg: AblationConfig, languages: Sequence[str] = LANGUAGES, progress: object = None
+    cfg: AblationConfig,
+    languages: str | Sequence[str] | None = None,
+    progress: object = None,
 ) -> tuple[Runs, dict]:
     """Evaluate every unique feature setting once (base always included).
 
@@ -126,11 +127,10 @@ def run_ablations(
         raise ValueError(f"unknown model(s): {sorted(unknown)}")
 
     data_dir = Path(cfg.data)
-    dataset = load_dataset(data_dir)
-    folds = load_folds(data_dir)
+    dataset, folds, languages = load_evaluation_data(
+        data_dir, languages if languages is not None else cfg.languages
+    )
     train = dataset["train"]
-    if len(folds) != len(train):
-        raise ValueError("folds.json does not match train.jsonl; rebuild the dataset")
     texts = [s.text for s in train]
     labels = [s.language for s in train]
     models = {name: available[name] for name in cfg.models}
@@ -147,6 +147,7 @@ def run_ablations(
 
     meta = {
         **dataset_meta(data_dir, dataset, folds),
+        "languages": list(languages),
         "seed": cfg.seed,
         "config_hash": config_hash(cfg),
         "studies": [s.name for s in cfg.studies],
@@ -235,8 +236,9 @@ def language_table(
 
 
 def render_ablations_md(
-    cfg: AblationConfig, runs: Runs, meta: dict, languages: Sequence[str] = LANGUAGES
+    cfg: AblationConfig, runs: Runs, meta: dict, languages: Sequence[str] | None = None
 ) -> str:
+    languages = languages or meta.get("languages") or LANGUAGES
     files = ", ".join(f"`{k}` {v}" for k, v in meta["dataset_files"].items()) or "n/a"
     primary = cfg.models[0]
     config_path = meta.get("config_path")
@@ -282,13 +284,14 @@ ABLATIONS_SCHEMA = "codelangtm.ablations/1"
 
 
 def ablations_json(
-    cfg: AblationConfig, runs: Runs, meta: dict, languages: Sequence[str] = LANGUAGES
+    cfg: AblationConfig, runs: Runs, meta: dict, languages: Sequence[str] | None = None
 ) -> dict:
     """Machine-readable twin of `render_ablations_md`.
 
     Each unique setting appears once (`settings`, base first, id = position); studies refer to
     settings by id. Vocabulary size and binarize time are per setting (shared by all models).
     """
+    languages = languages or meta.get("languages") or LANGUAGES
     settings = cfg.feature_settings()
     ids = {features: i for i, features in enumerate(settings)}
     out_settings = []
