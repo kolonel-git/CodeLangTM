@@ -69,18 +69,19 @@ uv run codelangtm explain --file my_snippet.rs                    # votes per la
 
 ## Status
 
-Pre-alpha. **Read the [report](docs/report.md)** for the results so far, with figures; new to Tsetlin Machines or the evaluation terms? Start with the [concepts guide](docs/concepts.md). Full plan in [docs/roadmap.md](docs/roadmap.md).
+Pre-alpha, heading for **v1.0.0**: the definition of "done" is in the [roadmap](docs/roadmap.md) (*Definition of done for v1.0*); a data-efficiency study (how little training data is enough) follows as M8. **Read the [report](docs/report.md)** for the results so far, with figures; new to Tsetlin Machines or the evaluation terms? Start with the [concepts guide](docs/concepts.md). Full plan in [docs/roadmap.md](docs/roadmap.md).
 
 | Milestone | Status |
 | --- | --- |
 | M0 Foundations | done |
-| M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)); Stage B collected: v6, 8,993 snippets, 14 languages, 1,960 repos ([dataset card v6](docs/dataset-card-v6.md)); experiments on v6 follow a frozen [analysis plan](docs/analysis-plan-v6.md) (draft) |
+| M1 Data pipeline | Stage A done: 869 snippets, 8 languages, 196 repos ([dataset card](docs/dataset-card.md)); Stage B collected: v6, 8,993 snippets, 14 languages, 1,960 repos ([dataset card v6](docs/dataset-card-v6.md)); experiments on v6 follow the [analysis plan](docs/analysis-plan-v6.md), frozen 2026-10-20 (13 classes: JavaScript and TypeScript merged; equivalence margin one F1 point) |
 | M2 Features & baselines | done: best baseline CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)), thanks to label-aware feature selection ([ablations](docs/ablations.md)) |
 | M3 TM training | done (PRs #7 and #8): the 400-clause TM matches the best baselines (repeated test macro-F1 0.966 vs Naive Bayes 0.968, no significant difference; 164 KB model) ([report](docs/report.md), key findings and section 7); every clause readable as a rule and every prediction traceable ([clauses](docs/clauses.md)); errors studied out of fold ([errors](docs/errors.md)). Next: Stage B data, then M4 |
-| M4 Tuning & compression | planned |
+| M4 Tuning & compression | planned (v1.0: clause sweep and smallest model within one point) |
 | M5 Explainability | planned |
-| M6 Deployment & benchmarks | planned |
-| M7 Showcase & release | planned |
+| M6 Deployment & benchmarks | planned (v1.0: C runtime, `predict` CLI, benchmark, simple web demo) |
+| M7 Showcase & release | planned (tag `v1.0.0`) |
+| M8 Data efficiency | after v1.0: how little training data is enough ([plan](docs/analysis-plan-v6.md), section 10) |
 
 ## License
 

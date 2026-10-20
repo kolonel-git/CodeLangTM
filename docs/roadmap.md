@@ -99,27 +99,46 @@ Languages: 8 core (Python, C++, Java, JavaScript, Rust, Go, SQL, HTML). Stretch 
 - [x] Every learned clause inspectable: [clauses.md](clauses.md) + `clauses.json` (all 3,200, checked against the model)
 - [x] Any prediction traceable: `codelangtm explain`
 
+## Definition of done for v1.0 (decided 2026-10-20)
+**The project is "complete" (tag `v1.0.0`) when it answers its first question honestly: can a readable Tsetlin Machine identify a snippet's language as accurately as standard classifiers, and stay small and fast?** The data-efficiency question (how little data is enough) comes next as M8 and is *not* part of v1.0. Scope is deliberately lean; everything else is listed under "After v1.0".
+
+Steps, in order (each ends with a check-in and a PR):
+1. [x] **Freeze the analysis plan** ([analysis-plan-v6.md](analysis-plan-v6.md), 2026-10-20): 13 classes (JavaScript+TypeScript merged), margin of one F1 point, TM at 400 and 800 clauses, short snippets and interpretability measures in scope.
+2. [ ] **Class-merge option** (`merge:` in the configs, `--merge`), recorded in every report; folds unchanged.
+3. [ ] **`collect from-manifest`**: refetch exactly the v6 data and match the four hashes of the plan.
+4. [ ] **Feature check on v6** (CV only, selection rule of the plan), then **baselines** on the 13 classes, the original 8 and the 14-class view.
+5. [ ] **TM on v6**: training curves, then the full protocol at 400 and 800 clauses over 5 seeds; **equivalence test** against the best baseline (Holm over the 13-class and core-8 comparisons); bootstrap over test repos.
+6. [ ] **Clause sweep** (50-800 clauses, CV only): most accurate model and the smallest within one point.
+7. [ ] **Interpretability measures** for the TM and logistic regression (explanation size for 90% of the margin, rule length, faithfulness) and **short-snippet evaluation** (1/3/5/10 lines cut from the test repos).
+8. [ ] **C runtime** (`export_c`), equality with the Python predictions on the whole test set, `codelangtm predict`, **benchmark** against < 0.1 ms and < 500 KB.
+9. [ ] **Simple web demo**: a static page that loads the JSON model, predicts in JavaScript and shows the votes and the clauses that fired.
+10. [ ] **Finish**: README and [report.md](report.md) with the v6 results (restate the v5 "matches" claim as "within about 1.2 points"), limitations, CHANGELOG, tag `v1.0.0`.
+
+**After v1.0:** M8 data efficiency (below), Guesslang as an external baseline, a wild test set, the full s/T/N_c grid and Optuna, the HTML explanation report and rule gallery, a demo notebook, the blog post and research write-up.
+
 ## Review flags (independent review, 2026-09-30)
-A blind review of the study at the end of Stage B collection. Each flag is a task; the [v6 analysis plan](analysis-plan-v6.md) covers the ones marked *plan*.
+A blind review of the study at the end of Stage B collection. Each flag is a task; the [v6 analysis plan](analysis-plan-v6.md) covers the ones marked *plan*. Flags not covered by the v1.0 steps above are marked *after v1.0*.
 
 Critical:
-- [ ] **Interpretability is claimed, not measured.** Define measures (explanation size for 90% of the vote margin, rule length, faithfulness) and report them for the TM *and* logistic regression, whose top weights are rules too (*plan* section 8; before M4 tuning).
-- [ ] **"No significant difference" is not equivalence.** Use an equivalence test with a margin fixed in advance; restate the v5 claim as "within about 1.2 points" ([report](report.md)) (*plan* section 6).
-- [ ] **Choices made after seeing data.** Freeze the analysis plan before any TM run on v6; log later changes as amendments (*plan*).
-- [ ] **No generalization beyond 20-50 line GitHub windows.** Short-snippet evaluation cut from the test repos (*plan* section 7) and a small wild set before the demo makes claims.
-- [ ] **No external baseline.** Guesslang (or GitHub Linguist's classifier) on the same test set (*plan* section 7).
+- [ ] **Interpretability is claimed, not measured.** Define measures (explanation size for 90% of the vote margin, rule length, faithfulness) and report them for the TM *and* logistic regression, whose top weights are rules too (*plan* section 8; v1.0 step 7).
+- [ ] **"No significant difference" is not equivalence.** Use an equivalence test with a margin fixed in advance; restate the v5 claim as "within about 1.2 points" ([report](report.md)) (*plan* section 6; v1.0 steps 5 and 10).
+- [x] **Choices made after seeing data.** Analysis plan frozen on 2026-10-20 before any TM run on v6; later changes are logged as amendments (*plan*).
+- [ ] **No generalization beyond 20-50 line GitHub windows.** Short-snippet evaluation cut from the test repos is in v1.0 (*plan* section 7, step 7); the wild set is *after v1.0*.
+- [ ] **No external baseline.** Guesslang (or GitHub Linguist's classifier) on the same test set: *after v1.0*.
 
 Major:
-- [ ] **Dataset not reproducible from commands** (search drift, [issues-and-fixes](issues-and-fixes.md) D10): `collect from-manifest`; the M1 exit criterion ("data build reproduces the dataset from configs") is not met for v6 until then.
-- [ ] **JavaScript/TypeScript task definition:** decide the framing (14 classes plus a pair-merged view and an ambiguity ceiling, recommended) (*plan* section 2).
+- [ ] **Dataset not reproducible from commands** (search drift, [issues-and-fixes](issues-and-fixes.md) D10): `collect from-manifest` (v1.0 step 3); the M1 exit criterion ("data build reproduces the dataset from configs") is not met for v6 until then.
+- [x] **JavaScript/TypeScript task definition:** decided 2026-10-20: merge into one class for the primary 13-class analysis, 14-class score and ceiling still reported (*plan* section 2; amendment-log entry).
 - [ ] **Hard examples make HTML easier:** report HTML with and without the policy; score hard examples only from test repos (41 of 216) (*plan* section 7).
 - [ ] **Uncertainty per language:** bootstrap over test repositories (*plan* section 6).
-- [ ] **Targets were set for 8 languages:** decide the 14-language targets before the results (*plan* section 3).
+- [x] **Targets were set for 8 languages:** decided 2026-10-20: 96% for the original 8; on the 13 classes the TM must be equivalent to the best baseline (*plan* section 3).
 
 Moderate: SQL is a mix of dialects (report errors per dialect); Ruby's 44% test files (no leak found so far; recheck after features change); popularity bias (50+ stars only); latency claims stay tied to the M6 benchmark.
 
 ## M4 — Tuning & compression
 **Goal:** best accuracy per byte and per rule. Runs on the Stage B dataset (after M3).
+
+**Scope for v1.0 (decided 2026-10-20):** only the clause sweep and the smallest model within one point (v1.0 step 6); the grid over s and T, Optuna, literal budgets and trade-off surfaces move to *after v1.0*.
 
 - [ ] Grid search over s, T, N_c; heatmaps saved to `docs/figures/`
 - [ ] Optuna refinement: epochs, drop-clause rate, literal budget (seeded)
@@ -134,6 +153,8 @@ Moderate: SQL is a mix of dialects (report errors per dialect); Ruby's 44% test 
 
 ## M5 — Explainability
 **Goal:** make the interpretability claim demonstrable.
+
+**Scope for v1.0 (decided 2026-10-20):** the interpretability measures (v1.0 step 7), `predict --explain` (with the CLI in M6) and the rule-quality numbers; the HTML report and the rule gallery move to *after v1.0*.
 
 Rule extraction, per-prediction explanation and the per-language gallery move into M3 (B6, clause inspector). M5 keeps what builds on them: rule quality on the test set, the HTML report and a polished `predict --explain`.
 
@@ -154,19 +175,34 @@ Rule extraction, per-prediction explanation and the per-language gallery move in
 - [ ] Sparse clause evaluation: check only each clause's included literals (the NumPy version reads a dense 500 × 3,200 matrix, 0.34 ms per snippet in B5)
 - [ ] Benchmark script: latency per snippet (median, p95) and compiled model size, including the bit-packed clause size (moved from M3 B5)
 - [ ] Results vs targets in README (< 0.1 ms, < 500 KB), reported as measured
-- [ ] Web demo: paste code, see the prediction, the votes and the clauses that fired. Technology decided later (options: static page with JavaScript inference, WebAssembly from the C runtime, or a hosted Python app); until then the saved model format stays portable and documented
+- [ ] Web demo (in v1.0, decided 2026-10-20): a simple static page that loads the JSON model, predicts in JavaScript and shows the votes and the clauses that fired; no server. WebAssembly from the C runtime is *after v1.0*
 
 **Exit:** C runtime builds with a plain compiler; benchmarks reproducible.
 
 ## M7 — Showcase & release
+**For v1.0 (decided 2026-10-20):** README results table with figures and rule examples, report updated with the v6 results and limitations, CHANGELOG, tag **`v1.0.0`** (not `v0.1.0`).
+
 - [ ] README: results table, figures, rule examples
-- [ ] Demo notebook (`notebooks/demo.ipynb`)
-- [ ] Write-up / blog post: method, ablations, findings, limitations
-- [ ] Research write-up (later): paper-style version of the report, built on the saved multi-seed runs
-- [ ] Tag `v0.1.0`, update CHANGELOG
+- [ ] Tag `v1.0.0`, update CHANGELOG
+- [ ] *After v1.0:* demo notebook (`notebooks/demo.ipynb`)
+- [ ] *After v1.0:* write-up / blog post: method, ablations, findings, limitations
+- [ ] *After v1.0:* research write-up: paper-style version of the report, built on the saved multi-seed runs
+
+## M8 — Data efficiency (after v1.0)
+**Goal (maintainer, 2026-10-20):** find how little training data the TM needs to train quickly, classify accurately and form stable clauses and signatures, and where more data stops paying off. Pre-registered in [analysis-plan-v6.md](analysis-plan-v6.md) section 10.
+
+- [ ] Learning curve: 1, 2, 4, 8, 16, 32, 64 and all training repos per language (whole repos sampled, vocabulary reselected per subset, same held-out folds, several draws x 5 folds x 3 seeds); TM, Naive Bayes and logistic regression; 13 classes and the original 8
+- [ ] Per size: macro-F1 (overall and per language), fit time, epochs until the TM levels off, clause statistics, model size
+- [ ] "Enough data" point n\*: smallest size within 0.010 macro-F1 of the model's own full-data score and staying there
+- [ ] Signatures: smallest size at which the subset model's signature n-grams agree with the full-data models as much as two full-data seeds agree with each other
+- [ ] Compare the TM's n\* with the baselines'; F1 at 10 and 50 snippets per language; test set scored once at the end
+- [ ] Report `docs/data-efficiency.md` + JSON sidecar + figures
+
+**Exit:** a curve per model with its n\*, and a plain-language answer to "how little data is enough".
 
 ## Future
-- Short-snippet evaluation: accuracy on 1-10 line snippets (collect or cut short windows from the same repos, report F1 by snippet length). Skipped in M3 by decision; the current dataset only has 20-50 line windows ([dataset card](dataset-card.md), Known limitations)
+- Short-snippet evaluation on newly *collected* short snippets (v1.0 cuts short windows from the test repos instead, see step 7); skipped in M3 by decision ([dataset card](dataset-card.md), Known limitations)
+- Guesslang as an external baseline, a wild test set, Optuna and the s/T/N_c grid (see *After v1.0* above)
 - Relational TM over ASTs (Horn clauses)
 - Convolutional TM over 2D code layout
 - VS Code extension
