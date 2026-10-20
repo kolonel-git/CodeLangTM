@@ -29,8 +29,9 @@ from .baselines import (
     _macro_f1,
     dataset_meta,
     evaluate_model,
-    load_evaluation_data,
+    load_view,
     make_models,
+    merge_lines,
     result_dict,
 )
 from .config import TMConfig, config_dict, config_hash
@@ -143,16 +144,23 @@ def run_tm_results(
     languages: str | Sequence[str] | None = None,
     models_dir: str | Path | None = "models",
     progress: Callable[[str], None] | None = None,
+    merge: str | Sequence[str] | None = None,
 ) -> tuple[list[ModelResult], list[TMEntry], dict]:
-    """Baselines once, then every TM setting x seed through the identical protocol."""
+    """Baselines once, then every TM setting x seed through the identical protocol.
+    `languages` and `merge` default to the config's."""
     say = progress or (lambda _m: None)
     chosen = [cfg.setting(n) for n in settings] if settings else list(cfg.settings)
     data_dir = Path(cfg.data)
-    dataset, folds, languages = load_evaluation_data(data_dir, languages)
+    view = load_view(
+        data_dir,
+        languages if languages is not None else cfg.languages,
+        merge if merge is not None else cfg.merge,
+    )
+    dataset, folds, languages = view.dataset, view.folds, view.classes
     binarizer = cfg.features.binarizer()
     meta = {
         **dataset_meta(data_dir, dataset, folds),
-        "languages": list(languages),
+        **view.meta(),
         "config_hash": config_hash(cfg),
         "seeds": list(cfg.seeds),
         "repeats": cfg.repeats,
@@ -189,6 +197,7 @@ def run_tm_results(
             model_meta = {
                 "setting": setting.name, "seed": seed, "config_hash": meta["config_hash"],
                 "dataset_files": meta["dataset_files"], "trained_on": "train (all folds)",
+                "languages": list(view.languages), "merge": list(view.merge.presets),
             }  # fmt: skip
             path = None
             if models_dir is not None:
@@ -270,7 +279,8 @@ def train_final(cfg: TMConfig, setting: str, seed: int, out: str | Path) -> dict
     Returns a summary; the test score is printed for information only, not used for choices."""
     s = cfg.setting(setting)
     data_dir = Path(cfg.data)
-    dataset, folds, _ = load_evaluation_data(data_dir)
+    view = load_view(data_dir, cfg.languages, cfg.merge)
+    dataset, folds = view.dataset, view.folds
     meta = dataset_meta(data_dir, dataset, folds)
     train, test = dataset["train"], dataset["test"]
     binarizer = cfg.features.binarizer()
@@ -285,6 +295,7 @@ def train_final(cfg: TMConfig, setting: str, seed: int, out: str | Path) -> dict
     model_meta = {
         "setting": setting, "seed": seed, "config_hash": config_hash(cfg),
         "dataset_files": meta["dataset_files"], "trained_on": "train (all folds)",
+        "languages": list(view.languages), "merge": list(view.merge.presets),
     }  # fmt: skip
     path = save_pipeline(out, pipe, model_meta)
     y_test = np.asarray([t.language for t in test])
@@ -387,6 +398,7 @@ def render_tm_results_md(data: dict) -> str:
         f"(settings hash `{meta['config_hash']}`)",
         f"- Dataset: `{meta['data_dir']}` (train {meta['n_train']}, test {meta['n_test']}); "
         f"SHA-256 prefixes: {files}",
+        *merge_lines(meta),
         "- Protocol (identical code for every model, `baselines.evaluate_model`): "
         f"{meta['n_folds']}-fold repo-grouped CV on train; one fit on all of train scored once on "
         f"test; {meta['repeats']} repeated balanced repo-level splits of train + test. "

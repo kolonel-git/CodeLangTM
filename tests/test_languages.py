@@ -206,7 +206,7 @@ def test_cli_override_and_config_precedence():
 
 def test_config_hash_of_older_runs_stays_valid_when_languages_is_auto():
     cfg = BaselinesConfig()
-    without = {k: v for k, v in config_dict(cfg).items() if k != "languages"}
+    without = {k: v for k, v in config_dict(cfg).items() if k not in ("languages", "merge")}
     import hashlib
 
     blob = json.dumps(without, sort_keys=True).encode("utf-8")

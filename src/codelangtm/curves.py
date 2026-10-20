@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .baselines import _macro_f1, dataset_meta, load_evaluation_data
+from .baselines import _macro_f1, dataset_meta, load_view, merge_lines
 from .config import CurveConfig, TMConfig, TMSetting, config_dict, config_hash
 from .model import TMLanguageClassifier
 
@@ -93,11 +93,18 @@ def run_curves(
     settings: Sequence[str] | None = None,
     languages: str | Sequence[str] | None = None,
     progress: Callable[[str], None] | None = None,
+    merge: str | Sequence[str] | None = None,
 ) -> tuple[dict[str, list[CurveRun]], dict]:
-    """Curves for the named settings (default: all), every fold x seed."""
+    """Curves for the named settings (default: all), every fold x seed. `languages` and `merge`
+    default to the config's."""
     chosen = [cfg.setting(n) for n in settings] if settings else list(cfg.settings)
     data_dir = Path(cfg.data)
-    dataset, folds, languages = load_evaluation_data(data_dir, languages)
+    view = load_view(
+        data_dir,
+        languages if languages is not None else cfg.languages,
+        merge if merge is not None else cfg.merge,
+    )
+    dataset, folds = view.dataset, view.folds
     train = dataset["train"]
     texts = np.asarray([s.text for s in train], dtype=object)
     labels = np.asarray([s.language for s in train])
@@ -128,7 +135,7 @@ def run_curves(
         tmu_version = "unknown"
     meta = {
         **dataset_meta(data_dir, dataset, folds),
-        "languages": list(languages),
+        **view.meta(),
         "config_hash": config_hash(cfg),
         "seeds": list(cfg.seeds),
         "tmu": tmu_version,
@@ -217,6 +224,7 @@ def render_curves_md(data: dict) -> str:
         "",
         f"- Generated: {meta['generated']}; config hash `{meta['config_hash']}`",
         f"- Dataset: `{meta['data_dir']}` (train {meta['n_train']}); SHA-256 prefixes: {files}",
+        *merge_lines(meta),
         f"- Protocol: {meta['n_folds']}-fold repo-grouped CV on train only (the test set is not "
         f"used); binarizer refit per fold; seeds {', '.join(map(str, meta['seeds']))}; "
         f"up to {curves['max_epochs']} epochs, macro-F1 on the held-out fold after every epoch",

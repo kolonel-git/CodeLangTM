@@ -1,6 +1,6 @@
 # M2 classical baselines. Regenerates docs/results.md:
 #   uv run codelangtm baselines --config configs/baselines.yaml
-# CLI flags (--model, --features, --seed, --repeats, --data, --out, --languages) override values here.
+# CLI flags (--model, --features, --seed, --repeats, --data, --out, --languages, --merge) override values here.
 
 data: data/processed
 out: docs/results.md
@@ -11,6 +11,10 @@ models: [naive_bayes, decision_tree, logistic_regression, linear_svm, random_for
 # all (14) or a list such as [python, go]. A language without data is an error, and every
 # report records the list it used.
 languages: auto
+# Merged classes: none (default) or a preset. js_ts trains and scores JavaScript + TypeScript as
+# one class `js_ts` (analysis plan, section 2). Applies only when both languages are chosen;
+# the report says when it did not. Not set here: the default keeps v5 results reproducible.
+# merge: js_ts
 
 # FROZEN feature config for M3 (chosen from docs/ablations.md, CV only; see PROGRESS.md):
 #   class_balanced is at the top of the fold-noise band (LR 0.953-0.959, NB 0.960-0.963) and gives

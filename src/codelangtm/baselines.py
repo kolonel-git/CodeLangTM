@@ -31,7 +31,15 @@ from sklearn.tree import DecisionTreeClassifier
 
 from . import LANGUAGES
 from .audit import load_dataset
-from .data import languages_present, resolve_languages, restrict_dataset
+from .data import (
+    MergePlan,
+    apply_merge,
+    languages_present,
+    merge_plan,
+    merged_classes,
+    resolve_languages,
+    restrict_dataset,
+)
 from .features import Binarizer
 from .splits import SPLIT_SALT, check_no_leakage, stable_split
 
@@ -167,12 +175,38 @@ def load_folds(data_dir: str | Path) -> np.ndarray:
     return np.asarray(data["folds"])
 
 
-def load_evaluation_data(
-    data_dir: str | Path, languages: str | Sequence[str] | None = None
-) -> tuple[dict[str, list], np.ndarray, tuple[str, ...]]:
-    """(dataset, folds, languages) for an experiment. `languages` is a spec for
-    `resolve_languages` (None = every language in the data); the dataset and the CV folds are
-    restricted to the chosen languages, each snippet keeping its original fold."""
+@dataclass(frozen=True)
+class EvaluationView:
+    """The data an experiment sees: restricted to the chosen languages, with merged classes.
+
+    `languages` are the original language names chosen; `classes` are the labels the models
+    train on and the reports show (the same, except where a merge preset applies)."""
+
+    dataset: dict[str, list]
+    folds: np.ndarray
+    languages: tuple[str, ...]
+    classes: tuple[str, ...]
+    merge: MergePlan
+
+    def meta(self) -> dict:
+        """Report metadata. `languages` lists the evaluated classes; the merge keys appear only
+        when a merge was requested, so reports without a merge keep their old shape."""
+        out: dict = {"languages": list(self.classes)}
+        if self.merge.presets:
+            out["source_languages"] = list(self.languages)
+            out["merge"] = self.merge.as_meta()
+        return out
+
+
+def load_view(
+    data_dir: str | Path,
+    languages: str | Sequence[str] | None = None,
+    merge: str | Sequence[str] | None = None,
+) -> EvaluationView:
+    """Load a dataset for an experiment. `languages` is a spec for `resolve_languages` (None =
+    every language in the data) and `merge` a spec for `merge_plan` (None = no merge). The
+    dataset and the CV folds are restricted to the chosen languages, each snippet keeping its
+    original fold, and then merged languages are relabelled."""
     dataset = load_dataset(data_dir)
     folds = load_folds(data_dir)
     if len(folds) != len(dataset["train"]):
@@ -180,7 +214,21 @@ def load_evaluation_data(
     present = languages_present(s for part in dataset.values() for s in part)
     chosen = resolve_languages(languages, present)
     dataset, folds = restrict_dataset(dataset, folds, chosen)
-    return dataset, folds, chosen
+    plan = merge_plan(merge, chosen)
+    return EvaluationView(
+        apply_merge(dataset, plan), folds, chosen, merged_classes(chosen, plan), plan
+    )
+
+
+def load_evaluation_data(
+    data_dir: str | Path,
+    languages: str | Sequence[str] | None = None,
+    merge: str | Sequence[str] | None = None,
+) -> tuple[dict[str, list], np.ndarray, tuple[str, ...]]:
+    """(dataset, folds, classes) for an experiment; see `load_view` (which also returns the
+    original languages and the merge plan for the report metadata)."""
+    view = load_view(data_dir, languages, merge)
+    return view.dataset, view.folds, view.classes
 
 
 def check_languages_covered(dataset: dict[str, list], languages: Sequence[str]) -> None:
@@ -278,11 +326,14 @@ def run_baselines(
     languages: str | Sequence[str] | None = None,
     repeats: int = 10,
     binarizer: Binarizer | None = None,
+    merge: str | Sequence[str] | None = None,
 ) -> tuple[list[ModelResult], dict]:
     """`binarizer` (unfitted) sets all feature options; if omitted, `Binarizer(n_features)`.
-    `languages`: see `resolve_languages` (default: every language in the data)."""
+    `languages`: see `resolve_languages` (default: every language in the data); `merge`: see
+    `merge_plan` (default: none)."""
     data_dir = Path(data_dir)
-    dataset, folds, languages = load_evaluation_data(data_dir, languages)
+    view = load_view(data_dir, languages, merge)
+    dataset, folds, languages = view.dataset, view.folds, view.classes
     available = make_models(seed)
     unknown = set(models or ()) - set(available)
     if unknown:
@@ -294,7 +345,7 @@ def run_baselines(
     ]
     meta = {
         **dataset_meta(data_dir, dataset, folds),
-        "languages": list(languages),
+        **view.meta(),
         "n_features": binarizer.n_features,
         "features": {**binarizer.get_params(), "ngram_sizes": list(binarizer.ngram_sizes)},
         "seed": seed,
@@ -486,6 +537,21 @@ def _config_text(meta: dict) -> str:
     return f"{source} (settings hash `{cfg['hash']}`)"
 
 
+def merge_lines(meta: dict) -> list[str]:
+    """Setup bullet(s) naming the merged classes of a run; empty when nothing was requested."""
+    merge = meta.get("merge")
+    if not merge:
+        return []
+    applied: dict[str, list[str]] = {}
+    for language, label in merge["applied"].items():
+        applied.setdefault(label, []).append(language)
+    parts = [f"`{label}` = {' + '.join(members)}" for label, members in applied.items()]
+    line = f"- Merged classes (preset {', '.join(merge['presets'])}): " + (
+        "; ".join(parts) if parts else "none applied"
+    )
+    return [line] + [f"- Merge note: {note}" for note in merge["notes"]]
+
+
 def render_results_md(
     results: Sequence[ModelResult], meta: dict, languages: Sequence[str] | None = None
 ) -> str:
@@ -504,6 +570,7 @@ def render_results_md(
         f"- Dataset: `{meta['data_dir']}` (train {meta['n_train']}, test {meta['n_test']}, "
         f"wild {meta['n_wild']}); SHA-256 prefixes: {files}",
         f"- Languages ({len(languages)}): {', '.join(languages)}",
+        *merge_lines(meta),
         f"- Features: {_features_text(meta)}, refit inside every fold",
         f"- Split: {_split_text(meta.get('split', {}))}",
         f"- Protocol: {meta['n_folds']}-fold repo-grouped CV on train (model selection), then "

@@ -9,6 +9,7 @@ out: docs/ablations.md
 seed: 0
 models: [logistic_regression, naive_bayes]   # first model drives the per-language tables
 languages: auto   # auto | core | all | [list]; see configs/baselines.yaml
+# merge: js_ts    # none (default) | js_ts: JavaScript + TypeScript as one class
 
 base:                    # current baseline features (configs/baselines.yaml)
   n_features: 500

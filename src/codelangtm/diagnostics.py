@@ -21,7 +21,7 @@ from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 
 from .audit import _fence, permalink
-from .baselines import load_evaluation_data, make_models
+from .baselines import load_view, make_models
 from .data import Snippet
 from .features import Binarizer
 
@@ -259,9 +259,11 @@ def run_diagnostics(
     seed: int = 0,
     top_k: int = 15,
     languages: str | Sequence[str] | None = None,
+    merge: str | Sequence[str] | None = None,
 ) -> Diagnostics:
     data_dir = Path(data_dir)
-    dataset, folds, languages = load_evaluation_data(data_dir, languages)
+    view = load_view(data_dir, languages, merge)
+    dataset, folds = view.dataset, view.folds
     train = dataset["train"]
     probs, classes = oof_probabilities(train, folds, n_features, seed)
     joint, issues = confident_learning(train, probs, classes)
@@ -271,7 +273,7 @@ def run_diagnostics(
         "data_dir": str(data_dir),
         "n_features": n_features,
         "seed": seed,
-        "languages": list(languages),
+        **view.meta(),
     }
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)

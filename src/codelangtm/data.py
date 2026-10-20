@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from . import ALL_LANGUAGES, CORE_LANGUAGES, LANGUAGES
@@ -109,6 +109,97 @@ def restrict_dataset(dataset: dict[str, list], folds, languages: Sequence[str]):
     return restricted, folds[mask]
 
 
+# ------------------------------------------------------------------ merged classes
+
+# Presets that treat several languages as one class. The label of a merged class is the preset's
+# own class name (never a language name). Merged by name at load time only: the files, the repo
+# split and the CV folds are untouched, so a merged and an unmerged run use the same folds.
+MERGE_PRESETS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "js_ts": ("js_ts", ("javascript", "typescript")),
+}
+MERGE_SPEC_HELP = "none, or a preset: js_ts (JavaScript and TypeScript as one class `js_ts`)"
+
+
+@dataclass(frozen=True)
+class MergePlan:
+    """Which languages become which class for one experiment."""
+
+    presets: tuple[str, ...] = ()  # the requested presets, in order
+    mapping: tuple[tuple[str, str], ...] = ()  # (language, class) for the languages merged
+    notes: tuple[str, ...] = ()  # presets that could not be applied, and why
+
+    @property
+    def applied(self) -> dict[str, str]:
+        return dict(self.mapping)
+
+    def as_meta(self) -> dict:
+        return {"presets": list(self.presets), "applied": self.applied, "notes": list(self.notes)}
+
+
+def parse_merge_spec(spec: str | Sequence[str] | None) -> tuple[str, ...]:
+    """YAML/command-line value -> tuple of preset names; `none`, empty or None -> ()."""
+    if spec is None:
+        return ()
+    if isinstance(spec, str):
+        names = [part.strip().lower() for part in spec.split(",") if part.strip()]
+    elif isinstance(spec, list | tuple) and all(isinstance(part, str) for part in spec):
+        names = [part.strip().lower() for part in spec]
+    else:
+        raise ValueError(f"merge: expected preset names (text or a list), got {spec!r}")
+    if "none" in names:
+        if len(names) > 1:
+            raise ValueError("merge: `none` cannot be combined with other presets")
+        return ()
+    unknown = sorted(set(names) - set(MERGE_PRESETS))
+    if unknown:
+        raise ValueError(f"unknown merge preset(s) {unknown}; use {MERGE_SPEC_HELP}")
+    return tuple(dict.fromkeys(names))
+
+
+def merge_plan(spec: str | Sequence[str] | None, languages: Sequence[str]) -> MergePlan:
+    """The merges that apply to `languages` (original language names, already chosen).
+
+    A preset applies only when at least two of its languages are chosen. With one or none
+    (for example `--languages core` has JavaScript but no TypeScript) it is not applied, and
+    the plan says so: a merge must never happen, or fail to happen, without being recorded."""
+    presets = parse_merge_spec(spec)
+    chosen = set(languages)
+    mapping: dict[str, str] = {}
+    notes = []
+    for name in presets:
+        label, members = MERGE_PRESETS[name]
+        present = [m for m in members if m in chosen]
+        if len(present) < 2:
+            notes.append(
+                f"{name}: not applied ({', '.join(present) or 'none'} of "
+                f"{', '.join(members)} chosen; at least two are needed)"
+            )
+            continue
+        clash = [m for m in present if m in mapping]
+        if clash:
+            raise ValueError(f"merge: {clash} belong to more than one preset")
+        mapping.update(dict.fromkeys(present, label))
+    return MergePlan(presets, tuple(mapping.items()), tuple(notes))
+
+
+def merged_classes(languages: Sequence[str], plan: MergePlan) -> tuple[str, ...]:
+    """The class names after merging, in order of first appearance of a member."""
+    mapping = plan.applied
+    return tuple(dict.fromkeys(mapping.get(lang, lang) for lang in languages))
+
+
+def apply_merge(dataset: dict[str, list], plan: MergePlan) -> dict[str, list]:
+    """Relabel the merged languages in every split (a new dataset; the input is untouched)."""
+    mapping = plan.applied
+    if not mapping:
+        return dataset
+    return {
+        split: [replace(s, language=mapping[s.language]) if s.language in mapping else s
+                for s in part]
+        for split, part in dataset.items()
+    }  # fmt: skip
+
+
 def save_snippets(snippets: Iterable[Snippet], path: str | Path) -> int:
     n = 0
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -132,8 +223,14 @@ def load_snippets(path: str | Path, languages: tuple[str, ...] | None = None) ->
 
 __all__ = [
     "LANGUAGES",
+    "MERGE_PRESETS",
     "SOURCES",
+    "MergePlan",
     "Snippet",
+    "apply_merge",
+    "merge_plan",
+    "merged_classes",
+    "parse_merge_spec",
     "languages_present",
     "load_snippets",
     "save_snippets",

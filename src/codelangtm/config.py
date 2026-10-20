@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from .data import parse_language_spec
+from .data import parse_language_spec, parse_merge_spec
 from .features import SELECTIONS, Binarizer
 
 
@@ -49,6 +49,7 @@ class BaselinesConfig:
     repeats: int = 10
     features: FeatureConfig = field(default_factory=FeatureConfig)
     languages: str | tuple[str, ...] = "auto"  # auto | core | all | explicit names
+    merge: str | tuple[str, ...] = "none"  # none | preset names (js_ts)
 
     def with_overrides(self, **overrides: Any) -> BaselinesConfig:
         """Apply CLI overrides; `None` means "not given". `n_features` targets the feature block."""
@@ -60,6 +61,8 @@ class BaselinesConfig:
             given["models"] = tuple(given["models"])
         if "languages" in given:
             given["languages"] = _language_spec("config.languages", given["languages"])
+        if "merge" in given:
+            given["merge"] = _merge_spec("config.merge", given["merge"])
         return replace(cfg, **given)
 
 
@@ -79,6 +82,15 @@ def _language_spec(where: str, value: Any) -> str | tuple[str, ...]:
     except ValueError as e:
         raise ValueError(f"{where}: {e}") from e
     raise ValueError(f"{where}: expected auto, core, all or a list of language names")
+
+
+def _merge_spec(where: str, value: Any) -> str | tuple[str, ...]:
+    """`none`, or one or more merge preset names (comma-separated string or list)."""
+    try:
+        names = parse_merge_spec(value)
+    except ValueError as e:
+        raise ValueError(f"{where}: {e}") from e
+    return names or "none"
 
 
 def _int(section: str, key: str, value: Any, minimum: int) -> int:
@@ -138,6 +150,8 @@ def parse_baselines(raw: dict | None) -> BaselinesConfig:
         cfg = replace(cfg, repeats=_int("config", "repeats", raw["repeats"], 0))
     if "languages" in raw:
         cfg = replace(cfg, languages=_language_spec("config.languages", raw["languages"]))
+    if "merge" in raw:
+        cfg = replace(cfg, merge=_merge_spec("config.merge", raw["merge"]))
     return cfg
 
 
@@ -159,6 +173,7 @@ class AblationConfig:
     base: FeatureConfig = field(default_factory=FeatureConfig)
     studies: tuple[Study, ...] = ()
     languages: str | tuple[str, ...] = "auto"
+    merge: str | tuple[str, ...] = "none"
 
     def feature_settings(self) -> list[FeatureConfig]:
         """Unique settings across all studies (base first), in first-seen order."""
@@ -205,6 +220,8 @@ def parse_ablations(raw: dict | None) -> AblationConfig:
         cfg = replace(cfg, models=tuple(models))
     if "languages" in raw:
         cfg = replace(cfg, languages=_language_spec("config.languages", raw["languages"]))
+    if "merge" in raw:
+        cfg = replace(cfg, merge=_merge_spec("config.merge", raw["merge"]))
     studies = raw.get("studies")
     if not isinstance(studies, dict) or not studies:
         raise ValueError("config.studies: expected a mapping of study name -> varied options")
@@ -246,6 +263,17 @@ class TMConfig:
     features: FeatureConfig = field(default_factory=FeatureConfig)
     curves: CurveConfig = field(default_factory=CurveConfig)
     settings: tuple[TMSetting, ...] = ()
+    languages: str | tuple[str, ...] = "auto"  # auto | core | all | explicit names
+    merge: str | tuple[str, ...] = "none"  # none | preset names (js_ts)
+
+    def with_overrides(self, **overrides: Any) -> TMConfig:
+        """Apply CLI overrides of `languages` / `merge`; `None` means "not given"."""
+        given = {k: v for k, v in overrides.items() if v is not None}
+        if "languages" in given:
+            given["languages"] = _language_spec("config.languages", given["languages"])
+        if "merge" in given:
+            given["merge"] = _merge_spec("config.merge", given["merge"])
+        return replace(self, **given)
 
     def setting(self, name: str) -> TMSetting:
         for s in self.settings:
@@ -302,6 +330,10 @@ def parse_tm(raw: dict | None) -> TMConfig:
         cfg = replace(cfg, seeds=seeds)
     if "repeats" in raw:
         cfg = replace(cfg, repeats=_int("config", "repeats", raw["repeats"], 0))
+    if "languages" in raw:
+        cfg = replace(cfg, languages=_language_spec("config.languages", raw["languages"]))
+    if "merge" in raw:
+        cfg = replace(cfg, merge=_merge_spec("config.merge", raw["merge"]))
     if "baselines" in raw:
         names = raw["baselines"]
         if not isinstance(names, list) or not all(isinstance(m, str) for m in names):
@@ -376,7 +408,9 @@ def config_dict(cfg: Any) -> dict:
 def config_hash(cfg: Any) -> str:
     """Short SHA-256 of the effective settings; identical settings give identical hashes."""
     settings = config_dict(cfg)
-    if settings.get("languages") == "auto":  # the default: hashes of older runs stay valid
+    if settings.get("languages") == "auto":  # the defaults: hashes of older runs stay valid
         settings.pop("languages")
+    if settings.get("merge") == "none":
+        settings.pop("merge")
     blob = json.dumps(settings, sort_keys=True).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()[:12]
