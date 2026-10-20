@@ -18,7 +18,7 @@ from sklearn.base import clone
 from sklearn.metrics import f1_score
 
 from . import LANGUAGES
-from .baselines import _macro_f1, dataset_meta, load_evaluation_data, make_models
+from .baselines import _macro_f1, dataset_meta, load_view, make_models, merge_lines
 from .config import AblationConfig, FeatureConfig, Study, config_dict, config_hash
 
 
@@ -116,6 +116,7 @@ def run_ablations(
     cfg: AblationConfig,
     languages: str | Sequence[str] | None = None,
     progress: object = None,
+    merge: str | Sequence[str] | None = None,
 ) -> tuple[Runs, dict]:
     """Evaluate every unique feature setting once (base always included).
 
@@ -127,9 +128,12 @@ def run_ablations(
         raise ValueError(f"unknown model(s): {sorted(unknown)}")
 
     data_dir = Path(cfg.data)
-    dataset, folds, languages = load_evaluation_data(
-        data_dir, languages if languages is not None else cfg.languages
+    view = load_view(
+        data_dir,
+        languages if languages is not None else cfg.languages,
+        merge if merge is not None else cfg.merge,
     )
+    dataset, folds, languages = view.dataset, view.folds, view.classes
     train = dataset["train"]
     texts = [s.text for s in train]
     labels = [s.language for s in train]
@@ -147,7 +151,7 @@ def run_ablations(
 
     meta = {
         **dataset_meta(data_dir, dataset, folds),
-        "languages": list(languages),
+        **view.meta(),
         "seed": cfg.seed,
         "config_hash": config_hash(cfg),
         "studies": [s.name for s in cfg.studies],
@@ -253,6 +257,7 @@ def render_ablations_md(
         f"- Config: {f'`{config_path}`' if config_path else 'n/a'} "
         f"(settings hash `{meta['config_hash']}`)",
         f"- Dataset: `{meta['data_dir']}` (train {meta['n_train']}); SHA-256 prefixes: {files}",
+        *merge_lines(meta),
         f"- Base features: {describe(cfg.base)}",
         f"- Protocol: {meta['n_folds']}-fold repo-grouped CV on train only; binarizer refit per "
         "fold. The test set is not used: ablations select the feature design.",

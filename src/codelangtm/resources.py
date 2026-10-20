@@ -106,10 +106,10 @@ def _make_pipeline(spec: str, config: Path):
 
 
 def job_fit(spec: str, config: Path) -> dict:
-    from .audit import load_dataset
+    from .baselines import load_view
 
     cfg, pipe = _make_pipeline(spec, config)
-    train = load_dataset(cfg.data)["train"]
+    train = load_view(cfg.data, cfg.languages, cfg.merge).dataset["train"]
     texts, labels = [s.text for s in train], [s.language for s in train]
     if spec.startswith("tm:"):  # import TMU before the "before" reading, like the baselines' libs
         from .model import _tm_classifier_class
@@ -227,8 +227,7 @@ def measure_all(
     passes: int = 3,
     progress: Callable[[str], None] | None = None,
 ) -> tuple[list[dict], dict]:
-    from .audit import load_dataset
-    from .baselines import dataset_meta, load_folds
+    from .baselines import dataset_meta, load_view
     from .config import config_hash, load_tm_config
 
     say = progress or (lambda _m: None)
@@ -243,7 +242,7 @@ def measure_all(
             model_file = spec["model_file"]
             if model_file is None:  # baselines: fit here once and pickle for the predict job
                 _, pipe = _make_pipeline(spec["spec"], config)
-                train = load_dataset(cfg.data)["train"]
+                train = load_view(cfg.data, cfg.languages, cfg.merge).dataset["train"]
                 pipe.fit([s.text for s in train], [s.language for s in train])
                 model_file = Path(tmp) / f"{spec['name']}.pkl"
                 model_file.write_bytes(pickle.dumps(pipe))
@@ -261,9 +260,10 @@ def measure_all(
                 "fit": _median_runs(fits), "predict": _median_runs(preds),
                 "fit_runs": fits, "predict_runs": preds,
             })  # fmt: skip
-    dataset = load_dataset(cfg.data)
+    view = load_view(cfg.data, cfg.languages, cfg.merge)
     meta = {
-        **dataset_meta(Path(cfg.data), dataset, load_folds(cfg.data)),
+        **dataset_meta(Path(cfg.data), view.dataset, view.folds),
+        **view.meta(),
         "config_hash": config_hash(cfg),
         "repeats": repeats,
         "passes": passes,

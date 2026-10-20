@@ -23,7 +23,7 @@ from sklearn.base import clone
 from sklearn.metrics import f1_score
 
 from . import ALL_LANGUAGES
-from .baselines import load_evaluation_data, make_models
+from .baselines import load_view, make_models
 from .config import TMConfig, config_hash
 from .labels import embedded_share
 from .rules import _code, extract_rules, short_rule, show_term
@@ -56,7 +56,8 @@ def run_out_of_fold(
 
     say = progress or (lambda _: None)
     data_dir = Path(cfg.data)
-    dataset, folds, _ = load_evaluation_data(data_dir)
+    view = load_view(data_dir, cfg.languages, cfg.merge)
+    dataset, folds = view.dataset, view.folds
     train = dataset["train"]
     texts = [s.text for s in train]
     y = np.asarray([s.language for s in train])
@@ -444,7 +445,11 @@ def signature_document_frequency(signatures: dict, vocabulary: Sequence[str],
 def analyse(oof: dict, tm_results: dict | None = None, overlap: dict | None = None,
             signature_df: dict | None = None, texts: dict[int, str] | None = None,
             languages: Sequence[str] | None = None) -> dict:  # fmt: skip
-    langs = [g for g in (languages or ALL_LANGUAGES) if g in oof["classes"]]
+    classes = list(oof["classes"])
+    known = [g for g in (languages or ALL_LANGUAGES) if g in classes]
+    # classes that are not language names (merged classes such as js_ts) follow, so they are
+    # never dropped from the report
+    langs = known + [c for c in classes if c not in ALL_LANGUAGES and c not in known]
     flows = inflow(oof)
     chance = 1 / (len(oof["classes"]) - 1)
     planned = None

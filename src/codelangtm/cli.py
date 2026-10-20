@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 from . import ALL_LANGUAGES, __version__
-from .data import LANGUAGE_SPEC_HELP
+from .data import LANGUAGE_SPEC_HELP, MERGE_SPEC_HELP
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -226,11 +226,16 @@ def _build_parser() -> argparse.ArgumentParser:
     diag.add_argument("--features", type=int, default=500)
     diag.add_argument("--top", type=int, default=15, help="features shown per language")
     diag.add_argument("--seed", type=int, default=0)
-    for command in (base, abl, diag):
+    for command in (base, abl, diag, curve, tmr, train, er):
         command.add_argument(
             "--languages",
             help=f"which languages to evaluate: {LANGUAGE_SPEC_HELP}, e.g. python,go "
             "(default: the config's `languages`, else auto). Every report records the list",
+        )
+        command.add_argument(
+            "--merge",
+            help=f"treat several languages as one class: {MERGE_SPEC_HELP} "
+            "(default: the config's `merge`, else none). Every report records the merge",
         )
     return parser
 
@@ -242,8 +247,9 @@ def _diagnose(args: argparse.Namespace) -> int:
     try:
         spec = parse_language_spec(args.languages) if args.languages else None
         result = run_diagnostics(
-            args.data, args.out, args.features, args.seed, args.top, languages=spec
-        )
+            args.data, args.out, args.features, args.seed, args.top, languages=spec,
+            merge=args.merge,
+        )  # fmt: skip
     except (FileNotFoundError, ValueError) as e:
         print(f"diagnose failed: {e}", file=sys.stderr)
         return 1
@@ -282,7 +288,9 @@ def _tm_results(args: argparse.Namespace) -> int:
     from .tm_results import render_tm_results_md, run_tm_results, summary_table, tm_results_json
 
     try:
-        cfg = load_tm_config(args.config)
+        cfg = load_tm_config(args.config).with_overrides(
+            languages=args.languages, merge=args.merge
+        )
         models_dir = None if args.no_save_models else args.models_dir
         baselines, entries, meta = run_tm_results(
             cfg, args.setting, models_dir=models_dir, progress=lambda m: print(m, flush=True)
@@ -330,7 +338,9 @@ def _tm_train(args: argparse.Namespace) -> int:
     from .tm_results import train_final
 
     try:
-        cfg = load_tm_config(args.config)
+        cfg = load_tm_config(args.config).with_overrides(
+            languages=args.languages, merge=args.merge
+        )
         setting = args.setting or cfg.settings[0].name
         out = args.out or Path("models") / f"{setting}_seed{args.seed}.json"
         summary = train_final(cfg, setting, args.seed, out)
@@ -377,14 +387,16 @@ def _seed_models(models_dir: Path, meta: dict) -> dict:
 
 
 def _clauses(args: argparse.Namespace) -> int:
-    from .audit import load_dataset
-    from .baselines import sidecar_path
+    from .baselines import load_view, sidecar_path
     from .model import load_model
     from .rules import clauses_json_text, inspect_model, render_clauses_md, summary_table
 
     try:
         model = load_model(args.model)
-        train = load_dataset(args.data)["train"]
+        # the languages and merged classes the model was trained on (older models: all, none)
+        train = load_view(
+            args.data, model.meta.get("languages"), model.meta.get("merge")
+        ).dataset["train"]
         manifest = args.data / "dataset.json"
         expected = model.meta.get("dataset_files")
         if expected and manifest.exists():
@@ -412,8 +424,7 @@ def _clauses(args: argparse.Namespace) -> int:
 
 
 def _errors(args: argparse.Namespace) -> int:
-    from .audit import load_dataset
-    from .baselines import sidecar_path
+    from .baselines import load_view, sidecar_path
     from .config import load_tm_config
     from .errors import (
         analyse,
@@ -427,9 +438,11 @@ def _errors(args: argparse.Namespace) -> int:
     from .rules import extract_rules, rows_json_text, signature_features
 
     try:
-        cfg = load_tm_config(args.config)
+        cfg = load_tm_config(args.config).with_overrides(
+            languages=args.languages, merge=args.merge
+        )
         cfg.setting(args.setting)  # fail early on an unknown setting
-        train = load_dataset(cfg.data)["train"]
+        train = load_view(cfg.data, cfg.languages, cfg.merge).dataset["train"]
         tm_results = overlap = signature_df = None
         if args.tm_results.exists():
             tm_results = load_sidecar(args.tm_results, "codelangtm.tm-results/")
@@ -495,7 +508,9 @@ def _tm_curve(args: argparse.Namespace) -> int:
     from .curves import curves_json, render_curves_md, run_curves, summary_table
 
     try:
-        cfg = load_tm_config(args.config)
+        cfg = load_tm_config(args.config).with_overrides(
+            languages=args.languages, merge=args.merge
+        )
         runs, meta = run_curves(cfg, args.setting, progress=lambda m: print(m, flush=True))
     except (FileNotFoundError, ValueError, ImportError) as e:
         print(f"tm-curve failed: {e}", file=sys.stderr)
@@ -526,7 +541,7 @@ def _ablate(args: argparse.Namespace) -> int:
     try:
         cfg = ab.select_studies(load_ablation_config(args.config), args.study)
         spec = parse_language_spec(args.languages) if args.languages else None
-        runs, meta = ab.run_ablations(cfg, languages=spec, progress=progress)
+        runs, meta = ab.run_ablations(cfg, languages=spec, progress=progress, merge=args.merge)
     except (FileNotFoundError, ValueError) as e:
         print(f"ablate failed: {e}", file=sys.stderr)
         return 1
@@ -557,14 +572,14 @@ def _baselines(args: argparse.Namespace) -> int:
     overrides = {
         "data": args.data, "models": args.model, "n_features": args.features,
         "seed": args.seed, "repeats": args.repeats, "out": args.out,
-        "languages": args.languages,
+        "languages": args.languages, "merge": args.merge,
     }  # fmt: skip
     try:
         cfg = load_baselines_config(args.config) if args.config else BaselinesConfig()
         cfg = cfg.with_overrides(**overrides)
         results, meta = run_baselines(
             cfg.data, cfg.models, seed=cfg.seed, repeats=cfg.repeats,
-            binarizer=cfg.features.binarizer(), languages=cfg.languages,
+            binarizer=cfg.features.binarizer(), languages=cfg.languages, merge=cfg.merge,
         )  # fmt: skip
     except (FileNotFoundError, ValueError) as e:
         print(f"baselines failed: {e}", file=sys.stderr)

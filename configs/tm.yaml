@@ -9,6 +9,8 @@ curves_out: docs/tm-curves.md    # B4: training curves and the epoch recommendat
 seeds: [1, 2, 3, 4, 5]
 repeats: 10                      # extra repo-level splits for the repeated test score
 baselines: [naive_bayes, logistic_regression]   # re-run beside the TM on identical splits
+# languages: auto   # auto | core | all | [list]; also --languages on every TM command
+# merge: js_ts      # none (default) | js_ts: JavaScript + TypeScript as one class (--merge)
 
 # Must equal the frozen features in configs/baselines.yaml (a test checks this).
 features:
