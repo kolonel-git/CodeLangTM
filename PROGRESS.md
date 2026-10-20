@@ -2,7 +2,7 @@
 
 Living tracker. Update after every work session. Planning detail lives in [docs/roadmap.md](docs/roadmap.md); problems and how they were solved live in [docs/issues-and-fixes.md](docs/issues-and-fixes.md).
 
-**Last updated:** 2026-10-01
+**Last updated:** 2026-10-20
 **Current milestone:** M3 — TM training, done (branch A merged, PR #6; branch B `feat/tm-training`: B1-B7, PR #7 merged; a Linux-only CI failure after the merge fixed in PR #8). Next: Stage B data (plan agreed 2026-09-29, see the done log), then M4
 **Overall:** M0 complete, M1 Stage A complete (dataset v5: 869 snippets, stable split, [dataset card](docs/dataset-card.md)), M2 done (PR #5 merged): feature config frozen (label-aware selection, [ablations](docs/ablations.md)), binarization 5-6× faster; bar to beat = Naive Bayes CV macro-F1 0.963, repeated test 0.968 ([results](docs/results.md)); M3 done (PR #7 merged): branch A merged (results [report](docs/report.md) with figures), branch B: the 400-clause TM matches Naive Bayes and logistic regression (repeated test 0.966 vs 0.968, p = 0.82; test 0.958 vs 0.959) with a 164 KB model, every clause is readable as a rule ([clauses](docs/clauses.md)) and its errors are studied out of fold ([errors](docs/errors.md))
 
@@ -49,15 +49,22 @@ M0-M3 are finished; each item is recorded in the done log below and ticked in [d
   - [x] B-S4 check the slice: language handling (option C), diagnose, shortcut probe, baselines on 14 languages and on the original 8 (issues-and-fixes M12, D9)
   - [x] B-S5 full collection: **v6, 8,993 snippets** (target 10,000+ missed by 10%), [dataset card v6](docs/dataset-card-v6.md), ledger; baselines and diagnose on v6; ablations on the slice (issues-and-fixes D10)
   - [x] Independent review of the study (2026-09-30): flags recorded in the [roadmap](docs/roadmap.md) (Review flags)
-  - [ ] Freeze the [v6 analysis plan](docs/analysis-plan-v6.md) (draft written 2026-10-01; open points marked [decide])
-  - [ ] `collect from-manifest` (exact refetch; v6 is not reproducible from search)
-  - [ ] Ablations on v6 (CV only), then baselines and the TM protocol on v6 under the plan (14 languages and the original 8)
+  - [x] Freeze the [v6 analysis plan](docs/analysis-plan-v6.md) (frozen 2026-10-20; 13 classes, margin one F1 point)
+  - [ ] Finish to **v1.0.0**: ten steps in the roadmap (*Definition of done for v1.0*): class-merge option, `collect from-manifest`, feature check and baselines on v6, TM at 400 and 800 clauses with the equivalence test, clause sweep, interpretability and short-snippet measures, C runtime + `predict` + benchmark, simple web demo, README/report/tag
+  - [ ] After v1.0: M8 data efficiency (learning curve; pre-registered in the plan, section 10)
 - Not in Stage B (decided 2026-09-29): wild test set (after M4), short-snippet evaluation (Future), The Stack / CodeSearchNet loaders (only if the GitHub collector cannot reach the target)
 
 ## Blockers / open questions
 - None.
 
 ## Done log
+
+### 2026-10-20 — Project goal, definition of v1.0 and a frozen analysis plan (`docs/v1-scope`, docs only)
+- Choices (maintainer): finish the current question first and leave the repo as a completed project (**v1.0.0**), then study data efficiency (M8). Lean v1.0 plus a simple web demo and the short-snippet check; Guesslang, the wild set, Optuna, the HTML report, notebook and blog come after v1.0.
+- **New main question for M8:** how little training data does the TM need to train quickly, classify accurately and form stable clauses and signatures, compared with Naive Bayes and logistic regression? Method: learning curve over whole repositories per language; "enough data" = within 0.010 macro-F1 of the model's own full-data score; 13 classes and the original 8. Recorded in the plan (section 10) before any such result exists. Earlier numbers (logistic regression CV 0.953 at ~87 snippets per language on v5, 0.970 at ~166 on the slice, 0.978 at ~514 on v6 for 8 languages) are only hints: three different datasets.
+- **Analysis plan frozen (2026-10-20), all open points decided:** JavaScript and TypeScript merged into one class (13 classes; 14-class score still reported; decided after seeing the v6 baseline results on this pair and logged in the amendment log), targets 96% for the original 8 and equivalence to the best baseline for the 13 classes, TM at 400 and 800 clauses, equivalence margin +/- 0.010, short snippets and interpretability measures in v1.0.
+- Docs updated: roadmap (Definition of done for v1.0, scope notes in M4-M7, new M8, review flags ticked or marked *after v1.0*), analysis plan, README status, concepts, CHANGELOG. No code changed; tests unchanged.
+- Next: class-merge option (code), then `collect from-manifest`.
 
 ### 2026-09-30 — Stage B, B-S3: the ~3,000-snippet slice collected, built and audited (`feat/stage-b-data`, PR #10 merged)
 - Choices (start of step): 45 repos per language, at most 5 snippets per repo, three collection runs by the user (core languages, common stretch languages, SQL and Ruby with `--min-stars 10`); slice in `data/slice/` (hard examples in `data/slice-hard/`, build in `data/processed-slice/`, all gitignored) so `data/processed` stays v5.
